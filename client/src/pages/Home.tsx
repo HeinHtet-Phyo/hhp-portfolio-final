@@ -1,25 +1,55 @@
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { Streamdown } from 'streamdown';
+// Dark Space Theme — Main Portfolio Page
+// Assembles all sections with global effects
+import PageLoader from "@/components/PageLoader";
+import CustomCursor from "@/components/CustomCursor";
+import ParticleBackground from "@/components/ParticleBackground";
+import ShootingStars from "@/components/ShootingStars";
+import ScrollProgress from "@/components/ScrollProgress";
+import Header from "@/components/Header";
+import HeroSection from "@/components/sections/HeroSection";
+import AboutSection from "@/components/sections/AboutSection";
+import ExperienceSection from "@/components/sections/ExperienceSection";
+import EducationSection from "@/components/sections/EducationSection";
+import ProjectsSection from "@/components/sections/ProjectsSection";
+import SkillsSection from "@/components/sections/SkillsSection";
+import ContactSection from "@/components/sections/ContactSection";
 
-/**
- * All content in this page are only for example, replace with your own feature implementation
- * When building pages, remember your instructions in Frontend Best Practices, Design Guide and Common Pitfalls
- */
-export default function Home() {
-  // If theme is switchable in App.tsx, we can implement theme toggling like this:
-  // const { theme, toggleTheme } = useTheme();
-
+function TelemetryDivider({ label }: { label: string }) {
   return (
-    <div className="min-h-screen flex flex-col">
-      <main>
-        {/* Example: lucide-react for icons */}
-        <Loader2 className="animate-spin" />
-        Example Page
-        {/* Example: Streamdown for markdown rendering */}
-        <Streamdown>Any **markdown** content</Streamdown>
-        <Button variant="default">Example Button</Button>
-      </main>
+    <div className="telemetry-divider">
+      <span>{label}</span>
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <>
+      {/* Global Effects */}
+      <PageLoader />
+      <CustomCursor />
+      <ParticleBackground />
+      <ShootingStars />
+      <ScrollProgress />
+
+      {/* Layout */}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <Header />
+        <main>
+          <HeroSection />
+          <AboutSection />
+          <TelemetryDivider label="SYS.EXP — WORK RECORD" />
+          <ExperienceSection />
+          <TelemetryDivider label="SYS.EDU — ACADEMIC LOG" />
+          <EducationSection />
+          <TelemetryDivider label="SYS.PRJ — BUILD HISTORY" />
+          <ProjectsSection />
+          <TelemetryDivider label="SYS.SKL — TECHNICAL STACK" />
+          <SkillsSection />
+          <TelemetryDivider label="SYS.CTX — OPEN CHANNEL" />
+          <ContactSection />
+        </main>
+      </div>
+    </>
   );
 }
