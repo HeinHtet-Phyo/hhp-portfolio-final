@@ -138,29 +138,29 @@ function BrainModel({ selected }: { selected: Project | null }) {
         // Slow shimmer along surface
         float shimmer = 0.03 * sin(uTime * 0.5 + vWorldPos.y * 4.0 + vWorldPos.x * 2.0);
 
-        // Colour palette — vivid cyan like reference, smooth gradients
-        vec3 tealDeep  = vec3(0.00, 0.20, 0.32);  // shadow grooves
-        vec3 tealMid   = vec3(0.00, 0.72, 0.92);  // main body colour
-        vec3 tealBright= vec3(0.45, 0.95, 1.00);  // lit ridge tops
-        vec3 tealWhite = vec3(0.80, 1.00, 1.00);  // soft specular peak
+        // Colour palette — deep glassy cyan, not too bright
+        vec3 tealDeep  = vec3(0.00, 0.10, 0.18);  // very dark shadow in grooves
+        vec3 tealMid   = vec3(0.00, 0.52, 0.72);  // main body — muted, not vivid
+        vec3 tealBright= vec3(0.20, 0.82, 0.95);  // lit ridge tops
+        vec3 tealWhite = vec3(0.65, 0.95, 1.00);  // soft specular peak (not pure white)
 
-        // Smooth diffuse blend — shadow to mid to bright
-        float lit = clamp(diff1 * 1.2 + diff2 + diff3 + shimmer, 0.0, 1.5);
-        vec3 base = mix(tealDeep, tealMid, smoothstep(0.0, 0.8, lit));
-        base = mix(base, tealBright, smoothstep(0.5, 1.3, lit));
+        // Smooth diffuse blend — deeper shadows, controlled brightness
+        float lit = clamp(diff1 * 1.0 + diff2 * 0.8 + diff3 + shimmer, 0.0, 1.2);
+        vec3 base = mix(tealDeep, tealMid, smoothstep(0.0, 0.9, lit));
+        base = mix(base, tealBright, smoothstep(0.6, 1.2, lit));
 
-        // Soft specular — smooth white-teal transition on ridge tops
-        base = mix(base, tealWhite, smoothstep(0.0, 1.0, spec));
+        // Very soft specular — barely-there highlight on ridge tops
+        base = mix(base, tealWhite, smoothstep(0.3, 0.9, spec) * 0.6);
 
-        // Glowing cyan rim — strong but smooth (key look from reference)
-        vec3 rim = tealBright * fresnel * 2.2;
+        // Glassy rim — moderate, not overpowering
+        vec3 rim = tealBright * fresnel * 1.4;
 
-        // Emissive inner glow — brain glows softly from within
-        float pulse = 0.06 * sin(uTime * 0.9);
-        vec3 emissive = tealMid * (0.20 + pulse);
+        // Minimal emissive — just enough inner glow to look alive
+        float pulse = 0.04 * sin(uTime * 0.9);
+        vec3 emissive = tealMid * (0.10 + pulse);
 
-        // Translucency: edges glow brighter (glass effect)
-        vec3 glassEdge = tealBright * pow(1.0 - NdotV, 1.5) * 0.4;
+        // Subtle glass edge translucency
+        vec3 glassEdge = tealBright * pow(1.0 - NdotV, 2.0) * 0.25;
 
         vec3 color = base + rim + emissive + glassEdge;
         gl_FragColor = vec4(color, uOpacity);
