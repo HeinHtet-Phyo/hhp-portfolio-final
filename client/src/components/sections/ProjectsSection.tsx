@@ -23,6 +23,14 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Force full page reload on HMR to prevent R3F reconciler crash
+// (HMR partial patching of Three.js objects causes removeChild null errors)
+if (import.meta.hot) {
+  import.meta.hot.accept(() => {
+    import.meta.hot!.invalidate();
+  });
+}
+
 // ─── Projects ─────────────────────────────────────────────────────────────────
 const PROJECTS = [
   {
@@ -228,19 +236,85 @@ function BrainModel({
   const gltf = useLoader(GLTFLoader, "/manus-storage/brain_dc0a5366.glb");
   const notified = useRef(false);
 
-  // Dark grey material — matches Spline reference
-  const mat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#1c1c20",
-        emissive: "#000000",
-        emissiveIntensity: 0.0,
-        roughness: 0.80,
-        metalness: 0.04,
-        side: THREE.FrontSide,
-      }),
-    []
-  );
+  // Iridescent tech-gradient ShaderMaterial: cyan -> blue -> purple
+  // Uses vertex normals + world-space Y position for gradient mapping
+  const mat = useMemo(() => {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTime:       { value: 0 },
+        uOpacity:    { value: 1.0 },
+        uLightDir:   { value: new THREE.Vector3(5, 6, 4).normalize() },
+        uLightDir2:  { value: new THREE.Vector3(-4, 4, 2).normalize() },
+      },
+      vertexShader: /* glsl */`
+        varying vec3 vNormal;
+        varying vec3 vWorldPos;
+        varying vec3 vViewDir;
+        void main() {
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPos = worldPos.xyz;
+          vNormal   = normalize(normalMatrix * normal);
+          vViewDir  = normalize(cameraPosition - worldPos.xyz);
+          gl_Position = projectionMatrix * viewMatrix * worldPos;
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform float uTime;
+        uniform float uOpacity;
+        uniform vec3  uLightDir;
+        uniform vec3  uLightDir2;
+        varying vec3  vNormal;
+        varying vec3  vWorldPos;
+        varying vec3  vViewDir;
+
+        // Tech gradient palette: deep navy -> cyan -> blue -> violet
+        vec3 techGradient(float t) {
+          // t in [0,1]
+          vec3 c0 = vec3(0.02, 0.04, 0.12); // deep navy (shadow)
+          vec3 c1 = vec3(0.00, 0.55, 0.85); // bright cyan
+          vec3 c2 = vec3(0.20, 0.20, 0.90); // electric blue
+          vec3 c3 = vec3(0.55, 0.10, 0.90); // violet-purple
+          vec3 c4 = vec3(0.80, 0.10, 0.60); // hot pink accent
+          if (t < 0.25) return mix(c0, c1, t / 0.25);
+          if (t < 0.50) return mix(c1, c2, (t - 0.25) / 0.25);
+          if (t < 0.75) return mix(c2, c3, (t - 0.50) / 0.25);
+          return mix(c3, c4, (t - 0.75) / 0.25);
+        }
+
+        void main() {
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(vViewDir);
+
+          // Fresnel rim — brighter at silhouette edges (iridescent glow)
+          float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+
+          // Gradient driven by: world Y + fresnel + slow time shimmer
+          float shimmer = 0.04 * sin(uTime * 0.8 + vWorldPos.x * 3.0 + vWorldPos.z * 2.0);
+          float gradT = clamp((vWorldPos.y + 0.35) / 0.70 + fresnel * 0.35 + shimmer, 0.0, 1.0);
+          vec3 baseColor = techGradient(gradT);
+
+          // Diffuse lighting from two directional lights
+          float diff1 = max(dot(N, uLightDir),  0.0);
+          float diff2 = max(dot(N, uLightDir2), 0.0) * 0.4;
+          float diffuse = diff1 + diff2;
+
+          // Specular highlight (Blinn-Phong)
+          vec3 H = normalize(uLightDir + V);
+          float spec = pow(max(dot(N, H), 0.0), 64.0) * 1.8;
+
+          // Combine: ambient + diffuse colour + specular white + fresnel rim
+          vec3 ambient = baseColor * 0.18;
+          vec3 lit     = baseColor * (0.55 + diffuse * 0.70);
+          vec3 rimGlow = techGradient(clamp(gradT + 0.3, 0.0, 1.0)) * fresnel * 1.2;
+          vec3 color   = ambient + lit + vec3(spec) + rimGlow;
+
+          gl_FragColor = vec4(color, uOpacity);
+        }
+      `,
+      transparent: true,
+      side: THREE.FrontSide,
+    });
+  }, []);
 
   useEffect(() => {
     gltf.scene.traverse((child) => {
@@ -262,14 +336,20 @@ function BrainModel({
     });
   }, [gltf, mat, onVertsReady]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (!groupRef.current) return;
-    // Slow rotation when not selected — matches Spline's slow spin
+    // Slow rotation when not selected
     if (!selected) groupRef.current.rotation.y += delta * 0.22;
 
+    // Animate time uniform for shimmer effect
+    mat.uniforms.uTime.value = state.clock.elapsedTime;
+
     // Fade brain slightly when selected to focus on neural network
-    mat.opacity = THREE.MathUtils.lerp(mat.opacity ?? 1, selected ? 0.55 : 1.0, 0.05);
-    mat.transparent = selected ? true : false;
+    mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
+      mat.uniforms.uOpacity.value,
+      selected ? 0.55 : 1.0,
+      0.05
+    );
   });
 
   return (
