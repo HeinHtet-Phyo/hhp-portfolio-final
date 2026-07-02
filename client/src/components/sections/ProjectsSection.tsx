@@ -191,7 +191,11 @@ function BrainModel({ selected }: { selected: Project | null }) {
       {/* Definitive anatomical left-side profile confirmed by Python rendering:
            X=-PI/2: stands brain upright (brainstem points down)
            Y=PI/2: rotates to show left-side profile (frontal lobe left, cerebellum lower-right) */}
-      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.05, 0]}>
+      {/* X=-PI/2: tilts brain from top-down to upright (brainstem points down)
+           Y=-PI/2: rotates to left lateral profile (frontal on left, occipital on right) */}
+      {/* X=+PI/2: tilts brain upright (cortex top, brainstem bottom)
+           Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
+      <group rotation={[Math.PI / 2, Math.PI / 2, 0]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
