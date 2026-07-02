@@ -184,7 +184,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   return (
     <group ref={groupRef}>
       {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.12, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0019, 0.0019, 0.0019]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -599,7 +599,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 1.4], fov: 45, near: 0.01, far: 100 }}
+        camera={{ position: [0, 0, 1.05], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
