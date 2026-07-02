@@ -169,7 +169,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = Math.PI / 2 - 0.44;  // PI/2 - 25°: front-right turns toward viewer
+  const Y_OFFSET = Math.PI / 2 - 0.44;  // PI/2 - 25° offset
   const SPIN_SPEED = 0.30;               // rad/s turntable speed
   const SPIN_PAUSED = false;  // spin active
 
@@ -186,7 +186,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0, 0.15]}>
+    <group ref={groupRef} position={[0, 0, 0.32]}>
       {/* Rotate X by -PI/2 to lay brain horizontal (side-profile view like reference photo)
            Rotate Y by PI to face frontal lobe toward viewer */}
       {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
