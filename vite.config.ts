@@ -213,13 +213,10 @@ function vitePluginStripR3FDataLoc(): Plugin {
     enforce: "post",
     transform(code, id) {
       if (!id.endsWith(".tsx") && !id.endsWith(".jsx")) return null;
-      // Remove data-loc from Three.js R3F elements (lowercase tags: mesh, group, points, etc.)
-      // These are identified by being lowercase JSX elements with data-loc prop
-      // Pattern: data-loc="..." on lowercase JSX elements
-      const transformed = code.replace(
-        /(<(?:mesh|group|points|line|lineSegments|bufferGeometry|sphereGeometry|cylinderGeometry|planeGeometry|boxGeometry|meshStandardMaterial|meshBasicMaterial|pointsMaterial|lineBasicMaterial|ambientLight|directionalLight|pointLight|spotLight|hemisphereLight|perspectiveCamera|orthographicCamera|primitive|instancedMesh|skinnedMesh|bone|object3D|scene|fog|axesHelper|gridHelper|arrowHelper|boxHelper)[^>]*)\s+data-loc="[^"]*"/g,
-        "$1"
-      );
+      // Remove ALL data-loc attributes from JSX — R3F passes unknown props to Three.js
+      // objects which don't have a .data property, causing applyProps to crash.
+      // Safest fix: strip data-loc everywhere in TSX/JSX files.
+      const transformed = code.replace(/\s+data-loc="[^"]*"/g, "");
       return transformed !== code ? { code: transformed, map: null } : null;
     },
   };
