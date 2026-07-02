@@ -185,8 +185,13 @@ function BrainModel({ selected }: { selected: Project | null }) {
       {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
       {/* X=PI/2 stands brain upright from flat OBJ; Y=-PI/2 rotates to show left-side profile */}
       {/* X=PI/2 stands brain upright; Y=0 to check natural side orientation */}
-      {/* X=PI/2 upright, Y=PI front-facing, Z=-0.2 slight tilt like reference photo */}
-      <group rotation={[Math.PI / 2, Math.PI, -0.2]} position={[0, 0.05, 0]}>
+      {/* Anatomical left-side profile:
+           X=-PI/2: OBJ Y(brainstem-cortex) maps to Three.js -Y so brainstem points DOWN
+           Y=PI/2: rotates so OBJ left-side (+X face) points toward camera (-Z) */}
+      {/* Definitive anatomical left-side profile confirmed by Python rendering:
+           X=-PI/2: stands brain upright (brainstem points down)
+           Y=PI/2: rotates to show left-side profile (frontal lobe left, cerebellum lower-right) */}
+      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
