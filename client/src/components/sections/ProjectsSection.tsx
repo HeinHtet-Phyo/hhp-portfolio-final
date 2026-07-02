@@ -156,107 +156,115 @@ function HotspotDot({ position, index, active, onSelect }: {
   );
 }
 
-// ─── Circuit Overlay (canvas texture drawn on a plane in front of brain) ──────
-function CircuitOverlay() {
+// ─── Per-project neural network graph definitions (Obsidian-style) ────────────────
+type GraphNode = { id: string; x: number; y: number; size: number; label: string; central?: boolean };
+type GraphEdge = { a: string; b: string };
+type ProjectGraph = { nodes: GraphNode[]; edges: GraphEdge[]; color: string; accentColor: string };
+
+const PROJECT_GRAPHS: ProjectGraph[] = [
+  // 0: MoodTunes AI — music neural net, star topology around central model
+  {
+    color: "rgba(0,229,255,",
+    accentColor: "#00e5ff",
+    nodes: [
+      { id: "model",   x: 256, y: 256, size: 10, label: "LightGBM",     central: true },
+      { id: "spotify", x: 140, y: 160, size: 6,  label: "Spotify API" },
+      { id: "mood1",   x: 360, y: 150, size: 5,  label: "Happy" },
+      { id: "mood2",   x: 390, y: 270, size: 5,  label: "Sad" },
+      { id: "mood3",   x: 340, y: 370, size: 5,  label: "Energetic" },
+      { id: "mood4",   x: 160, y: 370, size: 5,  label: "Calm" },
+      { id: "mood5",   x: 120, y: 270, size: 5,  label: "Angry" },
+      { id: "feat",    x: 200, y: 200, size: 5,  label: "Features" },
+      { id: "rec",     x: 300, y: 200, size: 5,  label: "Recommend" },
+      { id: "tracks",  x: 256, y: 140, size: 6,  label: "114K Tracks" },
+    ],
+    edges: [
+      { a: "spotify", b: "model" }, { a: "tracks", b: "model" }, { a: "feat", b: "model" },
+      { a: "model", b: "mood1" }, { a: "model", b: "mood2" }, { a: "model", b: "mood3" },
+      { a: "model", b: "mood4" }, { a: "model", b: "mood5" }, { a: "model", b: "rec" },
+      { a: "feat", b: "spotify" }, { a: "rec", b: "mood1" }, { a: "rec", b: "mood2" },
+    ],
+  },
+  // 1: IT Career Planner — skill tree / career path graph
+  {
+    color: "rgba(100,200,100,",
+    accentColor: "#64c864",
+    nodes: [
+      { id: "xgb",    x: 256, y: 256, size: 10, label: "XGBoost",    central: true },
+      { id: "sfia",   x: 150, y: 180, size: 7,  label: "SFIA" },
+      { id: "data",   x: 350, y: 170, size: 6,  label: "Data Sci" },
+      { id: "dev",    x: 370, y: 300, size: 6,  label: "Dev" },
+      { id: "ai",     x: 260, y: 140, size: 6,  label: "AI/ML" },
+      { id: "gap",    x: 140, y: 310, size: 5,  label: "Gap Analysis" },
+      { id: "path",   x: 200, y: 370, size: 6,  label: "Career Path" },
+      { id: "skills", x: 330, y: 380, size: 5,  label: "Skills" },
+      { id: "acc",    x: 256, y: 380, size: 6,  label: "99.75%" },
+    ],
+    edges: [
+      { a: "sfia", b: "xgb" }, { a: "data", b: "xgb" }, { a: "dev", b: "xgb" },
+      { a: "ai", b: "xgb" }, { a: "xgb", b: "gap" }, { a: "xgb", b: "path" },
+      { a: "xgb", b: "skills" }, { a: "xgb", b: "acc" }, { a: "sfia", b: "skills" },
+      { a: "path", b: "data" }, { a: "path", b: "dev" }, { a: "gap", b: "skills" },
+    ],
+  },
+  // 2: CityPulse — hub-and-spoke city data layers
+  {
+    color: "rgba(255,160,50,",
+    accentColor: "#ffa032",
+    nodes: [
+      { id: "city",    x: 256, y: 256, size: 10, label: "CityPulse",   central: true },
+      { id: "trans",   x: 140, y: 170, size: 6,  label: "Transport" },
+      { id: "demo",    x: 370, y: 160, size: 6,  label: "Demographics" },
+      { id: "infra",   x: 390, y: 300, size: 6,  label: "Infrastructure" },
+      { id: "geo",     x: 280, y: 140, size: 5,  label: "GeoPandas" },
+      { id: "plotly",  x: 140, y: 320, size: 5,  label: "Plotly" },
+      { id: "maps",    x: 200, y: 390, size: 6,  label: "Maps" },
+      { id: "realtime",x: 330, y: 380, size: 5,  label: "Real-time" },
+      { id: "intel",   x: 380, y: 230, size: 5,  label: "Intelligence" },
+    ],
+    edges: [
+      { a: "trans", b: "city" }, { a: "demo", b: "city" }, { a: "infra", b: "city" },
+      { a: "geo", b: "city" }, { a: "city", b: "plotly" }, { a: "city", b: "maps" },
+      { a: "city", b: "realtime" }, { a: "city", b: "intel" }, { a: "trans", b: "maps" },
+      { a: "demo", b: "intel" }, { a: "infra", b: "realtime" }, { a: "geo", b: "maps" },
+    ],
+  },
+  // 3: PreventPath — risk scoring pipeline
+  {
+    color: "rgba(220,80,120,",
+    accentColor: "#dc5078",
+    nodes: [
+      { id: "risk",    x: 256, y: 256, size: 10, label: "Risk Score",  central: true },
+      { id: "patient", x: 140, y: 180, size: 6,  label: "Patient Data" },
+      { id: "ml",      x: 360, y: 160, size: 7,  label: "ML Pipeline" },
+      { id: "flask",   x: 390, y: 290, size: 5,  label: "Flask API" },
+      { id: "plan",    x: 280, y: 140, size: 6,  label: "Prevention Plan" },
+      { id: "health",  x: 140, y: 320, size: 5,  label: "Health Factors" },
+      { id: "alert",   x: 200, y: 390, size: 5,  label: "Alerts" },
+      { id: "score",   x: 340, y: 380, size: 6,  label: "Scoring" },
+      { id: "personal",x: 170, y: 260, size: 5,  label: "Personalised" },
+    ],
+    edges: [
+      { a: "patient", b: "risk" }, { a: "ml", b: "risk" }, { a: "flask", b: "risk" },
+      { a: "plan", b: "risk" }, { a: "risk", b: "health" }, { a: "risk", b: "alert" },
+      { a: "risk", b: "score" }, { a: "risk", b: "personal" }, { a: "patient", b: "health" },
+      { a: "ml", b: "score" }, { a: "flask", b: "alert" }, { a: "plan", b: "personal" },
+    ],
+  },
+];
+
+// ─── Neural Network Overlay (per-project Obsidian-style graph) ──────────────────
+function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const texRef  = useRef<THREE.CanvasTexture | null>(null);
+  const opacityRef = useRef(0);
+  const prevIdRef  = useRef<number | null>(null);
 
   const canvas2d = useMemo(() => {
     const c = document.createElement("canvas");
     c.width = 512; c.height = 512;
-    const ctx = c.getContext("2d")!;
-
-    // Draw circuit traces
-    ctx.clearRect(0, 0, 512, 512);
-    ctx.strokeStyle = "rgba(0,229,255,0.55)";
-    ctx.lineWidth = 1.2;
-
-    // Horizontal + vertical traces
-    const traces = [
-      // [x1,y1,x2,y2]
-      [120, 200, 220, 200], [220, 200, 220, 260], [220, 260, 310, 260],
-      [310, 260, 310, 180], [310, 180, 390, 180],
-      [150, 320, 260, 320], [260, 320, 260, 380], [260, 380, 350, 380],
-      [180, 150, 180, 240], [180, 240, 240, 240],
-      [350, 300, 420, 300], [420, 300, 420, 360],
-      [100, 260, 140, 260], [140, 260, 140, 310], [140, 310, 200, 310],
-    ];
-    for (const [x1, y1, x2, y2] of traces) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-
-    // Junction dots
-    const junctions = [[220,200],[310,260],[310,180],[260,320],[260,380],[180,240],[420,300],[140,260],[140,310]];
-    ctx.fillStyle = "rgba(0,229,255,0.9)";
-    for (const [jx, jy] of junctions) {
-      ctx.beginPath(); ctx.arc(jx, jy, 4, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // Chip outline in centre
-    ctx.strokeStyle = "rgba(0,229,255,0.7)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(220, 200, 90, 80);
-    // Chip pins
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 200); ctx.lineTo(220 + i * 22 + 11, 188); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 280); ctx.lineTo(220 + i * 22 + 11, 292); ctx.stroke();
-    }
-
     return c;
   }, []);
-
-  useFrame(({ clock }) => {
-    if (!texRef.current) return;
-    // Animate: redraw with animated glow
-    const c = canvas2d;
-    const ctx = c.getContext("2d")!;
-    const t = clock.elapsedTime;
-
-    ctx.clearRect(0, 0, 512, 512);
-
-    // Animated trace glow
-    const glow = 0.4 + 0.25 * Math.sin(t * 1.5);
-    ctx.strokeStyle = `rgba(0,229,255,${glow})`;
-    ctx.lineWidth = 1.2;
-    const traces = [
-      [120, 200, 220, 200], [220, 200, 220, 260], [220, 260, 310, 260],
-      [310, 260, 310, 180], [310, 180, 390, 180],
-      [150, 320, 260, 320], [260, 320, 260, 380], [260, 380, 350, 380],
-      [180, 150, 180, 240], [180, 240, 240, 240],
-      [350, 300, 420, 300], [420, 300, 420, 360],
-      [100, 260, 140, 260], [140, 260, 140, 310], [140, 310, 200, 310],
-    ];
-    for (const [x1, y1, x2, y2] of traces) {
-      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-    }
-
-    // Animated data packet along traces
-    const pkt = (t * 80) % 512;
-    const pg = ctx.createRadialGradient(pkt, 200, 0, pkt, 200, 12);
-    pg.addColorStop(0, "rgba(0,255,255,1)");
-    pg.addColorStop(1, "rgba(0,255,255,0)");
-    ctx.fillStyle = pg;
-    ctx.beginPath(); ctx.arc(pkt > 220 ? 220 : pkt, 200, 12, 0, Math.PI * 2); ctx.fill();
-
-    // Junction dots
-    const junctions = [[220,200],[310,260],[310,180],[260,320],[260,380],[180,240],[420,300],[140,260],[140,310]];
-    const jg = 0.7 + 0.3 * Math.sin(t * 2.0);
-    ctx.fillStyle = `rgba(0,229,255,${jg})`;
-    for (const [jx, jy] of junctions) {
-      ctx.beginPath(); ctx.arc(jx, jy, 4, 0, Math.PI * 2); ctx.fill();
-    }
-
-    // Chip
-    ctx.strokeStyle = `rgba(0,229,255,${0.5 + 0.3 * Math.sin(t)})`;
-    ctx.lineWidth = 2;
-    ctx.strokeRect(220, 200, 90, 80);
-    for (let i = 0; i < 4; i++) {
-      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 200); ctx.lineTo(220 + i * 22 + 11, 188); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 280); ctx.lineTo(220 + i * 22 + 11, 292); ctx.stroke();
-    }
-
-    texRef.current.needsUpdate = true;
-  });
 
   const tex = useMemo(() => {
     const t = new THREE.CanvasTexture(canvas2d);
@@ -264,10 +272,105 @@ function CircuitOverlay() {
     return t;
   }, [canvas2d]);
 
+  useFrame(({ clock }) => {
+    if (!texRef.current) return;
+    const t = clock.elapsedTime;
+    const ctx = canvas2d.getContext("2d")!;
+    const W = 512, H = 512;
+
+    // Fade in/out
+    const targetOpacity = selected ? 1.0 : 0.0;
+    opacityRef.current += (targetOpacity - opacityRef.current) * 0.06;
+
+    // Update mesh opacity
+    if (meshRef.current) {
+      (meshRef.current.material as THREE.MeshBasicMaterial).opacity = opacityRef.current * 0.85;
+    }
+
+    if (opacityRef.current < 0.02) {
+      ctx.clearRect(0, 0, W, H);
+      texRef.current.needsUpdate = true;
+      return;
+    }
+
+    const graph = selected ? PROJECT_GRAPHS[selected.id] : PROJECT_GRAPHS[prevIdRef.current ?? 0];
+    if (selected) prevIdRef.current = selected.id;
+    const col = graph.color;
+    const alpha = opacityRef.current;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Build node map
+    const nodeMap: Record<string, GraphNode> = {};
+    for (const n of graph.nodes) nodeMap[n.id] = n;
+
+    // Draw edges
+    for (const edge of graph.edges) {
+      const na = nodeMap[edge.a], nb = nodeMap[edge.b];
+      if (!na || !nb) continue;
+
+      // Animated pulse along edge
+      const edgePhase = (t * 0.6 + graph.nodes.findIndex(n => n.id === edge.a) * 0.3) % 1;
+      const px = na.x + (nb.x - na.x) * edgePhase;
+      const py = na.y + (nb.y - na.y) * edgePhase;
+
+      // Edge line
+      const edgeAlpha = (0.25 + 0.15 * Math.sin(t * 1.2 + graph.nodes.findIndex(n => n.id === edge.a))) * alpha;
+      ctx.strokeStyle = `${col}${edgeAlpha})`;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(na.x, na.y);
+      ctx.lineTo(nb.x, nb.y);
+      ctx.stroke();
+
+      // Travelling pulse dot
+      const pg = ctx.createRadialGradient(px, py, 0, px, py, 8);
+      pg.addColorStop(0, `${col}${0.9 * alpha})`);
+      pg.addColorStop(1, `${col}0)`);
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw nodes
+    for (const node of graph.nodes) {
+      const pulse = node.central
+        ? 1.0 + 0.2 * Math.sin(t * 2.0)
+        : 1.0 + 0.12 * Math.sin(t * 1.5 + node.x * 0.01);
+      const r = node.size * pulse;
+
+      // Outer glow
+      const ng = ctx.createRadialGradient(node.x, node.y, 0, node.x, node.y, r * 3.5);
+      ng.addColorStop(0, `${col}${0.55 * alpha})`);
+      ng.addColorStop(1, `${col}0)`);
+      ctx.fillStyle = ng;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r * 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Core dot
+      ctx.fillStyle = `${col}${0.9 * alpha})`;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label (small, monospace)
+      if (alpha > 0.4) {
+        ctx.font = `${node.central ? 9 : 7}px JetBrains Mono, monospace`;
+        ctx.fillStyle = `${col}${Math.min(1, alpha * 1.5) * 0.85})`;
+        ctx.textAlign = "center";
+        ctx.fillText(node.label, node.x, node.y + r + 11);
+      }
+    }
+
+    texRef.current.needsUpdate = true;
+  });
+
   return (
-    <mesh ref={meshRef} position={[0, 0.08, 0.30]} rotation={[0, 0, 0]}>
-      <planeGeometry args={[0.52, 0.52]} />
-      <meshBasicMaterial map={tex} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
+    <mesh ref={meshRef} position={[0, 0.08, 0.31]} rotation={[0, 0, 0]}>
+      <planeGeometry args={[0.58, 0.58]} />
+      <meshBasicMaterial ref={(m) => { if (m) m.opacity = 0; }} map={tex} transparent opacity={0} depthWrite={false} blending={THREE.AdditiveBlending} />
     </mesh>
   );
 }
@@ -412,8 +515,8 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Circuit overlay rotates with brain */}
-        <CircuitOverlay />
+        {/* Per-project neural network overlay rotates with brain */}
+        <NeuralNetworkOverlay selected={selected} />
       </group>
       {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
       {PROJECTS.map((proj, i) => (
