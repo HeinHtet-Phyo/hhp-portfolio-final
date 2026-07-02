@@ -88,9 +88,9 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // BrainUVs_upright2: X=+90° + Y=+180° rotation pre-baked into vertices.
   // Brain stands upright AND correct lateral side faces the camera.
   // Zero runtime rotation needed — just load and spin on Y for clean turntable.
-  // BrainUVs_v3: X=+70° + Y=+90° pre-baked. Brain tilts 20° toward viewer,
-  // hiding the equatorial mesh seam. Left lateral side faces camera.
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_v3_b4940718.glb");
+  // BrainUVs_v4: All 12 sub-meshes MERGED into one single mesh + X+70 Y+90 rotation baked.
+  // Single mesh = no seam/boundary lines visible. Clean solid brain.
+  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_v4_f1567fa0.glb");
   const groupRef = useRef<THREE.Group>(null);
 
   const mat = useMemo(() => new THREE.ShaderMaterial({
