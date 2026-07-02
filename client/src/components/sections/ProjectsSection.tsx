@@ -166,10 +166,17 @@ function BrainModel({ selected }: { selected: Project | null }) {
     });
   }, [gltf, mat]);
 
-  useFrame((state, delta) => {
+  // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
+  // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
+  // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
+  const Y_OFFSET = Math.PI / 2;   // tune this to lock starting angle
+  const SPIN_SPEED = 0.30;         // rad/s turntable speed
+  const SPIN_PAUSED = false;       // CONFIRMED: t=0 shows correct left lateral profile
+
+  useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Slow Y rotation — like sitting on a turntable
-    groupRef.current.rotation.y += delta * 0.30;
+    // Absolute time-based rotation so t=0 always starts at Y_OFFSET
+    groupRef.current.rotation.y = Y_OFFSET + (SPIN_PAUSED ? 0 : state.clock.elapsedTime * SPIN_SPEED);
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
@@ -195,7 +202,9 @@ function BrainModel({ selected }: { selected: Project | null }) {
            Y=-PI/2: rotates to left lateral profile (frontal on left, occipital on right) */}
       {/* X=+PI/2: tilts brain upright (cortex top, brainstem bottom)
            Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
-      <group rotation={[Math.PI / 2, Math.PI / 2, 0]} position={[0, 0.05, 0]}>
+      {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
+           Y is handled by outer groupRef via Y_OFFSET + time formula */}
+      <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
