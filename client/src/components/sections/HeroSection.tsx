@@ -2,6 +2,7 @@
 // Split-char name animation, typing roles, count-up stats, magnetic buttons, 3D neural network
 import { useEffect, useRef, useState } from "react";
 import { FiGithub, FiLinkedin, FiMail, FiArrowRight, FiDownload } from "react-icons/fi";
+import RobotPlayground from "../RobotPlayground";
 
 
 const ROLES = ["Data Scientist", "AI Engineer", "ML Developer", "Data Analyst"];
@@ -319,33 +320,8 @@ export default function HeroSection() {
 
           {/* Right Column */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
-            {/* 3D Robot — Sketchfab Embed */}
-            <div style={{
-              width: "100%",
-              aspectRatio: "1 / 1",
-              borderRadius: "12px",
-              border: "1px solid rgba(0,212,255,0.15)",
-              overflow: "hidden",
-              background: "#000",
-              boxShadow: "0 0 40px rgba(0,180,255,0.12), inset 0 0 60px rgba(0,100,180,0.06)",
-              position: "relative",
-            }}>
-              <iframe
-                title="Robot Playground"
-                frameBorder="0"
-                allowFullScreen
-                allow="autoplay; fullscreen; xr-spatial-tracking"
-                src="https://sketchfab.com/models/59fc99d8dcb146f3a6c16dbbcc4680da/embed?autostart=1&ui_infos=0&ui_watermark_link=0&ui_watermark=0&ui_ar=0&ui_help=0&ui_settings=0&ui_inspector=0&ui_annotations=0&ui_stop=0&transparent=0&dnt=1"
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  position: "absolute",
-                  inset: 0,
-                  border: "none",
-                  background: "#000",
-                }}
-              />
-            </div>
+            {/* 3D Robot — GLB Viewer */}
+            <RobotPlayground />
 
             {/* Profile Photo Placeholder */}
             <div style={{ position: "relative", width: "180px", height: "180px" }}>
