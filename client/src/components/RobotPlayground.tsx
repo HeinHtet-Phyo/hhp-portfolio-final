@@ -25,8 +25,8 @@ function CameraAutoFit({ box }: { box: THREE.Box3 | null }) {
     box.getCenter(center);
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
-    // Tighter fit: 1.15x instead of 1.4x
-    const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.15;
+    // Wider fit: 1.7x so entire computer fits with padding
+    const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.7;
     // 3/4 view: right and above to show screen + keyboard
     camera.position.set(
       center.x + dist * 0.45,
