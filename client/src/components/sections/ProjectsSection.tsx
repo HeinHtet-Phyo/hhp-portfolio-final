@@ -157,26 +157,30 @@ function BrainModel({ selected }: { selected: Project | null }) {
   }), []);
 
   useEffect(() => {
-    // No geometry pre-rotation — use inner group rotation instead for clean control
+    // Bake X=+PI/2 rotation permanently into geometry vertices.
+    // Python render confirmed: X=+90deg makes brain upright (frontal lobe left, brainstem down).
+    // After baking, the brain is permanently upright so Y-axis spin = clean turntable.
+    const xRot = new THREE.Matrix4().makeRotationX(Math.PI / 2);
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        mesh.material = mat;
+        mesh.geometry = mesh.geometry.clone();
+        mesh.geometry.applyMatrix4(xRot);
         mesh.geometry.computeVertexNormals();
+        mesh.material = mat;
       }
     });
   }, [gltf, mat]);
 
-  // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
-  // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
-  // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = 0;  // outer group Y — combined with inner group rotation below
-  const SPIN_SPEED = 0.30;               // rad/s turntable speed
-  const SPIN_PAUSED = false;  // spin enabled — starts at left lateral profile
+  // Brain geometry is now permanently upright (X=+PI/2 baked in).
+  // Y_OFFSET sets starting angle; Y-axis spin = clean turntable rotation.
+  const Y_OFFSET = -Math.PI / 2;  // -90° rotates to left lateral profile (frontal lobe left, brainstem down)
+  const SPIN_SPEED = 0.30;  // rad/s
+  const SPIN_PAUSED = false;
 
   useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Absolute time-based rotation so t=0 always starts at Y_OFFSET
+    // Clean Y-axis turntable spin — geometry is already upright
     groupRef.current.rotation.y = Y_OFFSET + (SPIN_PAUSED ? 0 : state.clock.elapsedTime * SPIN_SPEED);
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
@@ -188,26 +192,8 @@ function BrainModel({ selected }: { selected: Project | null }) {
 
   return (
     <group ref={groupRef}>
-      {/* Rotate X by -PI/2 to lay brain horizontal (side-profile view like reference photo)
-           Rotate Y by PI to face frontal lobe toward viewer */}
-      {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
-      {/* X=PI/2 stands brain upright from flat OBJ; Y=-PI/2 rotates to show left-side profile */}
-      {/* X=PI/2 stands brain upright; Y=0 to check natural side orientation */}
-      {/* Anatomical left-side profile:
-           X=-PI/2: OBJ Y(brainstem-cortex) maps to Three.js -Y so brainstem points DOWN
-           Y=PI/2: rotates so OBJ left-side (+X face) points toward camera (-Z) */}
-      {/* Definitive anatomical left-side profile confirmed by Python rendering:
-           X=-PI/2: stands brain upright (brainstem points down)
-           Y=PI/2: rotates to show left-side profile (frontal lobe left, cerebellum lower-right) */}
-      {/* X=-PI/2: tilts brain from top-down to upright (brainstem points down)
-           Y=-PI/2: rotates to left lateral profile (frontal on left, occipital on right) */}
-      {/* X=+PI/2: tilts brain upright (cortex top, brainstem bottom)
-           Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
-      {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
-           Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      {/* X=-PI/2: OBJ Z-up → Y-up (brain upright, brainstem down). Y=PI/2: left lateral profile */}
-      {/* X=+PI/2 confirmed by Python render: brain upright, left lateral profile, brainstem down */}
-      <group rotation={[Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} scale={[0.0018, 0.0018, 0.0018]}>
+      {/* Geometry is permanently upright (X=+PI/2 baked in useEffect). Y spin = clean turntable. */}
+      <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -626,7 +612,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 1.4], fov: 45 }}
+        camera={{ position: [0, 0, 1.4], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
