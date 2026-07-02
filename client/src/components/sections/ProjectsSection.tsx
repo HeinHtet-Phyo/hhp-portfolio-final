@@ -114,47 +114,66 @@ function BrainModel({ selected }: { selected: Project | null }) {
         vec3 N = normalize(vNormal);
         vec3 V = normalize(vViewDir);
 
-        // Fresnel rim — bright teal glow at silhouette edges
-        float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.2);
+        // Strong fresnel — glassy rim glow like reference image
+        float NdotV = max(dot(N, V), 0.0);
+        float fresnel = pow(1.0 - NdotV, 3.5);
 
-        // Key light from upper-right (matches photo 1)
-        vec3 L1 = normalize(vec3(3.0, 4.0, 2.0));
+        // Primary key light — upper-left (matches reference bright left side)
+        vec3 L1 = normalize(vec3(-2.0, 3.5, 2.5));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Fill light from left
-        vec3 L2 = normalize(vec3(-2.0, 2.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.35;
+        // Secondary fill from right
+        vec3 L2 = normalize(vec3(2.5, 1.5, 1.0));
+        float diff2 = max(dot(N, L2), 0.0) * 0.4;
 
-        // Specular (Blinn-Phong)
-        vec3 H = normalize(L1 + V);
-        float spec = pow(max(dot(N, H), 0.0), 48.0) * 1.4;
+        // Back light for rim depth
+        vec3 L3 = normalize(vec3(0.0, 1.0, -2.0));
+        float diff3 = max(dot(N, L3), 0.0) * 0.25;
 
-        // Slow shimmer along Y
-        float shimmer = 0.05 * sin(uTime * 0.6 + vWorldPos.y * 4.0);
+        // Tight specular highlights — white hot spots on gyri ridges (like reference)
+        vec3 H1 = normalize(L1 + V);
+        float spec1 = pow(max(dot(N, H1), 0.0), 120.0) * 3.5;
+        vec3 H2 = normalize(L2 + V);
+        float spec2 = pow(max(dot(N, H2), 0.0), 80.0) * 1.8;
 
-        // Base teal colour — darker in shadows, brighter on lit faces
-        vec3 tealDark  = vec3(0.00, 0.28, 0.38);
-        vec3 tealMid   = vec3(0.00, 0.72, 0.90);
-        vec3 tealBright= vec3(0.60, 0.98, 1.00);
+        // Slow shimmer
+        float shimmer = 0.04 * sin(uTime * 0.5 + vWorldPos.y * 5.0);
 
-        float lit = diff1 + diff2 + shimmer;
-        vec3 base = mix(tealDark, tealMid, clamp(lit, 0.0, 1.0));
-        base = mix(base, tealBright, clamp(spec * 0.5, 0.0, 1.0));
+        // Colour palette — vivid cyan matching reference
+        vec3 tealDeep  = vec3(0.00, 0.18, 0.28);  // deep shadow
+        vec3 tealMid   = vec3(0.00, 0.75, 0.95);  // main body
+        vec3 tealLight = vec3(0.30, 0.95, 1.00);  // bright lit areas
+        vec3 white     = vec3(0.90, 1.00, 1.00);  // specular hot spots
 
-        // Rim glow
-        vec3 rim = tealBright * fresnel * 1.6;
+        float lit = diff1 + diff2 + diff3 + shimmer;
+        // Base: deep shadow → vivid mid → bright
+        vec3 base = mix(tealDeep, tealMid, clamp(lit * 1.1, 0.0, 1.0));
+        base = mix(base, tealLight, clamp(lit * 0.7 - 0.2, 0.0, 1.0));
 
-        // Emissive pulse
-        float pulse = 0.06 * sin(uTime * 1.2);
-        vec3 emissive = tealMid * (0.18 + pulse);
+        // White specular highlights on ridges
+        base = mix(base, white, clamp(spec1, 0.0, 1.0));
+        base = mix(base, tealLight, clamp(spec2 * 0.6, 0.0, 1.0));
 
-        vec3 color = base + rim + emissive + vec3(spec * 0.7, spec, spec);
+        // Glowing cyan rim (strong like reference)
+        vec3 rimColor = mix(tealMid, tealLight, fresnel);
+        vec3 rim = rimColor * fresnel * 2.8;
+
+        // Emissive inner glow — brain glows from within
+        float pulse = 0.08 * sin(uTime * 1.0);
+        vec3 emissive = tealMid * (0.22 + pulse);
+
+        // Interior translucency hint — brighter at grazing angles
+        vec3 interior = tealLight * pow(1.0 - NdotV, 1.2) * 0.35;
+
+        vec3 color = base + rim + emissive + interior;
+        // Clamp to avoid over-saturation but keep whites white
+        color = min(color, vec3(1.1, 1.1, 1.1));
         gl_FragColor = vec4(color, uOpacity);
       }
     `,
     transparent: false,
     depthWrite: true,
-    side: THREE.FrontSide,
+    side: THREE.DoubleSide,
   }), []);
 
   useEffect(() => {
@@ -168,11 +187,13 @@ function BrainModel({ selected }: { selected: Project | null }) {
   }, [gltf, mat]);
 
   const SPIN_SPEED = 0.30;  // rad/s
+  // Y_OFFSET: start at left lateral profile (frontal lobe facing left)
+  const Y_OFFSET = Math.PI / 2;  // start showing left lateral profile (frontal lobe left)
 
   useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Y-axis turntable spin on outer group
-    groupRef.current.rotation.y = state.clock.elapsedTime * SPIN_SPEED;
+    // Y-axis turntable spin on outer group, starting at left lateral profile
+    groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
@@ -184,7 +205,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   return (
     <group ref={groupRef}>
       {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0019, 0.0019, 0.0019]}>
+      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -599,7 +620,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 1.05], fov: 45, near: 0.01, far: 100 }}
+        camera={{ position: [0, 0, 1.25], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
