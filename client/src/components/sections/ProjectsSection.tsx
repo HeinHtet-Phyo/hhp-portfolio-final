@@ -207,6 +207,162 @@ function BrainModel({ selected }: { selected: Project | null }) {
   );
 }
 
+// ─── Tech Background Canvas ─────────────────────────────────────────────────
+function TechBackground() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    // Neural network nodes
+    const NODE_COUNT = 38;
+    type Node = { x: number; y: number; vx: number; vy: number; r: number; pulse: number; phase: number };
+    const nodes: Node[] = Array.from({ length: NODE_COUNT }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      r: 1.5 + Math.random() * 2,
+      pulse: 0,
+      phase: Math.random() * Math.PI * 2,
+    }));
+
+    // Data packets travelling along edges
+    type Packet = { a: number; b: number; t: number; speed: number };
+    const packets: Packet[] = [];
+    for (let i = 0; i < 12; i++) {
+      packets.push({ a: Math.floor(Math.random() * NODE_COUNT), b: Math.floor(Math.random() * NODE_COUNT), t: Math.random(), speed: 0.003 + Math.random() * 0.004 });
+    }
+
+    let raf = 0;
+    let frame = 0;
+
+    const draw = () => {
+      const W = canvas.width;
+      const H = canvas.height;
+      frame++;
+
+      // Clear with deep dark bg
+      ctx.fillStyle = "#020d18";
+      ctx.fillRect(0, 0, W, H);
+
+      // ── Dot grid ──────────────────────────────────────────────
+      const GRID = 36;
+      ctx.fillStyle = "rgba(0,212,255,0.035)";
+      for (let gx = GRID / 2; gx < W; gx += GRID) {
+        for (let gy = GRID / 2; gy < H; gy += GRID) {
+          ctx.beginPath();
+          ctx.arc(gx, gy, 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // ── Radial glow behind centre ─────────────────────────────
+      const cx = W * 0.5, cy = H * 0.5;
+      const pulse = 0.85 + 0.15 * Math.sin(frame * 0.018);
+      const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(W, H) * 0.52 * pulse);
+      grd.addColorStop(0,   "rgba(0,180,220,0.10)");
+      grd.addColorStop(0.4, "rgba(0,100,160,0.06)");
+      grd.addColorStop(1,   "rgba(0,0,0,0)");
+      ctx.fillStyle = grd;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── Move nodes ────────────────────────────────────────────
+      for (const n of nodes) {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < 0 || n.x > W) n.vx *= -1;
+        if (n.y < 0 || n.y > H) n.vy *= -1;
+        n.phase += 0.018;
+      }
+
+      // ── Draw edges between close nodes ────────────────────────
+      const LINK_DIST = Math.min(W, H) * 0.28;
+      for (let i = 0; i < NODE_COUNT; i++) {
+        for (let j = i + 1; j < NODE_COUNT; j++) {
+          const dx = nodes[i].x - nodes[j].x;
+          const dy = nodes[i].y - nodes[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < LINK_DIST) {
+            const alpha = (1 - dist / LINK_DIST) * 0.18;
+            ctx.strokeStyle = `rgba(0,200,240,${alpha})`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // ── Data packets along edges ──────────────────────────────
+      for (const pkt of packets) {
+        pkt.t += pkt.speed;
+        if (pkt.t >= 1) {
+          pkt.t = 0;
+          pkt.a = pkt.b;
+          pkt.b = Math.floor(Math.random() * NODE_COUNT);
+        }
+        const na = nodes[pkt.a], nb = nodes[pkt.b];
+        const px = na.x + (nb.x - na.x) * pkt.t;
+        const py = na.y + (nb.y - na.y) * pkt.t;
+        const pg = ctx.createRadialGradient(px, py, 0, px, py, 5);
+        pg.addColorStop(0, "rgba(0,229,255,0.9)");
+        pg.addColorStop(1, "rgba(0,229,255,0)");
+        ctx.fillStyle = pg;
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ── Draw nodes ────────────────────────────────────────────
+      for (const n of nodes) {
+        const glow = 0.5 + 0.5 * Math.sin(n.phase);
+        const ng = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r * 4);
+        ng.addColorStop(0, `rgba(0,229,255,${0.7 * glow})`);
+        ng.addColorStop(1, "rgba(0,229,255,0)");
+        ctx.fillStyle = ng;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r * 4, 0, Math.PI * 2);
+        ctx.fill();
+        // Core dot
+        ctx.fillStyle = `rgba(0,229,255,${0.85 * glow})`;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      raf = requestAnimationFrame(draw);
+    };
+
+    draw();
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "absolute", inset: 0, width: "100%", height: "100%",
+        zIndex: 0, pointerEvents: "none",
+      }}
+    />
+  );
+}
+
 // ─── Glowing Circular Platform ────────────────────────────────────────────────
 function Platform() {
   const ringRef1 = useRef<THREE.Mesh>(null);
@@ -586,16 +742,8 @@ export default function ProjectsSection() {
     <section id="projects" style={{
       height: "100vh", background: BG, position: "relative", overflow: "hidden",
     }}>
-      {/* Subtle grid background */}
-      <div style={{
-        position: "absolute", inset: 0, zIndex: 0,
-        backgroundImage: `
-          linear-gradient(${TEAL}08 1px, transparent 1px),
-          linear-gradient(90deg, ${TEAL}08 1px, transparent 1px)
-        `,
-        backgroundSize: "40px 40px",
-        pointerEvents: "none",
-      }} />
+      {/* Animated tech background: neural network nodes + dot grid + radial glow */}
+      <TechBackground />
 
       {/* Header */}
       <div style={{
@@ -613,11 +761,11 @@ export default function ProjectsSection() {
         </p>
       </div>
 
-      {/* 3D Canvas */}
+      {/* 3D Canvas — transparent bg so TechBackground shows through */}
       <Canvas
         camera={{ position: [0, 0, 1.25], fov: 45, near: 0.01, far: 100 }}
-        gl={{ antialias: true, alpha: false }}
-        style={{ background: BG, position: "absolute", inset: 0 }}
+        gl={{ antialias: true, alpha: true }}
+        style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
       >
         <BrainScene selected={selected} />
       </Canvas>
