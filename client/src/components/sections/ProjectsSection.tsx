@@ -170,7 +170,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
   const Y_OFFSET = Math.PI / 2 - 0.44;  // PI/2 - 25°: front-right turns toward viewer
-  const SPIN_SPEED = 0.30;               // rad/s turntable speed
+  const SPIN_SPEED = 0.60;               // rad/s turntable speed (2x more alive)
   const SPIN_PAUSED = false;  // spin active
 
   useFrame((state, _delta) => {
@@ -623,7 +623,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0.1, 1.4], fov: 45 }}
+        camera={{ position: [0, 0.1, 1.1], fov: 48 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
