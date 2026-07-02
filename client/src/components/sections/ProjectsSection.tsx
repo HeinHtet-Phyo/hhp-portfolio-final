@@ -83,7 +83,14 @@ const BG         = "#020d18";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
 function BrainModel({ selected }: { selected: Project | null }) {
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_afbd3b7b.glb");
+  // BrainUVs_upright: X=+90° rotation pre-baked into vertices at build time.
+  // Zero runtime rotation needed — just load and spin on Y for clean turntable.
+  // BrainUVs_upright2: X=+90° + Y=+180° rotation pre-baked into vertices.
+  // Brain stands upright AND correct lateral side faces the camera.
+  // Zero runtime rotation needed — just load and spin on Y for clean turntable.
+  // BrainUVs_v3: X=+70° + Y=+90° pre-baked. Brain tilts 20° toward viewer,
+  // hiding the equatorial mesh seam. Left lateral side faces camera.
+  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_v3_b4940718.glb");
   const groupRef = useRef<THREE.Group>(null);
 
   const mat = useMemo(() => new THREE.ShaderMaterial({
@@ -149,26 +156,21 @@ function BrainModel({ selected }: { selected: Project | null }) {
         vec3 emissive = tealMid * (0.18 + pulse);
 
         vec3 color = base + rim + emissive + vec3(spec * 0.7, spec, spec);
-        gl_FragColor = vec4(color, uOpacity);
+        // Output fully opaque — transparency causes z-fighting between the 12 sub-meshes
+        gl_FragColor = vec4(color, 1.0);
       }
     `,
-    transparent: true,
+    transparent: false,
+    depthWrite: true,
     side: THREE.FrontSide,
   }), []);
 
   useEffect(() => {
-    // Bake X=+PI/2 permanently into geometry vertices.
-    // This converts Z-up OBJ to Y-up Three.js so the brain stands upright.
-    // After baking, the brain's vertical axis IS the Y axis, so outer group
-    // Y-spin = clean turntable rotation with no tumbling.
-    const xRot = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+    // No geometry baking needed — rotation is pre-baked into the GLB file.
+    // Just assign the teal shader material.
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.geometry = mesh.geometry.clone();
-        mesh.geometry.applyMatrix4(xRot);
-        mesh.geometry.computeVertexNormals();
-        mesh.material = mat;
+        (child as THREE.Mesh).material = mat;
       }
     });
   }, [gltf, mat]);
@@ -188,8 +190,9 @@ function BrainModel({ selected }: { selected: Project | null }) {
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, 0.15, 0]}>
       {/* No rotation here — X=PI/2 is baked into geometry vertices */}
+      {/* Y=0.15 raises brain above the platform beam cylinder (world y≈-0.07) */}
       <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
@@ -223,17 +226,9 @@ function Platform() {
       <mesh ref={ringRef2} geometry={torusGeo(0.52)} material={ringMat(0.4)} rotation={[Math.PI / 2, 0, 0]} />
       <mesh ref={ringRef3} geometry={torusGeo(0.66)} material={ringMat(0.2)} rotation={[Math.PI / 2, 0, 0]} />
 
-      {/* Solid disc (platform surface) */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.38, 64]} />
-        <meshBasicMaterial color="#001a2e" transparent opacity={0.85} side={THREE.DoubleSide} />
-      </mesh>
+      {/* Solid disc removed — was causing visual interference with brain transparency */}
 
-      {/* Light beam cylinder going up */}
-      <mesh ref={beamRef} position={[0, 0.35, 0]}>
-        <cylinderGeometry args={[0.32, 0.38, 0.70, 32, 1, true]} />
-        <meshBasicMaterial color={TEAL_GLOW} transparent opacity={0.06} side={THREE.BackSide} />
-      </mesh>
+      {/* Light beam: removed — was intersecting brain and causing visible horizontal cut */}
 
       {/* Floor glow disc */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
@@ -609,7 +604,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 1.4], fov: 45, near: 0.01, far: 100 }}
+        camera={{ position: [0, 0.05, 1.4], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
