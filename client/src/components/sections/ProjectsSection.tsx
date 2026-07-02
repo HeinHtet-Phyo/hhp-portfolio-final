@@ -83,14 +83,7 @@ const BG         = "#020d18";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
 function BrainModel({ selected }: { selected: Project | null }) {
-  // BrainUVs_upright: X=+90° rotation pre-baked into vertices at build time.
-  // Zero runtime rotation needed — just load and spin on Y for clean turntable.
-  // BrainUVs_upright2: X=+90° + Y=+180° rotation pre-baked into vertices.
-  // Brain stands upright AND correct lateral side faces the camera.
-  // Zero runtime rotation needed — just load and spin on Y for clean turntable.
-  // BrainUVs_v4: All 12 sub-meshes MERGED into one single mesh + X+70 Y+90 rotation baked.
-  // Single mesh = no seam/boundary lines visible. Clean solid brain.
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_v4_f1567fa0.glb");
+  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_afbd3b7b.glb");
   const groupRef = useRef<THREE.Group>(null);
 
   const mat = useMemo(() => new THREE.ShaderMaterial({
@@ -124,59 +117,51 @@ function BrainModel({ selected }: { selected: Project | null }) {
         // Fresnel rim — bright teal glow at silhouette edges
         float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.2);
 
-        // Key light from upper-right
+        // Key light from upper-right (matches photo 1)
         vec3 L1 = normalize(vec3(3.0, 4.0, 2.0));
         float diff1 = max(dot(N, L1), 0.0);
 
         // Fill light from left
         vec3 L2 = normalize(vec3(-2.0, 2.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.5;
-
-        // Back fill light — prevents deep creases going black
-        vec3 L3 = normalize(vec3(0.0, -1.0, -1.0));
-        float diff3 = max(dot(N, L3), 0.0) * 0.4;
-
-        // Strong ambient so no area goes fully dark
-        float ambient = 0.55;
+        float diff2 = max(dot(N, L2), 0.0) * 0.35;
 
         // Specular (Blinn-Phong)
         vec3 H = normalize(L1 + V);
-        float spec = pow(max(dot(N, H), 0.0), 48.0) * 1.2;
+        float spec = pow(max(dot(N, H), 0.0), 48.0) * 1.4;
 
         // Slow shimmer along Y
-        float shimmer = 0.04 * sin(uTime * 0.6 + vWorldPos.y * 4.0);
+        float shimmer = 0.05 * sin(uTime * 0.6 + vWorldPos.y * 4.0);
 
-        // Base teal colour
-        vec3 tealDark  = vec3(0.00, 0.45, 0.58);  // raised floor — no more near-black
+        // Base teal colour — darker in shadows, brighter on lit faces
+        vec3 tealDark  = vec3(0.00, 0.28, 0.38);
         vec3 tealMid   = vec3(0.00, 0.72, 0.90);
         vec3 tealBright= vec3(0.60, 0.98, 1.00);
 
-        float lit = ambient + diff1 + diff2 + diff3 + shimmer;
-        vec3 base = mix(tealDark, tealMid, clamp(lit - ambient, 0.0, 1.0));
+        float lit = diff1 + diff2 + shimmer;
+        vec3 base = mix(tealDark, tealMid, clamp(lit, 0.0, 1.0));
         base = mix(base, tealBright, clamp(spec * 0.5, 0.0, 1.0));
 
         // Rim glow
-        vec3 rim = tealBright * fresnel * 1.4;
+        vec3 rim = tealBright * fresnel * 1.6;
 
         // Emissive pulse
-        float pulse = 0.05 * sin(uTime * 1.2);
-        vec3 emissive = tealMid * (0.22 + pulse);
+        float pulse = 0.06 * sin(uTime * 1.2);
+        vec3 emissive = tealMid * (0.18 + pulse);
 
-        vec3 color = base + rim + emissive + vec3(spec * 0.6, spec, spec);
-        gl_FragColor = vec4(color, 1.0);
+        vec3 color = base + rim + emissive + vec3(spec * 0.7, spec, spec);
+        gl_FragColor = vec4(color, uOpacity);
       }
     `,
-    transparent: false,
-    depthWrite: true,
+    transparent: true,
     side: THREE.FrontSide,
   }), []);
 
   useEffect(() => {
-    // No geometry baking needed — rotation is pre-baked into the GLB file.
-    // Just assign the teal shader material.
+    // Only assign custom teal shader material — no geometry rotation baking.
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).material = mat;
+        const mesh = child as THREE.Mesh;
+        mesh.material = mat;
       }
     });
   }, [gltf, mat]);
@@ -185,7 +170,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
 
   useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Clean Y-axis turntable spin — geometry is permanently upright after bake
+    // Y-axis turntable spin on outer group
     groupRef.current.rotation.y = state.clock.elapsedTime * SPIN_SPEED;
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
@@ -196,10 +181,9 @@ function BrainModel({ selected }: { selected: Project | null }) {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0.25, 0]}>
-      {/* No rotation here — X=PI/2 is baked into geometry vertices */}
-      {/* Y=0.15 raises brain above the platform beam cylinder (world y≈-0.07) */}
-      <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+    <group ref={groupRef}>
+      {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
+      <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -232,9 +216,17 @@ function Platform() {
       <mesh ref={ringRef2} geometry={torusGeo(0.52)} material={ringMat(0.4)} rotation={[Math.PI / 2, 0, 0]} />
       <mesh ref={ringRef3} geometry={torusGeo(0.66)} material={ringMat(0.2)} rotation={[Math.PI / 2, 0, 0]} />
 
-      {/* Solid disc removed — was causing visual interference with brain transparency */}
+      {/* Solid disc (platform surface) */}
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.38, 64]} />
+        <meshBasicMaterial color="#001a2e" transparent opacity={0.85} side={THREE.DoubleSide} />
+      </mesh>
 
-      {/* Light beam: removed — was intersecting brain and causing visible horizontal cut */}
+      {/* Light beam cylinder going up */}
+      <mesh ref={beamRef} position={[0, 0.35, 0]}>
+        <cylinderGeometry args={[0.32, 0.38, 0.70, 32, 1, true]} />
+        <meshBasicMaterial color={TEAL_GLOW} transparent opacity={0.06} side={THREE.BackSide} />
+      </mesh>
 
       {/* Floor glow disc */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
@@ -610,7 +602,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0.3, 1.4], fov: 45, near: 0.01, far: 100 }}
+        camera={{ position: [0, 0, 1.4], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
