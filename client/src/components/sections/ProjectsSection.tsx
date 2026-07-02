@@ -184,7 +184,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   return (
     <group ref={groupRef}>
       {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[Math.PI / 2, -Math.PI / 2, 0]} position={[0, 0.12, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.12, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
