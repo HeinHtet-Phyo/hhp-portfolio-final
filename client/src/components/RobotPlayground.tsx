@@ -1,20 +1,33 @@
 // Dark Space Theme — Robot Playground GLB Viewer
 // Cyan/blue rim lighting, auto Y-rotation, orbit controls, transparent background
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, OrbitControls } from "@react-three/drei";
+import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 
 const ROBOT_URL = "/manus-storage/robot_playground_8db15507.glb";
 
 function RobotModel() {
-  const { scene } = useGLTF(ROBOT_URL);
+  const { scene, animations } = useGLTF(ROBOT_URL);
   const groupRef = useRef<THREE.Group>(null);
+  const { actions, names } = useAnimations(animations, groupRef);
+
+  // Play all animations (or the first one) on mount
+  useEffect(() => {
+    if (names.length > 0) {
+      // Try to play an idle/walk animation, fallback to first
+      const preferred = names.find(n => /idle|walk|run|anim/i.test(n)) || names[0];
+      const action = actions[preferred];
+      if (action) {
+        action.reset().fadeIn(0.3).play();
+      }
+    }
+  }, [actions, names]);
 
   // Slow Y-axis auto-rotation
   useFrame((_, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.4;
+      groupRef.current.rotation.y += delta * 0.3;
     }
   });
 
