@@ -196,7 +196,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   });
 
   return (
-    <group ref={groupRef} position={[0, 0.15, 0]}>
+    <group ref={groupRef} position={[0, 0.25, 0]}>
       {/* No rotation here — X=PI/2 is baked into geometry vertices */}
       {/* Y=0.15 raises brain above the platform beam cylinder (world y≈-0.07) */}
       <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
@@ -610,7 +610,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0.05, 1.4], fov: 45, near: 0.01, far: 100 }}
+        camera={{ position: [0, 0.3, 1.4], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
