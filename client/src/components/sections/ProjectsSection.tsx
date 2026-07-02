@@ -204,7 +204,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
            Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
       {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
            Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      <group rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+      <group rotation={[-Math.PI / 2 - 0.40, 0, 0]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
