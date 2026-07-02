@@ -83,7 +83,7 @@ const BG         = "#020d18";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
 function BrainModel({ selected }: { selected: Project | null }) {
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/brain_dc0a5366.glb");
+  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_afbd3b7b.glb");
   const groupRef = useRef<THREE.Group>(null);
 
   const mat = useMemo(() => new THREE.ShaderMaterial({
@@ -169,7 +169,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = Math.PI / 2 - 0.44;  // PI/2 - 25° offset
+  const Y_OFFSET = Math.PI / 2;  // BrainUVs.obj: Y=+PI/2 gives left lateral profile (frontal lobe left)
   const SPIN_SPEED = 0.30;               // rad/s turntable speed
   const SPIN_PAUSED = false;  // spin active
 
@@ -204,7 +204,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
            Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
       {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
            Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      <group rotation={[-Math.PI / 2 - 0.35, 0, -0.13]} position={[0, 0.05, 0]}>
+      <group rotation={[-Math.PI / 2 - 0.15, 0, 0]} position={[0, -0.12, 0]} scale={[0.0018, 0.0018, 0.0018]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
