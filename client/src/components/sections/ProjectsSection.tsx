@@ -157,10 +157,17 @@ function BrainModel({ selected }: { selected: Project | null }) {
   }), []);
 
   useEffect(() => {
+    // Pre-rotate geometry to bake in correct orientation:
+    // OBJ is Z-up (3ds Max). Convert to Three.js Y-up: rotate X by -PI/2.
+    // Then rotate Y by PI to flip so frontal lobe faces +Z (toward camera).
+    // This gives: brain upright, frontal lobe facing camera, cerebellum at bottom-right when Y_OFFSET=PI/2.
+    // OBJ is Z-up. Rotate X by +PI/2 to convert Z-up → Y-up (brain upright, brainstem down).
+    const preRot = new THREE.Matrix4().makeRotationX(Math.PI / 2);
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.material = mat;
+        mesh.geometry.applyMatrix4(preRot);
         mesh.geometry.computeVertexNormals();
       }
     });
@@ -169,7 +176,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = Math.PI / 2;  // BrainUVs.obj: pure left lateral side profile (frontal lobe left, cerebellum lower-right)
+  const Y_OFFSET = 0;  // BrainUVs.obj with X=+PI/2 pre-rotation: Y=0 gives perfect left lateral profile (frontal lobe left, cerebellum lower-right, brainstem down)
   const SPIN_SPEED = 0.30;               // rad/s turntable speed
   const SPIN_PAUSED = false;  // spin active
 
@@ -204,7 +211,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
            Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
       {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
            Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      <group rotation={[-Math.PI / 2 + 0.12, 0, 0]} position={[0, -0.1, 0]} scale={[0.0018, 0.0018, 0.0018]}>
+      <group rotation={[0, 0, 0]} position={[0, -0.1, 0]} scale={[0.0018, 0.0018, 0.0018]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -623,7 +630,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0.1, 1.4], fov: 45 }}
+        camera={{ position: [0, 0, 1.4], fov: 45 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: BG, position: "absolute", inset: 0 }}
       >
