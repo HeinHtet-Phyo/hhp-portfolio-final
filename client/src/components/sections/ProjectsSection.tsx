@@ -114,60 +114,55 @@ function BrainModel({ selected }: { selected: Project | null }) {
         vec3 N = normalize(vNormal);
         vec3 V = normalize(vViewDir);
 
-        // Strong fresnel — glassy rim glow like reference image
         float NdotV = max(dot(N, V), 0.0);
-        float fresnel = pow(1.0 - NdotV, 3.5);
 
-        // Primary key light — upper-left (matches reference bright left side)
-        vec3 L1 = normalize(vec3(-2.0, 3.5, 2.5));
+        // Smooth fresnel — glassy translucent rim, not harsh
+        float fresnel = pow(1.0 - NdotV, 2.8);
+
+        // Key light — upper-left front (bright left side like reference)
+        vec3 L1 = normalize(vec3(-1.5, 3.0, 2.0));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Secondary fill from right
-        vec3 L2 = normalize(vec3(2.5, 1.5, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.4;
+        // Soft fill from right
+        vec3 L2 = normalize(vec3(2.0, 1.0, 1.0));
+        float diff2 = max(dot(N, L2), 0.0) * 0.5;
 
-        // Back light for rim depth
-        vec3 L3 = normalize(vec3(0.0, 1.0, -2.0));
-        float diff3 = max(dot(N, L3), 0.0) * 0.25;
+        // Soft under-fill (bounce light from platform)
+        vec3 L3 = normalize(vec3(0.0, -1.0, 0.5));
+        float diff3 = max(dot(N, L3), 0.0) * 0.2;
 
-        // Tight specular highlights — white hot spots on gyri ridges (like reference)
+        // Very soft, wide specular — smooth highlight, not a sharp blob
         vec3 H1 = normalize(L1 + V);
-        float spec1 = pow(max(dot(N, H1), 0.0), 120.0) * 3.5;
-        vec3 H2 = normalize(L2 + V);
-        float spec2 = pow(max(dot(N, H2), 0.0), 80.0) * 1.8;
+        float spec = pow(max(dot(N, H1), 0.0), 18.0) * 0.9;
 
-        // Slow shimmer
-        float shimmer = 0.04 * sin(uTime * 0.5 + vWorldPos.y * 5.0);
+        // Slow shimmer along surface
+        float shimmer = 0.03 * sin(uTime * 0.5 + vWorldPos.y * 4.0 + vWorldPos.x * 2.0);
 
-        // Colour palette — vivid cyan matching reference
-        vec3 tealDeep  = vec3(0.00, 0.18, 0.28);  // deep shadow
-        vec3 tealMid   = vec3(0.00, 0.75, 0.95);  // main body
-        vec3 tealLight = vec3(0.30, 0.95, 1.00);  // bright lit areas
-        vec3 white     = vec3(0.90, 1.00, 1.00);  // specular hot spots
+        // Colour palette — vivid cyan like reference, smooth gradients
+        vec3 tealDeep  = vec3(0.00, 0.20, 0.32);  // shadow grooves
+        vec3 tealMid   = vec3(0.00, 0.72, 0.92);  // main body colour
+        vec3 tealBright= vec3(0.45, 0.95, 1.00);  // lit ridge tops
+        vec3 tealWhite = vec3(0.80, 1.00, 1.00);  // soft specular peak
 
-        float lit = diff1 + diff2 + diff3 + shimmer;
-        // Base: deep shadow → vivid mid → bright
-        vec3 base = mix(tealDeep, tealMid, clamp(lit * 1.1, 0.0, 1.0));
-        base = mix(base, tealLight, clamp(lit * 0.7 - 0.2, 0.0, 1.0));
+        // Smooth diffuse blend — shadow to mid to bright
+        float lit = clamp(diff1 * 1.2 + diff2 + diff3 + shimmer, 0.0, 1.5);
+        vec3 base = mix(tealDeep, tealMid, smoothstep(0.0, 0.8, lit));
+        base = mix(base, tealBright, smoothstep(0.5, 1.3, lit));
 
-        // White specular highlights on ridges
-        base = mix(base, white, clamp(spec1, 0.0, 1.0));
-        base = mix(base, tealLight, clamp(spec2 * 0.6, 0.0, 1.0));
+        // Soft specular — smooth white-teal transition on ridge tops
+        base = mix(base, tealWhite, smoothstep(0.0, 1.0, spec));
 
-        // Glowing cyan rim (strong like reference)
-        vec3 rimColor = mix(tealMid, tealLight, fresnel);
-        vec3 rim = rimColor * fresnel * 2.8;
+        // Glowing cyan rim — strong but smooth (key look from reference)
+        vec3 rim = tealBright * fresnel * 2.2;
 
-        // Emissive inner glow — brain glows from within
-        float pulse = 0.08 * sin(uTime * 1.0);
-        vec3 emissive = tealMid * (0.22 + pulse);
+        // Emissive inner glow — brain glows softly from within
+        float pulse = 0.06 * sin(uTime * 0.9);
+        vec3 emissive = tealMid * (0.20 + pulse);
 
-        // Interior translucency hint — brighter at grazing angles
-        vec3 interior = tealLight * pow(1.0 - NdotV, 1.2) * 0.35;
+        // Translucency: edges glow brighter (glass effect)
+        vec3 glassEdge = tealBright * pow(1.0 - NdotV, 1.5) * 0.4;
 
-        vec3 color = base + rim + emissive + interior;
-        // Clamp to avoid over-saturation but keep whites white
-        color = min(color, vec3(1.1, 1.1, 1.1));
+        vec3 color = base + rim + emissive + glassEdge;
         gl_FragColor = vec4(color, uOpacity);
       }
     `,
