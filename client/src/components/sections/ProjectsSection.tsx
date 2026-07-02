@@ -169,7 +169,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = Math.PI * 0.75;  // BrainUVs.obj: 3/4 left-front view matching reference screenshot
+  const Y_OFFSET = Math.PI / 2;  // BrainUVs.obj: pure left lateral side profile (frontal lobe left, cerebellum lower-right)
   const SPIN_SPEED = 0.30;               // rad/s turntable speed
   const SPIN_PAUSED = false;  // spin active
 
@@ -204,7 +204,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
            Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
       {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
            Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      <group rotation={[-Math.PI / 2 + 0.2, 0, 0]} position={[0, -0.15, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      <group rotation={[-Math.PI / 2 + 0.12, 0, 0]} position={[0, -0.1, 0]} scale={[0.0018, 0.0018, 0.0018]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
