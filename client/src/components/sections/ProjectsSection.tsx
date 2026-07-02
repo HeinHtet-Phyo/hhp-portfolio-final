@@ -1,16 +1,21 @@
 /**
- * ProjectsSection — 3D Particle AI Brain
- * Inspired by Spline "Particle AI Brain" by jawadahmed15050
+ * ProjectsSection — Particle AI Brain (matching Spline reference)
  *
- * - 15,000 white/grey particles forming an anatomical brain shape
- * - Particles breathe (drift outward and back slowly)
- * - Brain auto-rotates slowly
- * - Drag to spin with OrbitControls
- * - 4 glowing project nodes on brain surface
- * - Click node → camera zooms in, colorful expanded network appears, detail panel slides in
+ * Visual approach:
+ * - Solid dark brain mesh with visible gyri/sulci folds (procedural displacement)
+ * - White particle halo surrounding the brain (densest at surface, scattering outward)
+ * - Vertical midline highlight (longitudinal fissure)
+ * - Auto-rotates, drag to spin, scroll to zoom
+ * - 4 coloured project nodes on brain surface
+ *
+ * Interaction:
+ * - Click a node → camera zooms INTO that brain region
+ * - Neural network connections appear INSIDE the brain at that location
+ * - Detail panel slides in from right
+ * - ESC / click background to return
  */
 
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
@@ -26,7 +31,8 @@ const PROJECTS = [
     tech: ["Python", "LightGBM", "Spotify API", "scikit-learn", "Pandas"],
     stats: [["0.5652", "F1 Score"], ["114K+", "Tracks"], ["5", "Moods"]] as [string, string][],
     color: "#00d4ff",
-    pos: [-0.7, 0.5, 0.6] as [number, number, number],
+    hex: new THREE.Color("#00d4ff"),
+    pos: [-0.55, 0.38, 0.72] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo/moodtunes-ai-group3",
   },
   {
@@ -36,8 +42,9 @@ const PROJECTS = [
     desc: "XGBoost classifier at 99.75% accuracy across 6,000 samples. Maps SFIA framework skills to career paths with gap analysis.",
     tech: ["Python", "XGBoost", "SFIA", "scikit-learn", "Streamlit"],
     stats: [["99.75%", "Accuracy"], ["6,000", "Samples"], ["SFIA", "Framework"]] as [string, string][],
-    color: "#a855f7",
-    pos: [0.7, 0.4, 0.5] as [number, number, number],
+    color: "#c084fc",
+    hex: new THREE.Color("#c084fc"),
+    pos: [0.55, 0.38, 0.68] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo/it-career-planner",
   },
   {
@@ -47,8 +54,9 @@ const PROJECTS = [
     desc: "Interactive urban analytics platform aggregating transportation, demographic, and infrastructure data into city-level intelligence.",
     tech: ["Python", "Pandas", "Plotly", "GeoPandas", "Streamlit"],
     stats: [["City", "Scale"], ["Real-time", "Data"], ["Interactive", "Maps"]] as [string, string][],
-    color: "#10b981",
-    pos: [-0.4, -0.5, 0.7] as [number, number, number],
+    color: "#34d399",
+    hex: new THREE.Color("#34d399"),
+    pos: [-0.48, -0.28, 0.80] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo",
   },
   {
@@ -58,138 +66,166 @@ const PROJECTS = [
     desc: "ML pipeline predicting health risk factors from patient data, generating personalised prevention plans with risk scoring.",
     tech: ["Python", "scikit-learn", "Flask", "Healthcare ML", "Risk Scoring"],
     stats: [["AI", "Powered"], ["Personal", "Plans"], ["Risk", "Scoring"]] as [string, string][],
-    color: "#f59e0b",
-    pos: [0.5, -0.5, 0.6] as [number, number, number],
+    color: "#fbbf24",
+    hex: new THREE.Color("#fbbf24"),
+    pos: [0.48, -0.28, 0.78] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo",
   },
 ];
 type Project = (typeof PROJECTS)[0];
 
-// ─── Particle Brain ───────────────────────────────────────────────────────────
-// Generates an anatomical brain shape using multiple displaced ellipsoids
-function generateBrainParticles(count: number) {
-  const positions = new Float32Array(count * 3);
-  const phases = new Float32Array(count);
-
-  // Seeded pseudo-random for deterministic shape
-  let seed = 12345;
-  const rand = () => {
-    seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-    return (seed >>> 0) / 0xffffffff;
+// ─── Seeded RNG ───────────────────────────────────────────────────────────────
+function makeRng(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 0x100000000;
   };
-
-  // Brain anatomy: [cx, cy, cz, rx, ry, rz, weight]
-  // Modelled after a real brain's major regions
-  const regions = [
-    // Left frontal lobe
-    { cx: -0.38, cy: 0.22, cz: 0.52, rx: 0.72, ry: 0.68, rz: 0.58, w: 0.14 },
-    // Right frontal lobe
-    { cx: 0.38, cy: 0.22, cz: 0.52, rx: 0.72, ry: 0.68, rz: 0.58, w: 0.14 },
-    // Left parietal lobe
-    { cx: -0.52, cy: 0.38, cz: -0.05, rx: 0.58, ry: 0.62, rz: 0.52, w: 0.12 },
-    // Right parietal lobe
-    { cx: 0.52, cy: 0.38, cz: -0.05, rx: 0.58, ry: 0.62, rz: 0.52, w: 0.12 },
-    // Left temporal lobe
-    { cx: -0.72, cy: -0.18, cz: 0.12, rx: 0.42, ry: 0.38, rz: 0.52, w: 0.10 },
-    // Right temporal lobe
-    { cx: 0.72, cy: -0.18, cz: 0.12, rx: 0.42, ry: 0.38, rz: 0.52, w: 0.10 },
-    // Left occipital lobe
-    { cx: -0.32, cy: 0.12, cz: -0.62, rx: 0.52, ry: 0.48, rz: 0.42, w: 0.09 },
-    // Right occipital lobe
-    { cx: 0.32, cy: 0.12, cz: -0.62, rx: 0.52, ry: 0.48, rz: 0.42, w: 0.09 },
-    // Cerebellum
-    { cx: 0.0, cy: -0.52, cz: -0.38, rx: 0.62, ry: 0.38, rz: 0.48, w: 0.10 },
-  ];
-
-  const totalW = regions.reduce((s, r) => s + r.w, 0);
-  let idx = 0;
-
-  for (const region of regions) {
-    const regionCount = Math.floor((region.w / totalW) * count);
-    for (let i = 0; i < regionCount && idx < count; i++) {
-      // Sample on unit sphere surface
-      const u = rand();
-      const v = rand();
-      const theta = 2 * Math.PI * u;
-      const phi = Math.acos(2 * v - 1);
-
-      let sx = Math.sin(phi) * Math.cos(theta);
-      let sy = Math.sin(phi) * Math.sin(theta);
-      let sz = Math.cos(phi);
-
-      // Add gyri/sulci surface detail — multiple frequency noise
-      const n1 = Math.sin(sx * 9.2 + sy * 7.1) * Math.cos(sz * 8.3) * 0.055;
-      const n2 = Math.sin(sy * 13.4 + sz * 11.2) * Math.cos(sx * 12.1) * 0.032;
-      const n3 = Math.sin(sz * 17.8 + sx * 15.3) * Math.cos(sy * 16.4) * 0.018;
-      const n4 = (rand() - 0.5) * 0.015; // micro-noise
-      const r = 1.0 + n1 + n2 + n3 + n4;
-
-      sx *= r;
-      sy *= r;
-      sz *= r;
-
-      positions[idx * 3 + 0] = sx * region.rx + region.cx;
-      positions[idx * 3 + 1] = sy * region.ry + region.cy;
-      positions[idx * 3 + 2] = sz * region.rz + region.cz;
-      phases[idx] = rand() * Math.PI * 2;
-      idx++;
-    }
-  }
-
-  // Fill remaining
-  while (idx < count) {
-    const u = rand(), v = rand();
-    const theta = 2 * Math.PI * u;
-    const phi = Math.acos(2 * v - 1);
-    positions[idx * 3 + 0] = Math.sin(phi) * Math.cos(theta) * 0.9;
-    positions[idx * 3 + 1] = Math.sin(phi) * Math.sin(theta) * 0.85 + 0.1;
-    positions[idx * 3 + 2] = Math.cos(phi) * 0.75;
-    phases[idx] = rand() * Math.PI * 2;
-    idx++;
-  }
-
-  return { positions, phases };
 }
 
-// ─── ParticleBrain Component ──────────────────────────────────────────────────
-function ParticleBrain({
-  dimmed,
+// ─── Brain Mesh ───────────────────────────────────────────────────────────────
+// Procedurally displaced sphere to look like a brain with gyri/sulci
+function createBrainGeometry(): THREE.BufferGeometry {
+  // Start with a high-res sphere
+  const geo = new THREE.SphereGeometry(1.0, 128, 96);
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const arr = pos.array as Float32Array;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = arr[i * 3 + 0];
+    const y = arr[i * 3 + 1];
+    const z = arr[i * 3 + 2];
+
+    // Normalize to get direction
+    const len = Math.sqrt(x * x + y * y + z * z);
+    const nx = x / len, ny = y / len, nz = z / len;
+
+    // Multi-octave gyri noise - deeper and more pronounced
+    const g1 = Math.sin(nx * 8.5 + ny * 7.2) * Math.cos(nz * 9.1 + nx * 6.8) * 0.12;
+    const g2 = Math.sin(ny * 13.4 + nz * 11.8) * Math.cos(nx * 12.3 + ny * 10.1) * 0.075;
+    const g3 = Math.sin(nz * 18.2 + nx * 16.5) * Math.cos(ny * 17.3 + nz * 15.9) * 0.045;
+    const g4 = Math.sin(nx * 24.1 + nz * 22.7) * Math.cos(ny * 23.4 + nx * 21.2) * 0.025;
+    // Sulci (deeper grooves)
+    const s1 = Math.abs(Math.sin(nx * 6.2 + ny * 5.8)) * -0.065;
+    const s2 = Math.abs(Math.sin(ny * 9.4 + nz * 8.6)) * -0.040;
+
+    // Brain shape: wider at top, narrower at bottom, elongated front-back
+    const shapeX = 0.88 + Math.abs(ny) * 0.04;
+    const shapeY = 0.78 + (ny > 0 ? 0.12 : -0.05);
+    const shapeZ = 0.92;
+
+    // Cerebellum bump at back-bottom
+    const cerebellum = ny < -0.3 && nz < -0.1
+      ? 0.06 * Math.exp(-((ny + 0.55) ** 2 + (nz + 0.4) ** 2) * 8)
+      : 0;
+
+    // Longitudinal fissure (midline groove)
+    const fissure = Math.abs(nx) < 0.08 ? -0.06 * (1 - Math.abs(nx) / 0.08) : 0;
+
+    const r = 1.0 + g1 + g2 + g3 + g4 + s1 + s2 + cerebellum + fissure;
+
+    arr[i * 3 + 0] = nx * r * shapeX;
+    arr[i * 3 + 1] = ny * r * shapeY;
+    arr[i * 3 + 2] = nz * r * shapeZ;
+  }
+
+  geo.computeVertexNormals();
+  return geo;
+}
+
+// ─── Particle Halo Generator ──────────────────────────────────────────────────
+// Particles form a halo/cloud around the brain — densest at surface, scatter outward
+function generateHaloParticles(count: number) {
+  const rng = makeRng(27182);
+  const positions = new Float32Array(count * 3);
+  const phases    = new Float32Array(count);
+  const sizes     = new Float32Array(count);
+
+  for (let i = 0; i < count; i++) {
+    // Random direction on sphere
+    const u = rng(), v = rng();
+    const theta = 2 * Math.PI * u;
+    const phi   = Math.acos(2 * v - 1);
+    const nx = Math.sin(phi) * Math.cos(theta);
+    const ny = Math.sin(phi) * Math.sin(theta);
+    const nz = Math.cos(phi);
+
+    // Brain shape factors
+    const shapeX = 0.88 + Math.abs(ny) * 0.04;
+    const shapeY = 0.78 + (ny > 0 ? 0.12 : -0.05);
+    const shapeZ = 0.92;
+
+    // Distance from brain surface: exponential falloff (most particles near surface)
+    const surfaceR = 1.0;
+    const scatter = rng();
+    // 70% within 0-0.25 of surface, 30% scattered further out
+    const dist = scatter < 0.7
+      ? surfaceR + rng() * 0.25
+      : surfaceR + 0.25 + rng() * 0.55;
+
+    positions[i * 3 + 0] = nx * dist * shapeX;
+    positions[i * 3 + 1] = ny * dist * shapeY;
+    positions[i * 3 + 2] = nz * dist * shapeZ;
+    phases[i] = rng() * Math.PI * 2;
+    // Particles closer to surface are slightly larger
+    sizes[i] = dist < 1.15 ? 0.008 + rng() * 0.006 : 0.004 + rng() * 0.004;
+  }
+
+  return { positions, phases, sizes };
+}
+
+// ─── Brain Mesh Component ─────────────────────────────────────────────────────
+function BrainMeshObj({
+  selected,
   groupRef,
 }: {
-  dimmed: boolean;
+  selected: Project | null;
   groupRef: React.RefObject<THREE.Group | null>;
 }) {
-  const PARTICLE_COUNT = 15000;
+  const HALO_COUNT = 22000;
+  const meshRef   = useRef<THREE.Mesh>(null);
   const pointsRef = useRef<THREE.Points>(null);
 
-  const { positions: basePos, phases } = useMemo(
-    () => generateBrainParticles(PARTICLE_COUNT),
+  const brainGeo = useMemo(() => createBrainGeometry(), []);
+
+  const brainMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: "#1a1a1e",
+        emissive: "#000000",
+        emissiveIntensity: 0.0,
+        roughness: 0.85,
+        metalness: 0.02,
+      }),
     []
   );
 
-  const animPos = useMemo(() => new Float32Array(basePos), [basePos]);
+  const { positions: haloBase, phases, sizes } = useMemo(
+    () => generateHaloParticles(HALO_COUNT),
+    []
+  );
+  const animPos = useMemo(() => new Float32Array(haloBase), [haloBase]);
 
-  const geometry = useMemo(() => {
+  const haloGeo = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(animPos, 3));
-
-    // Vertex colors: white at top, soft blue-grey at bottom
-    const colors = new Float32Array(PARTICLE_COUNT * 3);
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const y = basePos[i * 3 + 1];
-      const t = Math.max(0, Math.min(1, (y + 0.7) / 1.4));
-      colors[i * 3 + 0] = 0.72 + t * 0.28;
-      colors[i * 3 + 1] = 0.75 + t * 0.25;
-      colors[i * 3 + 2] = 0.82 + t * 0.18;
+    // White/light grey colours
+    const colors = new Float32Array(HALO_COUNT * 3);
+    const rngC = makeRng(99991);
+    for (let i = 0; i < HALO_COUNT; i++) {
+      const brightness = 0.55 + rngC() * 0.45;
+      colors[i * 3 + 0] = brightness * 0.92;
+      colors[i * 3 + 1] = brightness * 0.95;
+      colors[i * 3 + 2] = brightness; // pure white/grey
     }
     geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
     return geo;
-  }, [basePos, animPos]);
+  }, [animPos]);
 
-  const material = useMemo(
+  const haloMat = useMemo(
     () =>
       new THREE.PointsMaterial({
-        size: 0.011,
+        size: 0.008,
         vertexColors: true,
         transparent: true,
         opacity: 0.88,
@@ -203,274 +239,251 @@ function ParticleBrain({
   useFrame((state) => {
     if (!groupRef.current) return;
 
-    // Auto-rotate when nothing selected
-    if (!dimmed) {
-      groupRef.current.rotation.y += 0.003;
-    }
+    // Auto-rotate
+    if (!selected) groupRef.current.rotation.y += 0.0022;
 
-    // Breathing animation
     const t = state.clock.elapsedTime;
-    const pos = geometry.attributes.position as THREE.BufferAttribute;
-    const arr = pos.array as Float32Array;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const ph = phases[i];
-      const breathe = 1.0 + 0.022 * Math.sin(t * 0.7 + ph);
-      arr[i * 3 + 0] = basePos[i * 3 + 0] * breathe;
-      arr[i * 3 + 1] = basePos[i * 3 + 1] * breathe;
-      arr[i * 3 + 2] = basePos[i * 3 + 2] * breathe;
-    }
-    pos.needsUpdate = true;
+    const posAttr = haloGeo.attributes.position as THREE.BufferAttribute;
+    const posArr  = posAttr.array as Float32Array;
 
-    // Smooth opacity transition
-    const targetOpacity = dimmed ? 0.12 : 0.88;
-    material.opacity = THREE.MathUtils.lerp(material.opacity, targetOpacity, 0.04);
+    // Breathing animation — particles gently drift outward and back
+    for (let i = 0; i < HALO_COUNT; i++) {
+      const ph = phases[i];
+      const breathe = 1.0 + 0.022 * Math.sin(t * 0.55 + ph);
+      posArr[i * 3 + 0] = haloBase[i * 3 + 0] * breathe;
+      posArr[i * 3 + 1] = haloBase[i * 3 + 1] * breathe;
+      posArr[i * 3 + 2] = haloBase[i * 3 + 2] * breathe;
+    }
+    posAttr.needsUpdate = true;
+
+    // Fade brain opacity when zoomed in
+    brainMat.opacity = THREE.MathUtils.lerp(
+      brainMat.opacity ?? 1.0,
+      selected ? 0.45 : 1.0,
+      0.04
+    );
+    haloMat.opacity = THREE.MathUtils.lerp(
+      haloMat.opacity,
+      selected ? 0.55 : 0.88,
+      0.04
+    );
   });
 
   return (
     <group ref={groupRef}>
-      <points geometry={geometry} material={material} scale={1.35} />
+      {/* Solid brain mesh */}
+      <mesh ref={meshRef} geometry={brainGeo} material={brainMat} />
+
+      {/* Midline highlight — vertical line along longitudinal fissure */}
+      <mesh>
+        <cylinderGeometry args={[0.005, 0.005, 1.6, 8]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+
+      {/* Particle halo */}
+      <points ref={pointsRef} geometry={haloGeo} material={haloMat} />
     </group>
   );
 }
 
-// ─── Expanded Neural Network (shown on click) ─────────────────────────────────
-function ExpandedNetwork({
-  project,
-  visible,
-}: {
-  project: Project | null;
-  visible: boolean;
-}) {
+// ─── Neural Network Inside Brain ──────────────────────────────────────────────
+function BrainNeuralNetwork({ project, visible }: { project: Project | null; visible: boolean }) {
   const groupRef = useRef<THREE.Group>(null);
+  const fadeRef  = useRef(0);
 
-  const obj = useMemo(() => {
-    if (!project) return null;
-    let seed = project.id * 7919 + 31337;
-    const rand = () => {
-      seed = (seed * 1664525 + 1013904223) & 0xffffffff;
-      return (seed >>> 0) / 0xffffffff;
-    };
+  const { lines, nodes, lineMat, nodeMats } = useMemo(() => {
+    if (!project) return { lines: null, nodes: null, lineMat: null, nodeMats: [] };
+    const rng = makeRng(project.id * 7919 + 42);
+    const N   = 90;
+    const base  = new THREE.Color(project.color);
+    const white = new THREE.Color("#ffffff");
+    const palette = [base, base.clone().lerp(white, 0.4), white.clone().multiplyScalar(0.9), base.clone().lerp(new THREE.Color("#00d4ff"), 0.35)];
 
-    const N = 80;
-    const base = new THREE.Color(project.color);
-    const palette = [
-      base,
-      new THREE.Color("#00d4ff"),
-      new THREE.Color("#ffffff"),
-      new THREE.Color("#a855f7"),
-      new THREE.Color("#f59e0b"),
-      new THREE.Color("#10b981"),
-      new THREE.Color("#ff6b6b"),
-    ];
-
+    // Nodes clustered around the project region
+    const [px, py, pz] = project.pos;
     const nodePos: THREE.Vector3[] = [];
     for (let i = 0; i < N; i++) {
-      const theta = rand() * Math.PI * 2;
-      const phi = Math.acos(2 * rand() - 1);
-      const r = 0.1 + rand() * 1.4;
-      nodePos.push(
-        new THREE.Vector3(
-          r * Math.sin(phi) * Math.cos(theta),
-          r * Math.sin(phi) * Math.sin(theta),
-          r * Math.cos(phi)
-        )
-      );
+      const theta = rng() * Math.PI * 2;
+      const phi   = Math.acos(2 * rng() - 1);
+      const r     = 0.05 + rng() * 0.52;
+      nodePos.push(new THREE.Vector3(
+        px + r * Math.sin(phi) * Math.cos(theta),
+        py + r * Math.sin(phi) * Math.sin(theta),
+        pz + r * Math.cos(phi)
+      ));
     }
 
-    const posArr: number[] = [];
-    const colArr: number[] = [];
+    // Lines
+    const posArr: number[] = [], colArr: number[] = [];
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
-        if (nodePos[i].distanceTo(nodePos[j]) < 0.8 && rand() > 0.25) {
-          posArr.push(
-            nodePos[i].x, nodePos[i].y, nodePos[i].z,
-            nodePos[j].x, nodePos[j].y, nodePos[j].z
-          );
-          const c = palette[Math.floor(rand() * palette.length)];
+        if (nodePos[i].distanceTo(nodePos[j]) < 0.45 && rng() > 0.30) {
+          posArr.push(nodePos[i].x, nodePos[i].y, nodePos[i].z, nodePos[j].x, nodePos[j].y, nodePos[j].z);
+          const c = palette[Math.floor(rng() * palette.length)];
           colArr.push(c.r, c.g, c.b, c.r, c.g, c.b);
         }
       }
     }
-
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(posArr), 3));
-    lineGeo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(colArr), 3));
-    const lines = new THREE.LineSegments(
-      lineGeo,
-      new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, depthWrite: false })
-    );
+    lineGeo.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(colArr), 3));
+    const lineMat = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const lines = new THREE.LineSegments(lineGeo, lineMat);
 
-    const sphereGeo = new THREE.SphereGeometry(0.035, 8, 8);
-    const group = new THREE.Group();
-    group.add(lines);
+    // Node spheres
+    const sphereGeo = new THREE.SphereGeometry(0.016, 8, 8);
+    const nodeMats: THREE.MeshBasicMaterial[] = [];
+    const nodeGroup = new THREE.Group();
     nodePos.forEach((p) => {
-      const c = palette[Math.floor(rand() * palette.length)].clone().lerp(new THREE.Color("#ffffff"), rand() * 0.5);
-      const mesh = new THREE.Mesh(
-        sphereGeo,
-        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.9 })
-      );
+      const c = palette[Math.floor(rng() * palette.length)].clone();
+      const mat = new THREE.MeshBasicMaterial({
+        color: c, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      });
+      nodeMats.push(mat);
+      const mesh = new THREE.Mesh(sphereGeo, mat);
       mesh.position.copy(p);
-      group.add(mesh);
+      nodeGroup.add(mesh);
     });
 
-    return group;
+    return { lines, nodes: nodeGroup, lineMat, nodeMats };
   }, [project]);
 
   useFrame((_, delta) => {
-    if (groupRef.current && visible) {
-      groupRef.current.rotation.y += delta * 0.25;
-      groupRef.current.rotation.x += delta * 0.08;
-    }
+    if (!groupRef.current || !lineMat) return;
+    const target = visible ? 1.0 : 0.0;
+    fadeRef.current = THREE.MathUtils.lerp(fadeRef.current, target, delta * 2.5);
+    lineMat.opacity = fadeRef.current * 0.9;
+    nodeMats.forEach(m => { m.opacity = fadeRef.current * 0.95; });
+    if (visible) groupRef.current.rotation.y += delta * 0.10;
   });
 
-  if (!obj) return null;
+  if (!lines || !nodes) return null;
   return (
-    <group
-      ref={groupRef}
-      visible={visible}
-      position={project?.pos ?? [0, 0, 0]}
-      scale={visible ? 1 : 0}
-    >
-      <primitive object={obj} />
+    <group ref={groupRef}>
+      <primitive object={lines} />
+      <primitive object={nodes} />
     </group>
   );
 }
 
 // ─── Project Node ─────────────────────────────────────────────────────────────
 function ProjectNode({
-  project,
-  selected,
-  anySelected,
-  onSelect,
+  project, selected, anySelected, onSelect,
 }: {
-  project: Project;
-  selected: boolean;
-  anySelected: boolean;
-  onSelect: () => void;
+  project: Project; selected: boolean; anySelected: boolean; onSelect: () => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const coreRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
   const color = useMemo(() => new THREE.Color(project.color), [project.color]);
 
   useFrame(({ clock }) => {
-    if (!meshRef.current || !glowRef.current) return;
+    if (!coreRef.current || !glowRef.current) return;
     const t = clock.elapsedTime;
     const pulse = selected
-      ? 1.5 + 0.18 * Math.sin(t * 3.0)
+      ? 1.6 + 0.22 * Math.sin(t * 3.2)
       : hovered
-      ? 1.3 + 0.1 * Math.sin(t * 4.0)
-      : 1.0 + 0.06 * Math.sin(t * 1.8 + project.id);
+      ? 1.35 + 0.10 * Math.sin(t * 4.0)
+      : 1.0 + 0.08 * Math.sin(t * 1.7 + project.id * 1.4);
 
-    meshRef.current.scale.setScalar(pulse);
-    glowRef.current.scale.setScalar(pulse * 2.0);
+    coreRef.current.scale.setScalar(pulse);
+    glowRef.current.scale.setScalar(pulse * 2.4);
 
-    const dimTarget = anySelected && !selected ? 0.08 : 1.0;
-    const mat = meshRef.current.material as THREE.MeshStandardMaterial;
-    mat.opacity = THREE.MathUtils.lerp(mat.opacity, dimTarget, 0.06);
-    mat.emissiveIntensity = selected ? 6 : hovered ? 4 : 2.5;
+    const coreMat = coreRef.current.material as THREE.MeshStandardMaterial;
+    coreMat.emissiveIntensity = selected ? 10 : hovered ? 7 : 4;
+    coreMat.opacity = THREE.MathUtils.lerp(coreMat.opacity, anySelected && !selected ? 0.08 : 1.0, 0.07);
 
     const glowMat = glowRef.current.material as THREE.MeshBasicMaterial;
     glowMat.opacity = THREE.MathUtils.lerp(
       glowMat.opacity,
-      anySelected && !selected ? 0.01 : selected ? 0.55 : hovered ? 0.35 : 0.2,
-      0.06
+      anySelected && !selected ? 0.01 : selected ? 0.70 : hovered ? 0.45 : 0.28,
+      0.07
     );
   });
 
   return (
     <group position={project.pos}>
-      {/* Outer glow sphere */}
       <mesh ref={glowRef}>
         <sphereGeometry args={[0.05, 16, 16]} />
-        <meshBasicMaterial
-          color={color}
-          transparent
-          opacity={0.22}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
+        <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
-      {/* Core node */}
       <mesh
-        ref={meshRef}
+        ref={coreRef}
         onClick={(e) => { e.stopPropagation(); onSelect(); }}
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
       >
-        <sphereGeometry args={[0.022, 20, 20]} />
-        <meshStandardMaterial
-          color={color}
-          emissive={color}
-          emissiveIntensity={2.5}
-          roughness={0.1}
-          metalness={0.8}
-          transparent
-          opacity={1}
-        />
+        <sphereGeometry args={[0.024, 16, 16]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={4} roughness={0.05} metalness={0.9} transparent opacity={1} />
       </mesh>
     </group>
   );
 }
 
 // ─── Camera Controller ────────────────────────────────────────────────────────
-function CameraController({
-  selected,
-  controlsRef,
-}: {
-  selected: Project | null;
-  controlsRef: React.RefObject<any>;
-}) {
-  const targetCamPos = useRef(new THREE.Vector3(0, 0, 5));
+function CameraController({ selected, controlsRef }: { selected: Project | null; controlsRef: React.RefObject<any> }) {
+  const targetPos  = useRef(new THREE.Vector3(0, 0, 4.5));
   const targetLook = useRef(new THREE.Vector3(0, 0, 0));
 
   useEffect(() => {
     if (selected) {
-      const p = new THREE.Vector3(...selected.pos).multiplyScalar(1.35);
-      targetCamPos.current.set(p.x * 1.8, p.y * 1.8, p.z * 1.8 + 2.2);
-      targetLook.current.set(p.x * 0.8, p.y * 0.8, p.z * 0.8);
+      const [px, py, pz] = selected.pos;
+      // Zoom into the brain region — camera moves close to the node
+      const dir = new THREE.Vector3(px, py, pz).normalize();
+      const dist = 1.6;
+      targetPos.current.set(
+        dir.x * dist + px * 0.2,
+        dir.y * dist + py * 0.2,
+        dir.z * dist + pz * 0.2
+      );
+      targetLook.current.set(px * 0.6, py * 0.6, pz * 0.6);
       if (controlsRef.current) controlsRef.current.enabled = false;
     } else {
-      targetCamPos.current.set(0, 0, 5);
+      targetPos.current.set(0, 0, 4.5);
       targetLook.current.set(0, 0, 0);
       if (controlsRef.current) controlsRef.current.enabled = true;
     }
   }, [selected, controlsRef]);
 
   useFrame(({ camera }, delta) => {
-    camera.position.lerp(targetCamPos.current, delta * 2.5);
-    if (controlsRef.current) {
-      controlsRef.current.target.lerp(targetLook.current, delta * 2.5);
-    }
+    camera.position.lerp(targetPos.current, delta * 2.2);
+    if (controlsRef.current) controlsRef.current.target.lerp(targetLook.current, delta * 2.2);
   });
 
   return null;
 }
 
-// ─── 3D Scene ─────────────────────────────────────────────────────────────────
-function BrainScene({
-  selected,
-  onSelect,
-  controlsRef,
-}: {
+// ─── Scene ────────────────────────────────────────────────────────────────────
+function BrainScene({ selected, onSelect, controlsRef }: {
   selected: Project | null;
   onSelect: (p: Project | null) => void;
   controlsRef: React.RefObject<any>;
 }) {
-  const groupRef = useRef<THREE.Group>(null);
+  const brainGroupRef = useRef<THREE.Group>(null);
 
   return (
     <>
-      <ambientLight intensity={0.4} />
-      <pointLight position={[4, 4, 4]} intensity={1.5} color="#ffffff" />
-      <pointLight position={[-3, -2, -3]} intensity={0.8} color="#4488ff" />
-      <pointLight position={[0, -4, 2]} intensity={0.5} color="#8844ff" />
+      <ambientLight intensity={0.08} />
+      <directionalLight position={[3, 5, 4]}    intensity={8.5} color="#f0f4ff" />
+      <directionalLight position={[-3, 2, 2]}   intensity={3.0} color="#aabbdd" />
+      <directionalLight position={[0, -4, 2]}   intensity={1.5} color="#778899" />
+      <directionalLight position={[0, 1, -4]}   intensity={0.8} color="#556677" />
+      <pointLight position={[2, 3, 3]}  intensity={5.0} color="#ffffff" distance={8} />
+      <pointLight position={[-2, 2, 2]} intensity={2.5} color="#99aabb" distance={6} />
 
-      <Stars radius={90} depth={60} count={4000} factor={3} fade speed={0.4} />
+      <Stars radius={120} depth={60} count={4000} factor={3} fade speed={0.25} />
 
-      <ParticleBrain dimmed={!!selected} groupRef={groupRef} />
+      {/* Brain mesh + particle halo */}
+      <BrainMeshObj selected={selected} groupRef={brainGroupRef} />
 
-      {/* Project nodes are in world space (not inside brain group so they don't rotate with it) */}
+      {/* Neural network — appears inside brain on click */}
+      <BrainNeuralNetwork project={selected} visible={!!selected} />
+
+      {/* Project nodes — in world space (don't rotate with brain) */}
       {PROJECTS.map((proj) => (
         <ProjectNode
           key={proj.id}
@@ -481,122 +494,85 @@ function BrainScene({
         />
       ))}
 
-      <ExpandedNetwork project={selected} visible={!!selected} />
-
       <CameraController selected={selected} controlsRef={controlsRef} />
 
       <OrbitControls
         ref={controlsRef}
         enableZoom
         enablePan={false}
-        minDistance={2.5}
+        minDistance={1.5}
         maxDistance={9}
-        dampingFactor={0.08}
+        dampingFactor={0.07}
         enableDamping
+        autoRotate={false}
       />
     </>
   );
 }
 
 // ─── Detail Panel ─────────────────────────────────────────────────────────────
-function DetailPanel({
-  project,
-  onClose,
-}: {
-  project: Project;
-  onClose: () => void;
-}) {
+function DetailPanel({ project, onClose }: { project: Project; onClose: () => void }) {
   return (
     <motion.div
       initial={{ x: 60, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: 60, opacity: 0 }}
-      transition={{ duration: 0.45, ease: [0.23, 1, 0.32, 1] }}
-      className="absolute top-1/2 right-6 -translate-y-1/2 w-80 z-20"
+      transition={{ duration: 0.42, ease: [0.23, 1, 0.32, 1] }}
       style={{
-        background: "rgba(0,0,0,0.82)",
-        backdropFilter: "blur(24px)",
-        border: `1px solid ${project.color}45`,
-        borderRadius: "14px",
-        boxShadow: `0 0 50px ${project.color}20, inset 0 1px 0 ${project.color}30`,
+        position: "absolute", top: "50%", right: 24,
+        transform: "translateY(-50%)", width: 290, zIndex: 20,
+        background: "rgba(0,0,0,0.90)",
+        backdropFilter: "blur(28px)",
+        border: `1px solid ${project.color}40`,
+        borderRadius: 14,
+        boxShadow: `0 0 60px ${project.color}18, inset 0 1px 0 ${project.color}28`,
       }}
     >
-      {/* Top glow line */}
-      <div
-        className="h-px w-full rounded-t-xl"
-        style={{ background: `linear-gradient(90deg, transparent, ${project.color}cc, transparent)` }}
-      />
-
-      {/* Corner brackets */}
-      {["top-3 left-3 border-t border-l", "top-3 right-3 border-t border-r", "bottom-3 left-3 border-b border-l", "bottom-3 right-3 border-b border-r"].map((cls, i) => (
-        <div key={i} className={`absolute w-4 h-4 ${cls}`} style={{ borderColor: project.color + "80" }} />
+      <div style={{ height: 1, background: `linear-gradient(90deg, transparent, ${project.color}bb, transparent)`, borderRadius: "14px 14px 0 0" }} />
+      {[
+        { top: 10, left: 10, borderTop: `1px solid ${project.color}70`, borderLeft: `1px solid ${project.color}70` },
+        { top: 10, right: 10, borderTop: `1px solid ${project.color}70`, borderRight: `1px solid ${project.color}70` },
+        { bottom: 10, left: 10, borderBottom: `1px solid ${project.color}70`, borderLeft: `1px solid ${project.color}70` },
+        { bottom: 10, right: 10, borderBottom: `1px solid ${project.color}70`, borderRight: `1px solid ${project.color}70` },
+      ].map((s, i) => (
+        <div key={i} style={{ position: "absolute", width: 12, height: 12, ...s }} />
       ))}
 
-      <div className="p-6">
-        <p className="text-xs font-mono mb-1.5 tracking-wider" style={{ color: project.color }}>
+      <div style={{ padding: 22 }}>
+        <p style={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", color: project.color, letterSpacing: "0.16em", marginBottom: 5 }}>
           {project.subtitle}
         </p>
-        <h3
-          className="text-xl font-bold text-white mb-3"
-          style={{ fontFamily: "'Space Grotesk', sans-serif" }}
-        >
+        <h3 style={{ fontSize: 17, fontWeight: 700, color: "#ffffff", fontFamily: "'Space Grotesk', sans-serif", margin: "0 0 10px" }}>
           {project.title}
         </h3>
-        <p className="text-xs text-gray-400 leading-relaxed mb-5">{project.desc}</p>
+        <p style={{ fontSize: 11, color: "#9ca3af", lineHeight: 1.75, marginBottom: 16 }}>
+          {project.desc}
+        </p>
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-5">
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 7, marginBottom: 16 }}>
           {project.stats.map(([val, label]) => (
-            <div
-              key={label}
-              className="text-center p-2 rounded"
-              style={{ background: `${project.color}12`, border: `1px solid ${project.color}28` }}
-            >
-              <div
-                className="text-sm font-bold"
-                style={{ color: project.color, fontFamily: "'Space Grotesk', sans-serif" }}
-              >
-                {val}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">{label}</div>
+            <div key={label} style={{ textAlign: "center", padding: "7px 4px", background: `${project.color}10`, border: `1px solid ${project.color}25`, borderRadius: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: project.color, fontFamily: "'Space Grotesk', sans-serif" }}>{val}</div>
+              <div style={{ fontSize: 9, color: "#6b7280", marginTop: 2 }}>{label}</div>
             </div>
           ))}
         </div>
 
-        {/* Tech tags */}
-        <div className="flex flex-wrap gap-1.5 mb-5">
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
           {project.tech.map((t) => (
-            <span
-              key={t}
-              className="text-xs px-2 py-0.5 rounded font-mono"
-              style={{ border: `1px solid ${project.color}40`, color: project.color + "cc" }}
-            >
+            <span key={t} style={{ fontSize: 10, padding: "2px 7px", border: `1px solid ${project.color}38`, color: project.color + "cc", borderRadius: 4, fontFamily: "JetBrains Mono, monospace" }}>
               {t}
             </span>
           ))}
         </div>
 
-        {/* Buttons */}
-        <div className="flex gap-2">
-          <a
-            href={project.github}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-1 text-center text-xs py-2 rounded font-mono transition-all duration-200"
-            style={{
-              background: `${project.color}20`,
-              border: `1px solid ${project.color}60`,
-              color: project.color,
-            }}
-            onMouseOver={(e) => (e.currentTarget.style.background = `${project.color}38`)}
-            onMouseOut={(e) => (e.currentTarget.style.background = `${project.color}20`)}
-          >
+        <div style={{ display: "flex", gap: 8 }}>
+          <a href={project.github} target="_blank" rel="noopener noreferrer"
+            style={{ flex: 1, textAlign: "center", fontSize: 11, padding: "8px 0", background: `${project.color}18`, border: `1px solid ${project.color}55`, color: project.color, borderRadius: 6, fontFamily: "JetBrains Mono, monospace", textDecoration: "none" }}>
             GitHub →
           </a>
-          <button
-            onClick={onClose}
-            className="px-3 text-xs py-2 rounded font-mono text-gray-500 border border-white/10 hover:border-white/30 hover:text-gray-300 transition-all"
-          >
+          <button onClick={onClose}
+            style={{ padding: "8px 12px", fontSize: 11, background: "transparent", border: "1px solid rgba(255,255,255,0.10)", color: "#6b7280", borderRadius: 6, fontFamily: "JetBrains Mono, monospace", cursor: "pointer" }}>
             ESC
           </button>
         </div>
@@ -616,70 +592,46 @@ export default function ProjectsSection() {
   }, []);
 
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [handleClose]);
 
   return (
-    <section
-      id="projects"
-      style={{ height: "100vh", background: "#000000", position: "relative", overflow: "hidden" }}
-    >
+    <section id="projects" style={{ height: "100vh", background: "#000000", position: "relative", overflow: "hidden" }}>
       {/* Header */}
-      <div
-        style={{
-          position: "absolute", top: 32, left: 0, right: 0,
-          textAlign: "center", zIndex: 10, pointerEvents: "none",
-        }}
-      >
-        <p style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", color: "#00d4ff99", letterSpacing: "0.2em", marginBottom: 8 }}>
+      <div style={{ position: "absolute", top: 28, left: 0, right: 0, textAlign: "center", zIndex: 10, pointerEvents: "none" }}>
+        <p style={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", color: "#00d4ff88", letterSpacing: "0.22em", marginBottom: 6 }}>
           SYS.05 · PROJECT MATRIX
         </p>
-        <h2 style={{ fontSize: 36, fontWeight: 700, color: "#ffffff", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>
+        <h2 style={{ fontSize: 34, fontWeight: 700, color: "#ffffff", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>
           Projects
         </h2>
-        <p style={{ fontSize: 11, fontFamily: "JetBrains Mono, monospace", color: "#4b5563", marginTop: 8, letterSpacing: "0.12em" }}>
-          DRAG TO SPIN · SCROLL TO ZOOM · CLICK A NODE TO EXPLORE
+        <p style={{ fontSize: 10, fontFamily: "JetBrains Mono, monospace", color: "#374151", marginTop: 7, letterSpacing: "0.14em" }}>
+          {selected ? "CLICK ANYWHERE TO RETURN  ·  ESC TO EXIT" : "DRAG TO SPIN  ·  SCROLL TO ZOOM  ·  CLICK A NODE TO EXPLORE"}
         </p>
       </div>
 
       {/* Project list sidebar */}
-      <div
-        style={{
-          position: "absolute", left: 24, top: "50%", transform: "translateY(-50%)",
-          zIndex: 10, display: "flex", flexDirection: "column", gap: 8,
-        }}
-      >
+      <div style={{ position: "absolute", left: 20, top: "50%", transform: "translateY(-50%)", zIndex: 10, display: "flex", flexDirection: "column", gap: 6 }}>
         {PROJECTS.map((proj) => (
           <button
             key={proj.id}
             onClick={() => setSelected(selected?.id === proj.id ? null : proj)}
             style={{
-              background: selected?.id === proj.id ? `${proj.color}18` : "transparent",
-              border: `1px solid ${selected?.id === proj.id ? proj.color + "55" : "transparent"}`,
-              borderRadius: 8, padding: "8px 12px", cursor: "pointer",
+              background: selected?.id === proj.id ? `${proj.color}15` : "transparent",
+              border: `1px solid ${selected?.id === proj.id ? proj.color + "50" : "transparent"}`,
+              borderRadius: 8, padding: "7px 11px", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 8, textAlign: "left",
-              transition: "all 0.2s",
+              transition: "all 0.2s ease",
             }}
           >
-            <div
-              style={{
-                width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                background: proj.color,
-                boxShadow: `0 0 8px ${proj.color}`,
-              }}
-            />
+            <div style={{ width: 7, height: 7, borderRadius: "50%", flexShrink: 0, background: proj.color, boxShadow: `0 0 8px ${proj.color}` }} />
             <div>
-              <div style={{
-                fontSize: 12, fontWeight: 600, color: selected?.id === proj.id ? proj.color : "#9ca3af",
-                fontFamily: "'Space Grotesk', sans-serif",
-              }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: selected?.id === proj.id ? proj.color : "#9ca3af", fontFamily: "'Space Grotesk', sans-serif" }}>
                 {proj.title}
               </div>
-              <div style={{ fontSize: 10, color: "#4b5563", fontFamily: "JetBrains Mono, monospace" }}>
+              <div style={{ fontSize: 9, color: "#4b5563", fontFamily: "JetBrains Mono, monospace" }}>
                 {proj.subtitle}
               </div>
             </div>
@@ -689,7 +641,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 5], fov: 60 }}
+        camera={{ position: [0, 0, 4.5], fov: 52 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: "#000000" }}
         onPointerMissed={handleClose}
@@ -699,9 +651,7 @@ export default function ProjectsSection() {
 
       {/* Detail panel */}
       <AnimatePresence>
-        {selected && (
-          <DetailPanel project={selected} onClose={handleClose} />
-        )}
+        {selected && <DetailPanel project={selected} onClose={handleClose} />}
       </AnimatePresence>
     </section>
   );

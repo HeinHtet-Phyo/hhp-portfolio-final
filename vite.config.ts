@@ -203,7 +203,29 @@ function vitePluginStorageProxy(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()];
+// Strip data-loc from R3F Three.js elements (lowercase JSX tags) to prevent
+// R3F applyProps crash: "Cannot set data-loc. Ensure it is an object before setting loc."
+// The jsxLocPlugin injects data-loc into ALL JSX elements, but Three.js objects
+// don't have a .data property, so R3F throws when it tries to set .data.loc
+function vitePluginStripR3FDataLoc(): Plugin {
+  return {
+    name: "strip-r3f-data-loc",
+    enforce: "post",
+    transform(code, id) {
+      if (!id.endsWith(".tsx") && !id.endsWith(".jsx")) return null;
+      // Remove data-loc from Three.js R3F elements (lowercase tags: mesh, group, points, etc.)
+      // These are identified by being lowercase JSX elements with data-loc prop
+      // Pattern: data-loc="..." on lowercase JSX elements
+      const transformed = code.replace(
+        /(<(?:mesh|group|points|line|lineSegments|bufferGeometry|sphereGeometry|cylinderGeometry|planeGeometry|boxGeometry|meshStandardMaterial|meshBasicMaterial|pointsMaterial|lineBasicMaterial|ambientLight|directionalLight|pointLight|spotLight|hemisphereLight|perspectiveCamera|orthographicCamera|primitive|instancedMesh|skinnedMesh|bone|object3D|scene|fog|axesHelper|gridHelper|arrowHelper|boxHelper)[^>]*)\s+data-loc="[^"]*"/g,
+        "$1"
+      );
+      return transformed !== code ? { code: transformed, map: null } : null;
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy(), vitePluginStripR3FDataLoc()];
 
 export default defineConfig({
   plugins,
