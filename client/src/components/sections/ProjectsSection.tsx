@@ -17,7 +17,8 @@
  * - Deep dark teal/navy background (#020d18)
  */
 
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -82,10 +83,230 @@ const TEAL_GLOW  = "#00d4ff";
 const BG         = "#020d18";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-function BrainModel({ selected }: { selected: Project | null }) {
+// Project hotspot positions — placed ON the brain surface (brain radius ~0.28 at these angles)
+const PROJECT_HOTSPOTS: [number, number, number][] = [
+  [-0.08,  0.20,  0.24],  // 0: MoodTunes — frontal lobe (top-front)
+  [ 0.12,  0.14,  0.22],  // 1: IT Career — parietal (top-right)
+  [-0.04,  0.00,  0.26],  // 2: CityPulse — temporal (mid-front)
+  [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
+];
+
+// ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
+function HotspotDot({ position, index, active, onSelect }: {
+  position: [number, number, number];
+  index: number;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const proj = PROJECTS[index];
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    if (meshRef.current) {
+      const s = active ? 1.4 : (1.0 + 0.15 * Math.sin(t * 2.5 + index));
+      meshRef.current.scale.setScalar(s);
+    }
+    if (ringRef.current) {
+      const rs = 1.0 + 0.4 * Math.sin(t * 2.0 + index * 1.2);
+      ringRef.current.scale.setScalar(rs);
+      (ringRef.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.9 : (0.3 + 0.3 * Math.sin(t * 2.0 + index));
+    }
+  });
+
+  return (
+    <group position={position}>
+      {/* Outer pulsing ring */}
+      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.022, 0.004, 8, 32]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={0.5} />
+      </mesh>
+      {/* Core dot — clickable */}
+      <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <sphereGeometry args={[0.014, 16, 16]} />
+        <meshBasicMaterial color={active ? "#ffffff" : TEAL} />
+      </mesh>
+      {/* Glow halo — very small, additive */}
+      <mesh>
+        <circleGeometry args={[0.018, 16]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={active ? 0.55 : 0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      {/* HTML label */}
+      <Html
+        position={[0.04, 0.02, 0]}
+        style={{ pointerEvents: "none", userSelect: "none" }}
+        distanceFactor={1.2}
+      >
+        <div style={{
+          background: active ? "rgba(0,229,255,0.18)" : "rgba(0,20,35,0.75)",
+          border: `1px solid ${active ? "#00e5ff" : "rgba(0,229,255,0.3)"}`,
+          borderRadius: 4, padding: "3px 7px",
+          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
+          color: active ? "#ffffff" : "#00e5ff",
+          whiteSpace: "nowrap",
+          backdropFilter: "blur(4px)",
+          boxShadow: active ? "0 0 10px rgba(0,229,255,0.5)" : "none",
+          transition: "all 0.2s ease",
+        }}>
+          {PROJECTS[index].title}
+        </div>
+      </Html>
+    </group>
+  );
+}
+
+// ─── Circuit Overlay (canvas texture drawn on a plane in front of brain) ──────
+function CircuitOverlay() {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const texRef  = useRef<THREE.CanvasTexture | null>(null);
+
+  const canvas2d = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext("2d")!;
+
+    // Draw circuit traces
+    ctx.clearRect(0, 0, 512, 512);
+    ctx.strokeStyle = "rgba(0,229,255,0.55)";
+    ctx.lineWidth = 1.2;
+
+    // Horizontal + vertical traces
+    const traces = [
+      // [x1,y1,x2,y2]
+      [120, 200, 220, 200], [220, 200, 220, 260], [220, 260, 310, 260],
+      [310, 260, 310, 180], [310, 180, 390, 180],
+      [150, 320, 260, 320], [260, 320, 260, 380], [260, 380, 350, 380],
+      [180, 150, 180, 240], [180, 240, 240, 240],
+      [350, 300, 420, 300], [420, 300, 420, 360],
+      [100, 260, 140, 260], [140, 260, 140, 310], [140, 310, 200, 310],
+    ];
+    for (const [x1, y1, x2, y2] of traces) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+
+    // Junction dots
+    const junctions = [[220,200],[310,260],[310,180],[260,320],[260,380],[180,240],[420,300],[140,260],[140,310]];
+    ctx.fillStyle = "rgba(0,229,255,0.9)";
+    for (const [jx, jy] of junctions) {
+      ctx.beginPath(); ctx.arc(jx, jy, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Chip outline in centre
+    ctx.strokeStyle = "rgba(0,229,255,0.7)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(220, 200, 90, 80);
+    // Chip pins
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 200); ctx.lineTo(220 + i * 22 + 11, 188); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 280); ctx.lineTo(220 + i * 22 + 11, 292); ctx.stroke();
+    }
+
+    return c;
+  }, []);
+
+  useFrame(({ clock }) => {
+    if (!texRef.current) return;
+    // Animate: redraw with animated glow
+    const c = canvas2d;
+    const ctx = c.getContext("2d")!;
+    const t = clock.elapsedTime;
+
+    ctx.clearRect(0, 0, 512, 512);
+
+    // Animated trace glow
+    const glow = 0.4 + 0.25 * Math.sin(t * 1.5);
+    ctx.strokeStyle = `rgba(0,229,255,${glow})`;
+    ctx.lineWidth = 1.2;
+    const traces = [
+      [120, 200, 220, 200], [220, 200, 220, 260], [220, 260, 310, 260],
+      [310, 260, 310, 180], [310, 180, 390, 180],
+      [150, 320, 260, 320], [260, 320, 260, 380], [260, 380, 350, 380],
+      [180, 150, 180, 240], [180, 240, 240, 240],
+      [350, 300, 420, 300], [420, 300, 420, 360],
+      [100, 260, 140, 260], [140, 260, 140, 310], [140, 310, 200, 310],
+    ];
+    for (const [x1, y1, x2, y2] of traces) {
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+
+    // Animated data packet along traces
+    const pkt = (t * 80) % 512;
+    const pg = ctx.createRadialGradient(pkt, 200, 0, pkt, 200, 12);
+    pg.addColorStop(0, "rgba(0,255,255,1)");
+    pg.addColorStop(1, "rgba(0,255,255,0)");
+    ctx.fillStyle = pg;
+    ctx.beginPath(); ctx.arc(pkt > 220 ? 220 : pkt, 200, 12, 0, Math.PI * 2); ctx.fill();
+
+    // Junction dots
+    const junctions = [[220,200],[310,260],[310,180],[260,320],[260,380],[180,240],[420,300],[140,260],[140,310]];
+    const jg = 0.7 + 0.3 * Math.sin(t * 2.0);
+    ctx.fillStyle = `rgba(0,229,255,${jg})`;
+    for (const [jx, jy] of junctions) {
+      ctx.beginPath(); ctx.arc(jx, jy, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Chip
+    ctx.strokeStyle = `rgba(0,229,255,${0.5 + 0.3 * Math.sin(t)})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(220, 200, 90, 80);
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 200); ctx.lineTo(220 + i * 22 + 11, 188); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(220 + i * 22 + 11, 280); ctx.lineTo(220 + i * 22 + 11, 292); ctx.stroke();
+    }
+
+    texRef.current.needsUpdate = true;
+  });
+
+  const tex = useMemo(() => {
+    const t = new THREE.CanvasTexture(canvas2d);
+    texRef.current = t;
+    return t;
+  }, [canvas2d]);
+
+  return (
+    <mesh ref={meshRef} position={[0, 0.08, 0.30]} rotation={[0, 0, 0]}>
+      <planeGeometry args={[0.52, 0.52]} />
+      <meshBasicMaterial map={tex} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
+    </mesh>
+  );
+}
+
+// ─── Camera Controller (zoom in/out on project select) ────────────────────────
+function CameraController({ selected }: { selected: Project | null }) {
+  const { camera } = useThree();
+  const targetZ = useRef(1.25);
+  const targetX = useRef(0);
+  const targetY = useRef(0);
+
+  useEffect(() => {
+    if (selected) {
+      const hp = PROJECT_HOTSPOTS[selected.id];
+      targetX.current = hp[0] * 0.4;
+      targetY.current = hp[1] * 0.3;
+      targetZ.current = 0.75;  // zoom in
+    } else {
+      targetX.current = 0;
+      targetY.current = 0;
+      targetZ.current = 1.25;  // zoom out
+    }
+  }, [selected]);
+
+  useFrame(() => {
+    camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetX.current, 0.06);
+    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY.current, 0.06);
+    camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ.current, 0.06);
+    camera.lookAt(0, 0.08, 0);
+  });
+
+  return null;
+}
+
+function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_afbd3b7b.glb");
   const groupRef = useRef<THREE.Group>(null);
 
+  // Realistic flesh-tone brain shader
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -113,97 +334,98 @@ function BrainModel({ selected }: { selected: Project | null }) {
       void main() {
         vec3 N = normalize(vNormal);
         vec3 V = normalize(vViewDir);
-
         float NdotV = max(dot(N, V), 0.0);
 
-        // Smooth fresnel — glassy translucent rim, not harsh
-        float fresnel = pow(1.0 - NdotV, 2.8);
-
-        // Key light — upper-left front (bright left side like reference)
-        vec3 L1 = normalize(vec3(-1.5, 3.0, 2.0));
+        // Key light — warm upper-left
+        vec3 L1 = normalize(vec3(-1.5, 3.0, 2.5));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Soft fill from right
-        vec3 L2 = normalize(vec3(2.0, 1.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.5;
+        // Cool fill from right
+        vec3 L2 = normalize(vec3(2.5, 1.0, 1.0));
+        float diff2 = max(dot(N, L2), 0.0) * 0.35;
 
-        // Soft under-fill (bounce light from platform)
+        // Subtle under-bounce
         vec3 L3 = normalize(vec3(0.0, -1.0, 0.5));
-        float diff3 = max(dot(N, L3), 0.0) * 0.2;
+        float diff3 = max(dot(N, L3), 0.0) * 0.15;
 
-        // Very soft, wide specular — smooth highlight, not a sharp blob
+        // Soft specular (skin-like, not metallic)
         vec3 H1 = normalize(L1 + V);
-        float spec = pow(max(dot(N, H1), 0.0), 18.0) * 0.9;
+        float spec = pow(max(dot(N, H1), 0.0), 22.0) * 0.5;
 
-        // Slow shimmer along surface
-        float shimmer = 0.03 * sin(uTime * 0.5 + vWorldPos.y * 4.0 + vWorldPos.x * 2.0);
+        // Subsurface scattering hint — warm glow at edges
+        float sss = pow(1.0 - NdotV, 2.5) * 0.4;
 
-        // Colour palette — deep glassy cyan, not too bright
-        vec3 tealDeep  = vec3(0.00, 0.10, 0.18);  // very dark shadow in grooves
-        vec3 tealMid   = vec3(0.00, 0.52, 0.72);  // main body — muted, not vivid
-        vec3 tealBright= vec3(0.20, 0.82, 0.95);  // lit ridge tops
-        vec3 tealWhite = vec3(0.65, 0.95, 1.00);  // soft specular peak (not pure white)
+        // Flesh tone palette
+        vec3 shadowCol = vec3(0.28, 0.14, 0.12);  // dark reddish-brown grooves
+        vec3 baseCol   = vec3(0.72, 0.48, 0.40);  // warm pinkish-grey flesh
+        vec3 litCol    = vec3(0.85, 0.65, 0.55);  // lit ridge tops
+        vec3 specCol   = vec3(0.92, 0.80, 0.72);  // soft specular
+        vec3 sssCol    = vec3(0.90, 0.40, 0.30);  // warm SSS rim
 
-        // Smooth diffuse blend — deeper shadows, controlled brightness
-        float lit = clamp(diff1 * 1.0 + diff2 * 0.8 + diff3 + shimmer, 0.0, 1.2);
-        vec3 base = mix(tealDeep, tealMid, smoothstep(0.0, 0.9, lit));
-        base = mix(base, tealBright, smoothstep(0.6, 1.2, lit));
+        float lit = clamp(diff1 * 1.1 + diff2 + diff3, 0.0, 1.2);
+        vec3 base = mix(shadowCol, baseCol, smoothstep(0.0, 0.7, lit));
+        base = mix(base, litCol, smoothstep(0.5, 1.1, lit));
+        base = mix(base, specCol, smoothstep(0.4, 0.9, spec));
 
-        // Very soft specular — barely-there highlight on ridge tops
-        base = mix(base, tealWhite, smoothstep(0.3, 0.9, spec) * 0.6);
+        // Cyan circuit glow tint — subtle overlay to blend with circuit texture
+        float circuitGlow = 0.06 + 0.04 * sin(uTime * 1.2 + vWorldPos.x * 8.0 + vWorldPos.y * 6.0);
+        vec3 circuitTint = vec3(0.0, 0.8, 1.0) * circuitGlow;
 
-        // Glassy rim — moderate, not overpowering
-        vec3 rim = tealBright * fresnel * 1.4;
+        // SSS warm rim
+        vec3 sssRim = sssCol * sss;
 
-        // Minimal emissive — just enough inner glow to look alive
-        float pulse = 0.04 * sin(uTime * 0.9);
-        vec3 emissive = tealMid * (0.10 + pulse);
-
-        // Subtle glass edge translucency
-        vec3 glassEdge = tealBright * pow(1.0 - NdotV, 2.0) * 0.25;
-
-        vec3 color = base + rim + emissive + glassEdge;
+        vec3 color = base + sssRim + circuitTint;
         gl_FragColor = vec4(color, uOpacity);
       }
     `,
-    transparent: false,
+    transparent: true,
     depthWrite: true,
-    side: THREE.DoubleSide,
+    side: THREE.FrontSide,
   }), []);
 
   useEffect(() => {
-    // Only assign custom teal shader material — no geometry rotation baking.
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.material = mat;
+        (child as THREE.Mesh).material = mat;
       }
     });
   }, [gltf, mat]);
 
-  const SPIN_SPEED = 0.30;  // rad/s
-  // Y_OFFSET: start at left lateral profile (frontal lobe facing left)
-  const Y_OFFSET = Math.PI / 2;  // start showing left lateral profile (frontal lobe left)
+  const SPIN_SPEED = 0.25;
+  const Y_OFFSET = Math.PI / 2;
 
-  useFrame((state, _delta) => {
+  useFrame((state) => {
     if (!groupRef.current) return;
-    // Y-axis turntable spin on outer group, starting at left lateral profile
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
-      selected ? 0.65 : 1.0,
+      selected ? 0.75 : 1.0,
       0.05
     );
   });
 
   return (
-    <group ref={groupRef}>
-      {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
-        <primitive object={gltf.scene} />
+    <>
+      {/* Spinning brain group */}
+      <group ref={groupRef}>
+        <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
+          <primitive object={gltf.scene} />
+        </group>
+        {/* Circuit overlay rotates with brain */}
+        <CircuitOverlay />
       </group>
-    </group>
+      {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
+      {PROJECTS.map((proj, i) => (
+        <HotspotDot
+          key={proj.id}
+          position={PROJECT_HOTSPOTS[i]}
+          index={i}
+          active={selected?.id === proj.id}
+          onSelect={() => onHotspotSelect(proj)}
+        />
+      ))}
+    </>
   );
 }
 
@@ -449,16 +671,17 @@ function AmbientParticles() {
 }
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
-function BrainScene({ selected }: { selected: Project | null }) {
+function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   return (
     <>
-      <ambientLight intensity={0.04} />
-      <directionalLight position={[3, 4, 2]}  intensity={1.2} color={TEAL} />
-      <directionalLight position={[-2, 2, 1]} intensity={0.5} color="#004466" />
-      <pointLight position={[0, -0.4, 0]} intensity={3.0} color={TEAL_GLOW} distance={1.5} />
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[-2, 4, 3]} intensity={1.4} color="#fff5ee" />
+      <directionalLight position={[3, 1, 1]}  intensity={0.5} color="#aaddff" />
+      <pointLight position={[0, -0.4, 0]} intensity={2.0} color={TEAL_GLOW} distance={1.5} />
 
+      <CameraController selected={selected} />
       <Suspense fallback={null}>
-        <BrainModel selected={selected} />
+        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
       <Platform />
       <AmbientParticles />
@@ -767,7 +990,7 @@ export default function ProjectsSection() {
         gl={{ antialias: true, alpha: true }}
         style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
       >
-        <BrainScene selected={selected} />
+        <BrainScene selected={selected} onHotspotSelect={setSelected} />
       </Canvas>
 
       {/* HUD Corners */}
