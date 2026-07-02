@@ -5,7 +5,7 @@ import { Canvas } from "@react-three/fiber";
 import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 
-const ROBOT_URL = "/manus-storage/robot_playground_8db15507.glb";
+const ROBOT_URL = "/manus-storage/futuristic_flying_animated_robot_-_low_poly_5005f482.glb";
 
 function RobotModel() {
   const { scene, animations } = useGLTF(ROBOT_URL);
@@ -43,7 +43,7 @@ function RobotModel() {
 
   return (
     <group ref={groupRef}>
-      <primitive object={scene} scale={1.4} position={[0, -1.0, 0]} />
+      <primitive object={scene} scale={2.5} position={[0, -0.5, 0]} />
     </group>
   );
 }
@@ -75,7 +75,7 @@ export default function RobotPlayground() {
     }}>
       <Canvas
         gl={{ alpha: true, antialias: true, toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.0 }}
-        camera={{ position: [0, 0.8, 7], fov: 38 }}
+        camera={{ position: [0, 0.5, 4], fov: 42 }}
         style={{ background: "transparent" }}
       >
         <Lights />
