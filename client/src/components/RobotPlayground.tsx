@@ -1,4 +1,4 @@
-// Sci-Fi Computer GLB — auto-fit camera, full original brightness
+// Sci-Fi Computer GLB — full original brightness, auto-fit camera
 import { Suspense, useRef, useEffect, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
@@ -6,15 +6,11 @@ import * as THREE from "three";
 
 const MODEL_URL = "/manus-storage/sci_-_fi_computer_game_ready_575ecfbb.glb";
 
-// All material names in the GLB
-const SCREEN_MATS = ["digital_displays", "digital_display_sides"];
-
 function RendererSetup() {
   const { gl } = useThree();
   useEffect(() => {
-    // Disable tone mapping so original baked emissive colors show at full brightness
+    // No tone mapping — let baked emissive textures show at full intensity
     gl.toneMapping = THREE.NoToneMapping;
-    gl.toneMappingExposure = 1.0;
   }, [gl]);
   return null;
 }
@@ -29,12 +25,13 @@ function CameraAutoFit({ box }: { box: THREE.Box3 | null }) {
     box.getCenter(center);
     const maxDim = Math.max(size.x, size.y, size.z);
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
-    const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.4;
-    // 3/4 view: slightly right and above
+    // Tighter fit: 1.15x instead of 1.4x
+    const dist = (maxDim / 2 / Math.tan(fov / 2)) * 1.15;
+    // 3/4 view: right and above to show screen + keyboard
     camera.position.set(
-      center.x + dist * 0.5,
-      center.y + dist * 0.42,
-      center.z + dist * 0.82
+      center.x + dist * 0.45,
+      center.y + dist * 0.38,
+      center.z + dist * 0.78
     );
     camera.lookAt(center);
     camera.updateProjectionMatrix();
@@ -55,29 +52,29 @@ function Model({ onBox }: { onBox: (b: THREE.Box3) => void }) {
     }
   }, [actions, names]);
 
-  // Restore full original brightness on all materials
   useEffect(() => {
     scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-        mats.forEach((mat) => {
-          const m = mat as THREE.MeshStandardMaterial;
-          if (SCREEN_MATS.includes(m.name)) {
-            // Screen panels: bright cyan emissive glow
-            m.emissive = new THREE.Color(0x00ccff);
-            m.emissiveIntensity = 3.0;
-          } else {
-            // All other materials: boost emissive so they don't look washed out
-            if (m.emissiveIntensity !== undefined) {
-              m.emissiveIntensity = Math.max(m.emissiveIntensity, 0.3);
-            }
-          }
-          m.needsUpdate = true;
-        });
-      }
+      if (!(child as THREE.Mesh).isMesh) return;
+      const mesh = child as THREE.Mesh;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((mat) => {
+        const m = mat as THREE.MeshStandardMaterial;
+        if (m.name === "digital_displays") {
+          // This material has a baked emissive texture with factor [1,1,1]
+          // Crank emissiveIntensity way up so the texture blazes bright
+          m.emissiveIntensity = 8.0;
+          m.transparent = true;
+          m.depthWrite = false;
+        } else if (m.name === "digital_display_sides") {
+          // Screen frame sides — give a subtle cyan glow
+          m.emissive = new THREE.Color(0x00aaff);
+          m.emissiveIntensity = 1.5;
+          m.transparent = true;
+          m.depthWrite = false;
+        }
+        m.needsUpdate = true;
+      });
     });
-    // Compute bounding box
     const box = new THREE.Box3().setFromObject(scene);
     onBox(box);
   }, [scene, onBox]);
@@ -101,18 +98,16 @@ export default function RobotPlayground() {
           outputColorSpace: THREE.SRGBColorSpace,
           toneMapping: THREE.NoToneMapping,
         }}
-        camera={{ fov: 45, near: 0.01, far: 1000 }}
+        camera={{ fov: 42, near: 0.01, far: 1000 }}
         style={{ background: "transparent" }}
       >
         <RendererSetup />
-        {/* Strong neutral lights to show original colors at full brightness */}
-        <ambientLight intensity={4.0} color="#ffffff" />
-        <directionalLight position={[5, 8, 6]} intensity={5.0} color="#ffffff" />
-        <directionalLight position={[-4, 4, 4]} intensity={3.0} color="#eef4ff" />
-        {/* Cyan fill light from front-left */}
-        <pointLight position={[-3, 3, 5]} intensity={3.0} color="#00ddff" />
-        {/* Warm fill from right */}
-        <pointLight position={[4, 2, 3]} intensity={2.0} color="#ffffff" />
+        {/* Strong lights to illuminate the body while screen glows from emissive */}
+        <ambientLight intensity={3.5} color="#ffffff" />
+        <directionalLight position={[5, 8, 6]} intensity={4.0} color="#ffffff" />
+        <directionalLight position={[-4, 3, 5]} intensity={2.5} color="#cce8ff" />
+        {/* Cyan point light from front to fill the keyboard area */}
+        <pointLight position={[0, -1, 6]} intensity={3.0} color="#00ccff" />
         <Suspense fallback={null}>
           <Model onBox={setBox} />
           <CameraAutoFit box={box} />
