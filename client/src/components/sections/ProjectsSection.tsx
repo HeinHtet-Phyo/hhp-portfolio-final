@@ -152,7 +152,8 @@ function BrainModel({ selected }: { selected: Project | null }) {
         gl_FragColor = vec4(color, uOpacity);
       }
     `,
-    transparent: true,
+    transparent: false,
+    depthWrite: true,
     side: THREE.FrontSide,
   }), []);
 
@@ -183,7 +184,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   return (
     <group ref={groupRef}>
       {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      <group rotation={[Math.PI / 2, -Math.PI / 2, 0]} position={[0, 0.12, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
@@ -222,11 +223,7 @@ function Platform() {
         <meshBasicMaterial color="#001a2e" transparent opacity={0.85} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Light beam cylinder going up */}
-      <mesh ref={beamRef} position={[0, 0.35, 0]}>
-        <cylinderGeometry args={[0.32, 0.38, 0.70, 32, 1, true]} />
-        <meshBasicMaterial color={TEAL_GLOW} transparent opacity={0.06} side={THREE.BackSide} />
-      </mesh>
+      {/* Light beam removed — was intersecting brain and causing visible split */}
 
       {/* Floor glow disc */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
