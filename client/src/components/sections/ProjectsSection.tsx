@@ -1,12 +1,9 @@
 /**
- * ProjectsSection — Particle AI Brain (matching Spline reference)
+ * ProjectsSection — Real 3D Brain Model
  *
- * Visual approach:
- * - Solid dark brain mesh with visible gyri/sulci folds (procedural displacement)
- * - White particle halo surrounding the brain (densest at surface, scattering outward)
- * - Vertical midline highlight (longitudinal fissure)
- * - Auto-rotates, drag to spin, scroll to zoom
- * - 4 coloured project nodes on brain surface
+ * Uses a real anatomical brain GLB mesh (48K vertices, proper gyri/sulci).
+ * White particle halo scatters around the brain surface like the Spline reference.
+ * 4 coloured project nodes sit on the brain surface.
  *
  * Interaction:
  * - Click a node → camera zooms INTO that brain region
@@ -15,10 +12,11 @@
  * - ESC / click background to return
  */
 
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
-import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Project Data ─────────────────────────────────────────────────────────────
@@ -31,8 +29,8 @@ const PROJECTS = [
     tech: ["Python", "LightGBM", "Spotify API", "scikit-learn", "Pandas"],
     stats: [["0.5652", "F1 Score"], ["114K+", "Tracks"], ["5", "Moods"]] as [string, string][],
     color: "#00d4ff",
-    hex: new THREE.Color("#00d4ff"),
-    pos: [-0.55, 0.38, 0.72] as [number, number, number],
+    // Position on brain surface (normalized coords relative to brain center)
+    pos: [-0.18, 0.22, 0.28] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo/moodtunes-ai-group3",
   },
   {
@@ -43,8 +41,7 @@ const PROJECTS = [
     tech: ["Python", "XGBoost", "SFIA", "scikit-learn", "Streamlit"],
     stats: [["99.75%", "Accuracy"], ["6,000", "Samples"], ["SFIA", "Framework"]] as [string, string][],
     color: "#c084fc",
-    hex: new THREE.Color("#c084fc"),
-    pos: [0.55, 0.38, 0.68] as [number, number, number],
+    pos: [0.20, 0.22, 0.26] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo/it-career-planner",
   },
   {
@@ -55,8 +52,7 @@ const PROJECTS = [
     tech: ["Python", "Pandas", "Plotly", "GeoPandas", "Streamlit"],
     stats: [["City", "Scale"], ["Real-time", "Data"], ["Interactive", "Maps"]] as [string, string][],
     color: "#34d399",
-    hex: new THREE.Color("#34d399"),
-    pos: [-0.48, -0.28, 0.80] as [number, number, number],
+    pos: [-0.22, -0.05, 0.30] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo",
   },
   {
@@ -67,8 +63,7 @@ const PROJECTS = [
     tech: ["Python", "scikit-learn", "Flask", "Healthcare ML", "Risk Scoring"],
     stats: [["AI", "Powered"], ["Personal", "Plans"], ["Risk", "Scoring"]] as [string, string][],
     color: "#fbbf24",
-    hex: new THREE.Color("#fbbf24"),
-    pos: [0.48, -0.28, 0.78] as [number, number, number],
+    pos: [0.22, -0.05, 0.28] as [number, number, number],
     github: "https://github.com/HeinHtet-Phyo",
   },
 ];
@@ -83,152 +78,93 @@ function makeRng(seed: number) {
   };
 }
 
-// ─── Brain Mesh ───────────────────────────────────────────────────────────────
-// Procedurally displaced sphere to look like a brain with gyri/sulci
-function createBrainGeometry(): THREE.BufferGeometry {
-  // Start with a high-res sphere
-  const geo = new THREE.SphereGeometry(1.0, 128, 96);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const arr = pos.array as Float32Array;
-
-  for (let i = 0; i < pos.count; i++) {
-    const x = arr[i * 3 + 0];
-    const y = arr[i * 3 + 1];
-    const z = arr[i * 3 + 2];
-
-    // Normalize to get direction
-    const len = Math.sqrt(x * x + y * y + z * z);
-    const nx = x / len, ny = y / len, nz = z / len;
-
-    // Multi-octave gyri noise - deeper and more pronounced
-    const g1 = Math.sin(nx * 8.5 + ny * 7.2) * Math.cos(nz * 9.1 + nx * 6.8) * 0.12;
-    const g2 = Math.sin(ny * 13.4 + nz * 11.8) * Math.cos(nx * 12.3 + ny * 10.1) * 0.075;
-    const g3 = Math.sin(nz * 18.2 + nx * 16.5) * Math.cos(ny * 17.3 + nz * 15.9) * 0.045;
-    const g4 = Math.sin(nx * 24.1 + nz * 22.7) * Math.cos(ny * 23.4 + nx * 21.2) * 0.025;
-    // Sulci (deeper grooves)
-    const s1 = Math.abs(Math.sin(nx * 6.2 + ny * 5.8)) * -0.065;
-    const s2 = Math.abs(Math.sin(ny * 9.4 + nz * 8.6)) * -0.040;
-
-    // Brain shape: wider at top, narrower at bottom, elongated front-back
-    const shapeX = 0.88 + Math.abs(ny) * 0.04;
-    const shapeY = 0.78 + (ny > 0 ? 0.12 : -0.05);
-    const shapeZ = 0.92;
-
-    // Cerebellum bump at back-bottom
-    const cerebellum = ny < -0.3 && nz < -0.1
-      ? 0.06 * Math.exp(-((ny + 0.55) ** 2 + (nz + 0.4) ** 2) * 8)
-      : 0;
-
-    // Longitudinal fissure (midline groove)
-    const fissure = Math.abs(nx) < 0.08 ? -0.06 * (1 - Math.abs(nx) / 0.08) : 0;
-
-    const r = 1.0 + g1 + g2 + g3 + g4 + s1 + s2 + cerebellum + fissure;
-
-    arr[i * 3 + 0] = nx * r * shapeX;
-    arr[i * 3 + 1] = ny * r * shapeY;
-    arr[i * 3 + 2] = nz * r * shapeZ;
-  }
-
-  geo.computeVertexNormals();
-  return geo;
-}
-
-// ─── Particle Halo Generator ──────────────────────────────────────────────────
-// Particles form a halo/cloud around the brain — densest at surface, scatter outward
-function generateHaloParticles(count: number) {
-  const rng = makeRng(27182);
+// ─── Particle Halo ────────────────────────────────────────────────────────────
+// Particles scatter around the brain surface like the Spline reference
+function generateHaloParticles(count: number, brainVertices: Float32Array | null) {
+  const rng = makeRng(31415);
   const positions = new Float32Array(count * 3);
   const phases    = new Float32Array(count);
-  const sizes     = new Float32Array(count);
+
+  const vertCount = brainVertices ? brainVertices.length / 3 : 0;
 
   for (let i = 0; i < count; i++) {
-    // Random direction on sphere
-    const u = rng(), v = rng();
-    const theta = 2 * Math.PI * u;
-    const phi   = Math.acos(2 * v - 1);
-    const nx = Math.sin(phi) * Math.cos(theta);
-    const ny = Math.sin(phi) * Math.sin(theta);
-    const nz = Math.cos(phi);
+    let bx = 0, by = 0, bz = 0;
 
-    // Brain shape factors
-    const shapeX = 0.88 + Math.abs(ny) * 0.04;
-    const shapeY = 0.78 + (ny > 0 ? 0.12 : -0.05);
-    const shapeZ = 0.92;
+    if (brainVertices && vertCount > 0) {
+      // Pick a random vertex on the brain surface as the base
+      const vi = Math.floor(rng() * vertCount) * 3;
+      bx = brainVertices[vi];
+      by = brainVertices[vi + 1];
+      bz = brainVertices[vi + 2];
+    } else {
+      // Fallback: random sphere
+      const u = rng(), v = rng();
+      const theta = 2 * Math.PI * u;
+      const phi   = Math.acos(2 * v - 1);
+      bx = 0.3 * Math.sin(phi) * Math.cos(theta);
+      by = 0.3 * Math.sin(phi) * Math.sin(theta);
+      bz = 0.3 * Math.cos(phi);
+    }
 
-    // Distance from brain surface: exponential falloff (most particles near surface)
-    const surfaceR = 1.0;
+    // Scatter outward from surface: 60% close (0-0.08), 40% further (0.08-0.35)
     const scatter = rng();
-    // 70% within 0-0.25 of surface, 30% scattered further out
-    const dist = scatter < 0.7
-      ? surfaceR + rng() * 0.25
-      : surfaceR + 0.25 + rng() * 0.55;
+    const dist = scatter < 0.6
+      ? rng() * 0.08
+      : 0.08 + rng() * 0.27;
 
-    positions[i * 3 + 0] = nx * dist * shapeX;
-    positions[i * 3 + 1] = ny * dist * shapeY;
-    positions[i * 3 + 2] = nz * dist * shapeZ;
+    // Direction: outward from brain center
+    const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1;
+    const nx = bx / len, ny = by / len, nz = bz / len;
+
+    positions[i * 3 + 0] = bx + nx * dist;
+    positions[i * 3 + 1] = by + ny * dist;
+    positions[i * 3 + 2] = bz + nz * dist;
     phases[i] = rng() * Math.PI * 2;
-    // Particles closer to surface are slightly larger
-    sizes[i] = dist < 1.15 ? 0.008 + rng() * 0.006 : 0.004 + rng() * 0.004;
   }
 
-  return { positions, phases, sizes };
+  return { positions, phases };
 }
 
-// ─── Brain Mesh Component ─────────────────────────────────────────────────────
-function BrainMeshObj({
+// ─── Particle Halo Component ──────────────────────────────────────────────────
+function ParticleHalo({
+  brainVertices,
   selected,
-  groupRef,
 }: {
+  brainVertices: Float32Array | null;
   selected: Project | null;
-  groupRef: React.RefObject<THREE.Group | null>;
 }) {
-  const HALO_COUNT = 22000;
-  const meshRef   = useRef<THREE.Mesh>(null);
+  const COUNT = 20000;
   const pointsRef = useRef<THREE.Points>(null);
 
-  const brainGeo = useMemo(() => createBrainGeometry(), []);
-
-  const brainMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#1a1a1e",
-        emissive: "#000000",
-        emissiveIntensity: 0.0,
-        roughness: 0.85,
-        metalness: 0.02,
-      }),
-    []
+  const { positions: basePos, phases } = useMemo(
+    () => generateHaloParticles(COUNT, brainVertices),
+    [brainVertices]
   );
 
-  const { positions: haloBase, phases, sizes } = useMemo(
-    () => generateHaloParticles(HALO_COUNT),
-    []
-  );
-  const animPos = useMemo(() => new Float32Array(haloBase), [haloBase]);
+  const animPos = useMemo(() => new Float32Array(basePos), [basePos]);
 
-  const haloGeo = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(animPos, 3));
-    // White/light grey colours
-    const colors = new Float32Array(HALO_COUNT * 3);
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(animPos, 3));
+    const colors = new Float32Array(COUNT * 3);
     const rngC = makeRng(99991);
-    for (let i = 0; i < HALO_COUNT; i++) {
-      const brightness = 0.55 + rngC() * 0.45;
-      colors[i * 3 + 0] = brightness * 0.92;
-      colors[i * 3 + 1] = brightness * 0.95;
-      colors[i * 3 + 2] = brightness; // pure white/grey
+    for (let i = 0; i < COUNT; i++) {
+      const b = 0.55 + rngC() * 0.45;
+      colors[i * 3 + 0] = b * 0.92;
+      colors[i * 3 + 1] = b * 0.95;
+      colors[i * 3 + 2] = b;
     }
-    geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
-    return geo;
+    g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+    return g;
   }, [animPos]);
 
-  const haloMat = useMemo(
+  const mat = useMemo(
     () =>
       new THREE.PointsMaterial({
-        size: 0.008,
+        size: 0.006,
         vertexColors: true,
         transparent: true,
-        opacity: 0.88,
+        opacity: 0.85,
         sizeAttenuation: true,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
@@ -237,51 +173,96 @@ function BrainMeshObj({
   );
 
   useFrame((state) => {
-    if (!groupRef.current) return;
-
-    // Auto-rotate
-    if (!selected) groupRef.current.rotation.y += 0.0022;
-
     const t = state.clock.elapsedTime;
-    const posAttr = haloGeo.attributes.position as THREE.BufferAttribute;
-    const posArr  = posAttr.array as Float32Array;
+    const posAttr = geo.attributes.position as THREE.BufferAttribute;
+    const arr = posAttr.array as Float32Array;
 
-    // Breathing animation — particles gently drift outward and back
-    for (let i = 0; i < HALO_COUNT; i++) {
+    for (let i = 0; i < COUNT; i++) {
       const ph = phases[i];
-      const breathe = 1.0 + 0.022 * Math.sin(t * 0.55 + ph);
-      posArr[i * 3 + 0] = haloBase[i * 3 + 0] * breathe;
-      posArr[i * 3 + 1] = haloBase[i * 3 + 1] * breathe;
-      posArr[i * 3 + 2] = haloBase[i * 3 + 2] * breathe;
+      const breathe = 1.0 + 0.018 * Math.sin(t * 0.5 + ph);
+      arr[i * 3 + 0] = basePos[i * 3 + 0] * breathe;
+      arr[i * 3 + 1] = basePos[i * 3 + 1] * breathe;
+      arr[i * 3 + 2] = basePos[i * 3 + 2] * breathe;
     }
     posAttr.needsUpdate = true;
 
-    // Fade brain opacity when zoomed in
-    brainMat.opacity = THREE.MathUtils.lerp(
-      brainMat.opacity ?? 1.0,
-      selected ? 0.45 : 1.0,
-      0.04
-    );
-    haloMat.opacity = THREE.MathUtils.lerp(
-      haloMat.opacity,
-      selected ? 0.55 : 0.88,
-      0.04
-    );
+    mat.opacity = THREE.MathUtils.lerp(mat.opacity, selected ? 0.45 : 0.85, 0.04);
   });
+
+  return <points ref={pointsRef} geometry={geo} material={mat} />;
+}
+
+// ─── Real Brain Mesh ──────────────────────────────────────────────────────────
+function BrainModel({
+  onVerticesReady,
+  selected,
+  groupRef,
+}: {
+  onVerticesReady: (v: Float32Array) => void;
+  selected: Project | null;
+  groupRef: React.RefObject<THREE.Group | null>;
+}) {
+  const gltf = useLoader(GLTFLoader, "/manus-storage/brain_dc0a5366.glb");
+  const meshRef = useRef<THREE.Mesh>(null);
+  const matRef  = useRef<THREE.MeshStandardMaterial | null>(null);
+  const notified = useRef(false);
+
+  const brainMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: "#1a1a1e",
+        emissive: "#000000",
+        emissiveIntensity: 0.0,
+        roughness: 0.82,
+        metalness: 0.04,
+        side: THREE.DoubleSide,
+      }),
+    []
+  );
+  matRef.current = brainMat;
+
+  useEffect(() => {
+    if (!gltf || notified.current) return;
+    // Extract vertices from the first mesh in the GLTF
+    gltf.scene.traverse((child) => {
+      if (notified.current) return;
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const pos = mesh.geometry.attributes.position;
+        if (pos) {
+          notified.current = true;
+          onVerticesReady(pos.array as Float32Array);
+        }
+      }
+    });
+  }, [gltf, onVerticesReady]);
+
+  useFrame(() => {
+    if (!groupRef.current) return;
+    if (!selected) groupRef.current.rotation.y += 0.0018;
+
+    if (matRef.current) {
+      matRef.current.opacity = THREE.MathUtils.lerp(
+        matRef.current.opacity ?? 1,
+        selected ? 0.42 : 1.0,
+        0.04
+      );
+      matRef.current.transparent = selected ? true : false;
+    }
+  });
+
+  // Apply our material to all meshes in the brain
+  useEffect(() => {
+    gltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        (child as THREE.Mesh).material = brainMat;
+      }
+    });
+  }, [gltf, brainMat]);
 
   return (
     <group ref={groupRef}>
-      {/* Solid brain mesh */}
-      <mesh ref={meshRef} geometry={brainGeo} material={brainMat} />
-
-      {/* Midline highlight — vertical line along longitudinal fissure */}
-      <mesh>
-        <cylinderGeometry args={[0.005, 0.005, 1.6, 8]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
-
-      {/* Particle halo */}
-      <points ref={pointsRef} geometry={haloGeo} material={haloMat} />
+      <primitive object={gltf.scene} />
     </group>
   );
 }
@@ -293,31 +274,36 @@ function BrainNeuralNetwork({ project, visible }: { project: Project | null; vis
 
   const { lines, nodes, lineMat, nodeMats } = useMemo(() => {
     if (!project) return { lines: null, nodes: null, lineMat: null, nodeMats: [] };
-    const rng = makeRng(project.id * 7919 + 42);
-    const N   = 90;
+    const rng   = makeRng(project.id * 7919 + 42);
+    const N     = 80;
     const base  = new THREE.Color(project.color);
     const white = new THREE.Color("#ffffff");
-    const palette = [base, base.clone().lerp(white, 0.4), white.clone().multiplyScalar(0.9), base.clone().lerp(new THREE.Color("#00d4ff"), 0.35)];
+    const palette = [
+      base,
+      base.clone().lerp(white, 0.4),
+      white.clone().multiplyScalar(0.85),
+      base.clone().lerp(new THREE.Color("#00d4ff"), 0.35),
+    ];
 
-    // Nodes clustered around the project region
     const [px, py, pz] = project.pos;
     const nodePos: THREE.Vector3[] = [];
     for (let i = 0; i < N; i++) {
       const theta = rng() * Math.PI * 2;
       const phi   = Math.acos(2 * rng() - 1);
-      const r     = 0.05 + rng() * 0.52;
-      nodePos.push(new THREE.Vector3(
-        px + r * Math.sin(phi) * Math.cos(theta),
-        py + r * Math.sin(phi) * Math.sin(theta),
-        pz + r * Math.cos(phi)
-      ));
+      const r     = 0.04 + rng() * 0.22;
+      nodePos.push(
+        new THREE.Vector3(
+          px + r * Math.sin(phi) * Math.cos(theta),
+          py + r * Math.sin(phi) * Math.sin(theta),
+          pz + r * Math.cos(phi)
+        )
+      );
     }
 
-    // Lines
     const posArr: number[] = [], colArr: number[] = [];
     for (let i = 0; i < N; i++) {
       for (let j = i + 1; j < N; j++) {
-        if (nodePos[i].distanceTo(nodePos[j]) < 0.45 && rng() > 0.30) {
+        if (nodePos[i].distanceTo(nodePos[j]) < 0.18 && rng() > 0.35) {
           posArr.push(nodePos[i].x, nodePos[i].y, nodePos[i].z, nodePos[j].x, nodePos[j].y, nodePos[j].z);
           const c = palette[Math.floor(rng() * palette.length)];
           colArr.push(c.r, c.g, c.b, c.r, c.g, c.b);
@@ -327,29 +313,28 @@ function BrainNeuralNetwork({ project, visible }: { project: Project | null; vis
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(posArr), 3));
     lineGeo.setAttribute("color",    new THREE.BufferAttribute(new Float32Array(colArr), 3));
-    const lineMat = new THREE.LineBasicMaterial({
+    const lm = new THREE.LineBasicMaterial({
       vertexColors: true, transparent: true, opacity: 0,
       depthWrite: false, blending: THREE.AdditiveBlending,
     });
-    const lines = new THREE.LineSegments(lineGeo, lineMat);
+    const lines = new THREE.LineSegments(lineGeo, lm);
 
-    // Node spheres
-    const sphereGeo = new THREE.SphereGeometry(0.016, 8, 8);
-    const nodeMats: THREE.MeshBasicMaterial[] = [];
+    const sphereGeo = new THREE.SphereGeometry(0.012, 8, 8);
+    const nm: THREE.MeshBasicMaterial[] = [];
     const nodeGroup = new THREE.Group();
     nodePos.forEach((p) => {
-      const c = palette[Math.floor(rng() * palette.length)].clone();
+      const c   = palette[Math.floor(rng() * palette.length)].clone();
       const mat = new THREE.MeshBasicMaterial({
         color: c, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false,
       });
-      nodeMats.push(mat);
+      nm.push(mat);
       const mesh = new THREE.Mesh(sphereGeo, mat);
       mesh.position.copy(p);
       nodeGroup.add(mesh);
     });
 
-    return { lines, nodes: nodeGroup, lineMat, nodeMats };
+    return { lines, nodes: nodeGroup, lineMat: lm, nodeMats: nm };
   }, [project]);
 
   useFrame((_, delta) => {
@@ -357,8 +342,8 @@ function BrainNeuralNetwork({ project, visible }: { project: Project | null; vis
     const target = visible ? 1.0 : 0.0;
     fadeRef.current = THREE.MathUtils.lerp(fadeRef.current, target, delta * 2.5);
     lineMat.opacity = fadeRef.current * 0.9;
-    nodeMats.forEach(m => { m.opacity = fadeRef.current * 0.95; });
-    if (visible) groupRef.current.rotation.y += delta * 0.10;
+    nodeMats.forEach((m) => { m.opacity = fadeRef.current * 0.95; });
+    if (visible && groupRef.current) groupRef.current.rotation.y += delta * 0.08;
   });
 
   if (!lines || !nodes) return null;
@@ -385,22 +370,26 @@ function ProjectNode({
     if (!coreRef.current || !glowRef.current) return;
     const t = clock.elapsedTime;
     const pulse = selected
-      ? 1.6 + 0.22 * Math.sin(t * 3.2)
+      ? 1.7 + 0.25 * Math.sin(t * 3.2)
       : hovered
-      ? 1.35 + 0.10 * Math.sin(t * 4.0)
-      : 1.0 + 0.08 * Math.sin(t * 1.7 + project.id * 1.4);
+      ? 1.4 + 0.12 * Math.sin(t * 4.0)
+      : 1.0 + 0.09 * Math.sin(t * 1.7 + project.id * 1.4);
 
     coreRef.current.scale.setScalar(pulse);
-    glowRef.current.scale.setScalar(pulse * 2.4);
+    glowRef.current.scale.setScalar(pulse * 2.6);
 
     const coreMat = coreRef.current.material as THREE.MeshStandardMaterial;
-    coreMat.emissiveIntensity = selected ? 10 : hovered ? 7 : 4;
-    coreMat.opacity = THREE.MathUtils.lerp(coreMat.opacity, anySelected && !selected ? 0.08 : 1.0, 0.07);
+    coreMat.emissiveIntensity = selected ? 12 : hovered ? 8 : 5;
+    coreMat.opacity = THREE.MathUtils.lerp(
+      coreMat.opacity,
+      anySelected && !selected ? 0.06 : 1.0,
+      0.07
+    );
 
     const glowMat = glowRef.current.material as THREE.MeshBasicMaterial;
     glowMat.opacity = THREE.MathUtils.lerp(
       glowMat.opacity,
-      anySelected && !selected ? 0.01 : selected ? 0.70 : hovered ? 0.45 : 0.28,
+      anySelected && !selected ? 0.01 : selected ? 0.75 : hovered ? 0.50 : 0.30,
       0.07
     );
   });
@@ -408,8 +397,8 @@ function ProjectNode({
   return (
     <group position={project.pos}>
       <mesh ref={glowRef}>
-        <sphereGeometry args={[0.05, 16, 16]} />
-        <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <sphereGeometry args={[0.04, 16, 16]} />
+        <meshBasicMaterial color={color} transparent opacity={0.30} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh
         ref={coreRef}
@@ -417,73 +406,99 @@ function ProjectNode({
         onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
         onPointerOut={() => { setHovered(false); document.body.style.cursor = "default"; }}
       >
-        <sphereGeometry args={[0.024, 16, 16]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={4} roughness={0.05} metalness={0.9} transparent opacity={1} />
+        <sphereGeometry args={[0.018, 16, 16]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={5} roughness={0.05} metalness={0.9} transparent opacity={1} />
       </mesh>
     </group>
   );
 }
 
 // ─── Camera Controller ────────────────────────────────────────────────────────
-function CameraController({ selected, controlsRef }: { selected: Project | null; controlsRef: React.RefObject<any> }) {
-  const targetPos  = useRef(new THREE.Vector3(0, 0, 4.5));
+function CameraController({
+  selected,
+  controlsRef,
+}: {
+  selected: Project | null;
+  controlsRef: React.RefObject<any>;
+}) {
+  const targetPos  = useRef(new THREE.Vector3(0, 0, 0.9));
   const targetLook = useRef(new THREE.Vector3(0, 0, 0));
 
   useEffect(() => {
     if (selected) {
       const [px, py, pz] = selected.pos;
-      // Zoom into the brain region — camera moves close to the node
-      const dir = new THREE.Vector3(px, py, pz).normalize();
-      const dist = 1.6;
+      const dir  = new THREE.Vector3(px, py, pz).normalize();
+      const dist = 0.38;
       targetPos.current.set(
-        dir.x * dist + px * 0.2,
-        dir.y * dist + py * 0.2,
-        dir.z * dist + pz * 0.2
+        dir.x * dist + px * 0.15,
+        dir.y * dist + py * 0.15,
+        dir.z * dist + pz * 0.15
       );
-      targetLook.current.set(px * 0.6, py * 0.6, pz * 0.6);
+      targetLook.current.set(px * 0.5, py * 0.5, pz * 0.5);
       if (controlsRef.current) controlsRef.current.enabled = false;
     } else {
-      targetPos.current.set(0, 0, 4.5);
+      targetPos.current.set(0, 0, 0.9);
       targetLook.current.set(0, 0, 0);
       if (controlsRef.current) controlsRef.current.enabled = true;
     }
   }, [selected, controlsRef]);
 
   useFrame(({ camera }, delta) => {
-    camera.position.lerp(targetPos.current, delta * 2.2);
-    if (controlsRef.current) controlsRef.current.target.lerp(targetLook.current, delta * 2.2);
+    camera.position.lerp(targetPos.current, delta * 2.0);
+    if (controlsRef.current) {
+      controlsRef.current.target.lerp(targetLook.current, delta * 2.0);
+    }
   });
 
   return null;
 }
 
+// ─── Loading Fallback ─────────────────────────────────────────────────────────
+function BrainLoader() {
+  return (
+    <mesh>
+      <sphereGeometry args={[0.15, 16, 16]} />
+      <meshBasicMaterial color="#00d4ff" wireframe />
+    </mesh>
+  );
+}
+
 // ─── Scene ────────────────────────────────────────────────────────────────────
-function BrainScene({ selected, onSelect, controlsRef }: {
+function BrainScene({
+  selected,
+  onSelect,
+  controlsRef,
+}: {
   selected: Project | null;
   onSelect: (p: Project | null) => void;
   controlsRef: React.RefObject<any>;
 }) {
   const brainGroupRef = useRef<THREE.Group>(null);
+  const [brainVertices, setBrainVertices] = useState<Float32Array | null>(null);
 
   return (
     <>
-      <ambientLight intensity={0.08} />
-      <directionalLight position={[3, 5, 4]}    intensity={8.5} color="#f0f4ff" />
-      <directionalLight position={[-3, 2, 2]}   intensity={3.0} color="#aabbdd" />
-      <directionalLight position={[0, -4, 2]}   intensity={1.5} color="#778899" />
-      <directionalLight position={[0, 1, -4]}   intensity={0.8} color="#556677" />
-      <pointLight position={[2, 3, 3]}  intensity={5.0} color="#ffffff" distance={8} />
-      <pointLight position={[-2, 2, 2]} intensity={2.5} color="#99aabb" distance={6} />
+      <ambientLight intensity={0.10} />
+      <directionalLight position={[3, 5, 4]}    intensity={9.0} color="#f0f4ff" />
+      <directionalLight position={[-3, 2, 2]}   intensity={3.5} color="#aabbdd" />
+      <directionalLight position={[0, -4, 2]}   intensity={1.8} color="#778899" />
+      <directionalLight position={[0, 1, -4]}   intensity={1.0} color="#556677" />
+      <pointLight position={[2, 3, 3]}  intensity={5.5} color="#ffffff" distance={3} />
+      <pointLight position={[-2, 2, 2]} intensity={2.8} color="#99aabb" distance={2.5} />
 
       <Stars radius={120} depth={60} count={4000} factor={3} fade speed={0.25} />
 
-      {/* Brain mesh + particle halo */}
-      <BrainMeshObj selected={selected} groupRef={brainGroupRef} />
+      <Suspense fallback={<BrainLoader />}>
+        <BrainModel
+          onVerticesReady={setBrainVertices}
+          selected={selected}
+          groupRef={brainGroupRef}
+        />
+        <ParticleHalo brainVertices={brainVertices} selected={selected} />
+      </Suspense>
 
-      {/* Neural network — appears inside brain on click */}
       <BrainNeuralNetwork project={selected} visible={!!selected} />
 
-      {/* Project nodes — in world space (don't rotate with brain) */}
       {PROJECTS.map((proj) => (
         <ProjectNode
           key={proj.id}
@@ -500,11 +515,10 @@ function BrainScene({ selected, onSelect, controlsRef }: {
         ref={controlsRef}
         enableZoom
         enablePan={false}
-        minDistance={1.5}
-        maxDistance={9}
+        minDistance={0.3}
+        maxDistance={2.5}
         dampingFactor={0.07}
         enableDamping
-        autoRotate={false}
       />
     </>
   );
@@ -521,7 +535,7 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
       style={{
         position: "absolute", top: "50%", right: 24,
         transform: "translateY(-50%)", width: 290, zIndex: 20,
-        background: "rgba(0,0,0,0.90)",
+        background: "rgba(0,0,0,0.92)",
         backdropFilter: "blur(28px)",
         border: `1px solid ${project.color}40`,
         borderRadius: 14,
@@ -569,7 +583,7 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         <div style={{ display: "flex", gap: 8 }}>
           <a href={project.github} target="_blank" rel="noopener noreferrer"
             style={{ flex: 1, textAlign: "center", fontSize: 11, padding: "8px 0", background: `${project.color}18`, border: `1px solid ${project.color}55`, color: project.color, borderRadius: 6, fontFamily: "JetBrains Mono, monospace", textDecoration: "none" }}>
-            GitHub →
+            GitHub
           </a>
           <button onClick={onClose}
             style={{ padding: "8px 12px", fontSize: 11, background: "transparent", border: "1px solid rgba(255,255,255,0.10)", color: "#6b7280", borderRadius: 6, fontFamily: "JetBrains Mono, monospace", cursor: "pointer" }}>
@@ -641,7 +655,7 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, 0, 4.5], fov: 52 }}
+        camera={{ position: [0, 0, 0.9], fov: 52 }}
         gl={{ antialias: true, alpha: false }}
         style={{ background: "#000000" }}
         onPointerMissed={handleClose}
