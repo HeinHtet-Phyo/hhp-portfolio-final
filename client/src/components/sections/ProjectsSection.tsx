@@ -186,7 +186,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={[0, 0, 0.15]}>
       {/* Rotate X by -PI/2 to lay brain horizontal (side-profile view like reference photo)
            Rotate Y by PI to face frontal lobe toward viewer */}
       {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
