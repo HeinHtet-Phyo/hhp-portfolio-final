@@ -183,7 +183,10 @@ function BrainModel({ selected }: { selected: Project | null }) {
       {/* Rotate X by -PI/2 to lay brain horizontal (side-profile view like reference photo)
            Rotate Y by PI to face frontal lobe toward viewer */}
       {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
-      <group rotation={[Math.PI / 2, Math.PI, 0]} position={[0, 0.05, 0]}>
+      {/* X=PI/2 stands brain upright from flat OBJ; Y=-PI/2 rotates to show left-side profile */}
+      {/* X=PI/2 stands brain upright; Y=0 to check natural side orientation */}
+      {/* X=PI/2 upright, Y=PI front-facing, Z=-0.2 slight tilt like reference photo */}
+      <group rotation={[Math.PI / 2, Math.PI, -0.2]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
