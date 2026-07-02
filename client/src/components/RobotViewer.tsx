@@ -121,7 +121,7 @@ export default function RobotViewer() {
     >
       <Canvas
         gl={{ alpha: true, antialias: true }}
-        camera={{ position: [0, 1.2, 4.5], fov: 38 }}
+        camera={{ position: [0, 1.2, 6.5], fov: 38 }}
         style={{ background: "transparent" }}
       >
         <Lights />
