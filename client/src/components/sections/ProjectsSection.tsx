@@ -157,10 +157,17 @@ function BrainModel({ selected }: { selected: Project | null }) {
   }), []);
 
   useEffect(() => {
-    // Only assign custom teal shader material — no geometry rotation baking.
+    // Bake X=+PI/2 permanently into geometry vertices.
+    // This converts Z-up OBJ to Y-up Three.js so the brain stands upright.
+    // After baking, the brain's vertical axis IS the Y axis, so outer group
+    // Y-spin = clean turntable rotation with no tumbling.
+    const xRot = new THREE.Matrix4().makeRotationX(Math.PI / 2);
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
+        mesh.geometry = mesh.geometry.clone();
+        mesh.geometry.applyMatrix4(xRot);
+        mesh.geometry.computeVertexNormals();
         mesh.material = mat;
       }
     });
@@ -170,7 +177,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
 
   useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Y-axis turntable spin on outer group
+    // Clean Y-axis turntable spin — geometry is permanently upright after bake
     groupRef.current.rotation.y = state.clock.elapsedTime * SPIN_SPEED;
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
@@ -182,8 +189,8 @@ function BrainModel({ selected }: { selected: Project | null }) {
 
   return (
     <group ref={groupRef}>
-      {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
-      <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      {/* No rotation here — X=PI/2 is baked into geometry vertices */}
+      <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
