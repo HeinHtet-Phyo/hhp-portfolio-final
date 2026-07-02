@@ -181,7 +181,8 @@ function BrainModel({ selected }: { selected: Project | null }) {
   return (
     <group ref={groupRef}>
       {/* Tilt brain to horizontal side-profile (like photo 1) */}
-      <group rotation={[0.15, 0, 0]} position={[0, 0.05, 0]}>
+      {/* Rotate Y by Math.PI to flip brain to face forward (frontal lobe toward viewer) */}
+      <group rotation={[0.15, Math.PI, 0]} position={[0, 0.05, 0]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
