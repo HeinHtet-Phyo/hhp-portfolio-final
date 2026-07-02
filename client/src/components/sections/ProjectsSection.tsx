@@ -1,34 +1,13 @@
 /*
  * ProjectsSection — HUD Brain Interface
  *
- * Visual references:
- *   Photo 1: Teal brain in side-profile (horizontal), HUD corner brackets, bottom data bar
- *   Photo 2: Holographic brain on glowing circular platform, UI panels left/right, deep blue bg
- *
- * Design:
- * - Brain oriented horizontally (side profile, X-axis rotation ~15deg so it looks like photo 1)
- * - Single cyan/teal colour with emissive glow (not multi-colour gradient)
- * - Glowing circular platform/base underneath the brain (concentric rings, light beam)
- * - HUD corner brackets in all 4 corners of the canvas
- * - Left panel: scrolling code/data readout (like photo 2 left side)
- * - Right panel: project cards (click to select)
- * - Bottom bar: HUD data readout (like photo 1 bottom)
- * - Brain slowly rotates on Y axis (like sitting on a turntable)
- * - Deep dark teal/navy background (#020d18)
+ * Brain: Spline embed (particle AI brain)
+ * Panels: SYS.LOG (left), PROJECTS (right), bottom HUD bar
+ * Background: deep dark teal/navy (#020d18) with subtle grid
  */
 
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
-import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
-import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Force full page reload on HMR to prevent R3F reconciler crash
-if (import.meta.hot) {
-  import.meta.hot.accept(() => {
-    import.meta.hot!.invalidate();
-  });
-}
+import { useState, useEffect, useCallback } from "react";
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
 const PROJECTS = [
@@ -78,245 +57,7 @@ type Project = (typeof PROJECTS)[0];
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const TEAL       = "#00e5ff";
 const TEAL_DIM   = "#00b4cc";
-const TEAL_GLOW  = "#00d4ff";
 const BG         = "#020d18";
-
-// ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-function BrainModel({ selected }: { selected: Project | null }) {
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/brain_dc0a5366.glb");
-  const groupRef = useRef<THREE.Group>(null);
-
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uTime:    { value: 0 },
-      uOpacity: { value: 1.0 },
-    },
-    vertexShader: /* glsl */`
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      varying vec3 vViewDir;
-      void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vWorldPos = wp.xyz;
-        vNormal   = normalize(normalMatrix * normal);
-        vViewDir  = normalize(cameraPosition - wp.xyz);
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }
-    `,
-    fragmentShader: /* glsl */`
-      uniform float uTime;
-      uniform float uOpacity;
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      varying vec3 vViewDir;
-
-      void main() {
-        vec3 N = normalize(vNormal);
-        vec3 V = normalize(vViewDir);
-
-        // Fresnel rim — bright teal glow at silhouette edges
-        float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.2);
-
-        // Key light from upper-right (matches photo 1)
-        vec3 L1 = normalize(vec3(3.0, 4.0, 2.0));
-        float diff1 = max(dot(N, L1), 0.0);
-
-        // Fill light from left
-        vec3 L2 = normalize(vec3(-2.0, 2.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.35;
-
-        // Specular (Blinn-Phong)
-        vec3 H = normalize(L1 + V);
-        float spec = pow(max(dot(N, H), 0.0), 48.0) * 1.4;
-
-        // Slow shimmer along Y
-        float shimmer = 0.05 * sin(uTime * 0.6 + vWorldPos.y * 4.0);
-
-        // Base teal colour — darker in shadows, brighter on lit faces
-        vec3 tealDark  = vec3(0.00, 0.28, 0.38);
-        vec3 tealMid   = vec3(0.00, 0.72, 0.90);
-        vec3 tealBright= vec3(0.60, 0.98, 1.00);
-
-        float lit = diff1 + diff2 + shimmer;
-        vec3 base = mix(tealDark, tealMid, clamp(lit, 0.0, 1.0));
-        base = mix(base, tealBright, clamp(spec * 0.5, 0.0, 1.0));
-
-        // Rim glow
-        vec3 rim = tealBright * fresnel * 1.6;
-
-        // Emissive pulse
-        float pulse = 0.06 * sin(uTime * 1.2);
-        vec3 emissive = tealMid * (0.18 + pulse);
-
-        vec3 color = base + rim + emissive + vec3(spec * 0.7, spec, spec);
-        gl_FragColor = vec4(color, uOpacity);
-      }
-    `,
-    transparent: true,
-    side: THREE.FrontSide,
-  }), []);
-
-  useEffect(() => {
-    gltf.scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.material = mat;
-        mesh.geometry.computeVertexNormals();
-      }
-    });
-  }, [gltf, mat]);
-
-  // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
-  // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
-  // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = Math.PI / 2 - 0.44;  // PI/2 - 25° offset
-  const SPIN_SPEED = 0.30;               // rad/s turntable speed
-  const SPIN_PAUSED = false;  // spin active
-
-  useFrame((state, _delta) => {
-    if (!groupRef.current) return;
-    // Absolute time-based rotation so t=0 always starts at Y_OFFSET
-    groupRef.current.rotation.y = Y_OFFSET + (SPIN_PAUSED ? 0 : state.clock.elapsedTime * SPIN_SPEED);
-    mat.uniforms.uTime.value = state.clock.elapsedTime;
-    mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
-      mat.uniforms.uOpacity.value,
-      selected ? 0.65 : 1.0,
-      0.05
-    );
-  });
-
-  return (
-    <group ref={groupRef}>
-      {/* Rotate X by -PI/2 to lay brain horizontal (side-profile view like reference photo)
-           Rotate Y by PI to face frontal lobe toward viewer */}
-      {/* X=PI/2 tilts brain up from top-view to side-profile; Y=PI faces frontal lobe forward */}
-      {/* X=PI/2 stands brain upright from flat OBJ; Y=-PI/2 rotates to show left-side profile */}
-      {/* X=PI/2 stands brain upright; Y=0 to check natural side orientation */}
-      {/* Anatomical left-side profile:
-           X=-PI/2: OBJ Y(brainstem-cortex) maps to Three.js -Y so brainstem points DOWN
-           Y=PI/2: rotates so OBJ left-side (+X face) points toward camera (-Z) */}
-      {/* Definitive anatomical left-side profile confirmed by Python rendering:
-           X=-PI/2: stands brain upright (brainstem points down)
-           Y=PI/2: rotates to show left-side profile (frontal lobe left, cerebellum lower-right) */}
-      {/* X=-PI/2: tilts brain from top-down to upright (brainstem points down)
-           Y=-PI/2: rotates to left lateral profile (frontal on left, occipital on right) */}
-      {/* X=+PI/2: tilts brain upright (cortex top, brainstem bottom)
-           Y=-PI/2: left lateral profile (frontal on left, occipital on right) */}
-      {/* X=-PI/2: stands brain upright (brainstem at -Y, cortex at +Y)
-           Y is handled by outer groupRef via Y_OFFSET + time formula */}
-      <group rotation={[-Math.PI / 2 - 0.35, 0, -0.13]} position={[0, 0.05, 0]}>
-        <primitive object={gltf.scene} />
-      </group>
-    </group>
-  );
-}
-
-// ─── Glowing Circular Platform ────────────────────────────────────────────────
-function Platform() {
-  const ringRef1 = useRef<THREE.Mesh>(null);
-  const ringRef2 = useRef<THREE.Mesh>(null);
-  const ringRef3 = useRef<THREE.Mesh>(null);
-  const beamRef  = useRef<THREE.Mesh>(null);
-
-  useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    // Pulse the rings
-    if (ringRef1.current) (ringRef1.current.material as THREE.MeshBasicMaterial).opacity = 0.5 + 0.3 * Math.sin(t * 1.5);
-    if (ringRef2.current) (ringRef2.current.material as THREE.MeshBasicMaterial).opacity = 0.3 + 0.2 * Math.sin(t * 1.5 + 1.0);
-    if (ringRef3.current) (ringRef3.current.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.1 * Math.sin(t * 1.5 + 2.0);
-    if (beamRef.current)  (beamRef.current.material  as THREE.MeshBasicMaterial).opacity = 0.04 + 0.03 * Math.sin(t * 2.0);
-  });
-
-  const ringMat  = (opacity: number) => new THREE.MeshBasicMaterial({ color: TEAL_GLOW, transparent: true, opacity, side: THREE.DoubleSide });
-  const torusGeo = (r: number) => new THREE.TorusGeometry(r, 0.008, 8, 128);
-
-  return (
-    <group position={[0, -0.42, 0]}>
-      {/* Concentric glowing rings */}
-      <mesh ref={ringRef1} geometry={torusGeo(0.38)} material={ringMat(0.7)} rotation={[Math.PI / 2, 0, 0]} />
-      <mesh ref={ringRef2} geometry={torusGeo(0.52)} material={ringMat(0.4)} rotation={[Math.PI / 2, 0, 0]} />
-      <mesh ref={ringRef3} geometry={torusGeo(0.66)} material={ringMat(0.2)} rotation={[Math.PI / 2, 0, 0]} />
-
-      {/* Solid disc (platform surface) */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[0.38, 64]} />
-        <meshBasicMaterial color="#001a2e" transparent opacity={0.85} side={THREE.DoubleSide} />
-      </mesh>
-
-      {/* Light beam cylinder going up */}
-      <mesh ref={beamRef} position={[0, 0.35, 0]}>
-        <cylinderGeometry args={[0.32, 0.38, 0.70, 32, 1, true]} />
-        <meshBasicMaterial color={TEAL_GLOW} transparent opacity={0.06} side={THREE.BackSide} />
-      </mesh>
-
-      {/* Floor glow disc */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
-        <circleGeometry args={[0.70, 64]} />
-        <meshBasicMaterial color={TEAL_GLOW} transparent opacity={0.08} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─── Ambient Particles ────────────────────────────────────────────────────────
-function AmbientParticles() {
-  const COUNT = 1200;
-  const ref   = useRef<THREE.Points>(null);
-
-  const { geo, phases } = useMemo(() => {
-    const pos = new Float32Array(COUNT * 3);
-    const ph  = new Float32Array(COUNT);
-    for (let i = 0; i < COUNT; i++) {
-      const r = 0.5 + Math.random() * 1.2;
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.6;
-      pos[i * 3 + 2] = r * Math.cos(phi);
-      ph[i] = Math.random() * Math.PI * 2;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    return { geo: g, phases: ph };
-  }, []);
-
-  const mat = useMemo(() => new THREE.PointsMaterial({
-    color: TEAL_GLOW, size: 0.006, transparent: true, opacity: 0.55,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }), []);
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t   = clock.elapsedTime;
-    const pos = ref.current.geometry.attributes.position;
-    const arr = pos.array as Float32Array;
-    for (let i = 0; i < COUNT; i++) {
-      const ph = phases[i];
-      arr[i * 3 + 1] += 0.0003 * Math.sin(t * 0.4 + ph);
-    }
-    pos.needsUpdate = true;
-  });
-
-  return <points ref={ref} geometry={geo} material={mat} />;
-}
-
-// ─── Scene ────────────────────────────────────────────────────────────────────
-function BrainScene({ selected }: { selected: Project | null }) {
-  return (
-    <>
-      <ambientLight intensity={0.04} />
-      <directionalLight position={[3, 4, 2]}  intensity={1.2} color={TEAL} />
-      <directionalLight position={[-2, 2, 1]} intensity={0.5} color="#004466" />
-      <pointLight position={[0, -0.4, 0]} intensity={3.0} color={TEAL_GLOW} distance={1.5} />
-
-      <Suspense fallback={null}>
-        <BrainModel selected={selected} />
-      </Suspense>
-      <Platform />
-      <AmbientParticles />
-    </>
-  );
-}
 
 // ─── HUD Corner Brackets ──────────────────────────────────────────────────────
 function HudCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
@@ -351,7 +92,7 @@ function HudCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   return <div style={style}><div style={h} /><div style={v} /></div>;
 }
 
-// ─── Scrolling Code Panel (left side, like photo 2) ───────────────────────────
+// ─── Scrolling Code Panel (left side) ─────────────────────────────────────────
 const CODE_LINES = [
   "NEURAL_NET.init()",
   "loading brain_mesh.glb...",
@@ -388,14 +129,12 @@ function CodePanel() {
       position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)",
       width: 190, zIndex: 10, pointerEvents: "none",
     }}>
-      {/* Panel header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
         <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
           SYS.LOG
         </span>
       </div>
-      {/* Border */}
       <div style={{ border: `1px solid ${TEAL}30`, borderRadius: 4, padding: "10px 12px", background: "rgba(0,20,35,0.75)", backdropFilter: "blur(4px)" }}>
         {visible.map((line, i) => (
           <div key={i} style={{
@@ -419,7 +158,6 @@ function ProjectsPanel({ selected, onSelect }: { selected: Project | null; onSel
       position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)",
       width: 200, zIndex: 10, display: "flex", flexDirection: "column", gap: 6,
     }}>
-      {/* Panel header */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
         <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
         <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
@@ -462,7 +200,7 @@ function ProjectsPanel({ selected, onSelect }: { selected: Project | null; onSel
   );
 }
 
-// ─── Bottom HUD Data Bar (like photo 1) ───────────────────────────────────────
+// ─── Bottom HUD Data Bar ───────────────────────────────────────────────────────
 function HudBottomBar({ selected }: { selected: Project | null }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -514,7 +252,6 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         boxShadow: `0 0 30px ${TEAL}20`,
       }}
     >
-      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}80`, letterSpacing: "0.2em", marginBottom: 4 }}>
@@ -534,7 +271,6 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         }}>ESC</button>
       </div>
 
-      {/* Stats */}
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
         {project.stats.map(([val, key], i) => (
           <div key={i} style={{
@@ -547,12 +283,10 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         ))}
       </div>
 
-      {/* Description */}
       <p style={{ fontSize: 11, color: `${TEAL_DIM}aa`, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6, marginBottom: 12 }}>
         {project.desc}
       </p>
 
-      {/* Tech stack */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 14 }}>
         {project.tech.map((t) => (
           <span key={t} style={{
@@ -563,7 +297,6 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         ))}
       </div>
 
-      {/* GitHub link */}
       <a href={project.github} target="_blank" rel="noreferrer" style={{
         display: "inline-flex", alignItems: "center", gap: 6,
         fontSize: 9, fontFamily: "JetBrains Mono, monospace",
@@ -621,14 +354,25 @@ export default function ProjectsSection() {
         </p>
       </div>
 
-      {/* 3D Canvas */}
-      <Canvas
-        camera={{ position: [0, 0.1, 1.4], fov: 45 }}
-        gl={{ antialias: true, alpha: false }}
-        style={{ background: BG, position: "absolute", inset: 0 }}
-      >
-        <BrainScene selected={selected} />
-      </Canvas>
+      {/* Spline Brain Embed — fills the full section behind all UI panels */}
+      <div style={{
+        position: "absolute", inset: 0, zIndex: 1,
+        pointerEvents: "none",
+      }}>
+        <iframe
+          src="https://my.spline.design/particleaibrain-qTSH6ng45xCnedxYcL0Ov1Ri/"
+          frameBorder="0"
+          style={{
+            width: "100%",
+            height: "100%",
+            border: "none",
+            display: "block",
+            pointerEvents: "auto",
+          }}
+          title="AI Brain"
+          allow="autoplay"
+        />
+      </div>
 
       {/* HUD Corners */}
       <HudCorner pos="tl" />
