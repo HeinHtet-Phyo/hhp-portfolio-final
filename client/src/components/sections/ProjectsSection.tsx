@@ -176,7 +176,7 @@ function BrainModel({ selected }: { selected: Project | null }) {
   // Y_OFFSET: the exact angle at t=0 that shows the left lateral profile
   // X=-PI/2 stands brain upright; Y_OFFSET sets the starting view
   // Formula: rotation.y = Y_OFFSET + elapsedTime * SPIN_SPEED
-  const Y_OFFSET = 0;  // Y=0 with X=+PI/2 pre-rotation = perfect left lateral profile (confirmed from screenshot)
+  const Y_OFFSET = 0;  // BrainUVs.obj with X=+PI/2 pre-rotation: Y=0 gives perfect left lateral profile (frontal lobe left, cerebellum lower-right, brainstem down)
   const SPIN_SPEED = 0.30;               // rad/s turntable speed
   const SPIN_PAUSED = false;  // spin active
 
