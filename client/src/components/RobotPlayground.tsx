@@ -1,7 +1,7 @@
 // Dark Space Theme — Robot Playground GLB Viewer
-// Cyan/blue rim lighting, auto Y-rotation, orbit controls, transparent background
+// Bright original colors, no rotation, animation only, orbit controls
 import { Suspense, useRef, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 
@@ -12,11 +12,10 @@ function RobotModel() {
   const groupRef = useRef<THREE.Group>(null);
   const { actions, names } = useAnimations(animations, groupRef);
 
-  // Play all animations (or the first one) on mount
+  // Play the first animation on mount — no rotation, just the built-in animation
   useEffect(() => {
     if (names.length > 0) {
-      // Try to play an idle/walk animation, fallback to first
-      const preferred = names.find(n => /idle|walk|run|anim/i.test(n)) || names[0];
+      const preferred = names.find(n => /idle|walk|run|dance|wave|anim/i.test(n)) || names[0];
       const action = actions[preferred];
       if (action) {
         action.reset().fadeIn(0.3).play();
@@ -24,27 +23,23 @@ function RobotModel() {
     }
   }, [actions, names]);
 
-  // Slow Y-axis auto-rotation
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.3;
-    }
-  });
-
-  // Apply cyan emissive tint to all meshes for holographic feel
-  scene.traverse((child) => {
-    if ((child as THREE.Mesh).isMesh) {
-      const mesh = child as THREE.Mesh;
-      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      mats.forEach((mat) => {
-        if (mat instanceof THREE.MeshStandardMaterial) {
-          mat.emissive = new THREE.Color(0x001a2e);
-          mat.emissiveIntensity = 0.15;
-          mat.envMapIntensity = 1.2;
-        }
-      });
-    }
-  });
+  // Restore original bright materials — remove any dark tint
+  useEffect(() => {
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((mat) => {
+          if (mat instanceof THREE.MeshStandardMaterial) {
+            // Reset emissive to black so original colors show through
+            mat.emissive = new THREE.Color(0x000000);
+            mat.emissiveIntensity = 0;
+            mat.needsUpdate = true;
+          }
+        });
+      }
+    });
+  }, [scene]);
 
   return (
     <group ref={groupRef}>
@@ -56,21 +51,16 @@ function RobotModel() {
 function Lights() {
   return (
     <>
-      {/* Ambient base */}
-      <ambientLight intensity={0.3} color="#0a1628" />
-      {/* Key light — cool white from upper left */}
-      <directionalLight
-        position={[-3, 4, 3]}
-        intensity={2.5}
-        color="#c8e8ff"
-        castShadow={false}
-      />
-      {/* Cyan rim light from right */}
-      <pointLight position={[4, 1, -2]} intensity={3} color="#00d4ff" distance={12} />
-      {/* Blue fill from below */}
-      <pointLight position={[-2, -3, 2]} intensity={1.5} color="#0066ff" distance={10} />
-      {/* Warm accent from back */}
-      <pointLight position={[0, 3, -4]} intensity={1.2} color="#4488ff" distance={8} />
+      {/* Strong neutral ambient so original colors are fully visible */}
+      <ambientLight intensity={2.5} color="#ffffff" />
+      {/* Key light from upper front-left */}
+      <directionalLight position={[-2, 5, 4]} intensity={3.0} color="#ffffff" />
+      {/* Fill light from right */}
+      <directionalLight position={[4, 2, 2]} intensity={2.0} color="#e0f8ff" />
+      {/* Subtle cyan rim from behind */}
+      <pointLight position={[0, 3, -5]} intensity={2.0} color="#00d4ff" distance={15} />
+      {/* Soft bottom fill */}
+      <pointLight position={[0, -3, 3]} intensity={1.0} color="#ffffff" distance={10} />
     </>
   );
 }
@@ -84,7 +74,7 @@ export default function RobotPlayground() {
       background: "transparent",
     }}>
       <Canvas
-        gl={{ alpha: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        gl={{ alpha: true, antialias: true, toneMapping: THREE.LinearToneMapping, toneMappingExposure: 1.0 }}
         camera={{ position: [0, 0.8, 7], fov: 38 }}
         style={{ background: "transparent" }}
       >
