@@ -1,4 +1,5 @@
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
+// jsxLocPlugin removed — it injects data-loc into R3F Three.js elements causing applyProps crash
+// import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import fs from "node:fs";
@@ -222,7 +223,7 @@ function vitePluginStripR3FDataLoc(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy(), vitePluginStripR3FDataLoc()];
+const plugins = [react(), tailwindcss(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()];
 
 export default defineConfig({
   plugins,
