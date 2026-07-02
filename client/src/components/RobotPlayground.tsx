@@ -2,7 +2,7 @@
 // Cyan/blue rim lighting, auto Y-rotation, orbit controls, transparent background
 import { Suspense, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { useGLTF, OrbitControls, Environment } from "@react-three/drei";
+import { useGLTF, OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 
 const ROBOT_URL = "/manus-storage/robot_playground_8db15507.glb";
@@ -78,7 +78,6 @@ export default function RobotPlayground() {
         <Lights />
         <Suspense fallback={null}>
           <RobotModel />
-          <Environment preset="night" />
         </Suspense>
         <OrbitControls
           enableZoom={false}
