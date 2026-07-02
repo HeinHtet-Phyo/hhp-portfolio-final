@@ -1,4 +1,4 @@
-// Sci-Fi Computer GLB — original model, no modifications
+// Sci-Fi Computer GLB — original model, boosted lighting to restore bright cyan colors
 import { Suspense, useRef, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
@@ -18,6 +18,23 @@ function Model() {
     }
   }, [actions, names]);
 
+  // Boost emissive intensity on all materials to restore original bright colors
+  useEffect(() => {
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        mats.forEach((mat) => {
+          const m = mat as THREE.MeshStandardMaterial;
+          if (m.emissive) {
+            // Amplify existing emissive color so keyboard/screen glow brightly
+            m.emissiveIntensity = Math.max(m.emissiveIntensity ?? 1, 1.8);
+          }
+        });
+      }
+    });
+  }, [scene]);
+
   return (
     <group ref={groupRef}>
       <primitive object={scene} />
@@ -29,13 +46,18 @@ export default function RobotPlayground() {
   return (
     <div style={{ width: "100%", aspectRatio: "1 / 1", background: "transparent" }}>
       <Canvas
-        gl={{ alpha: true, antialias: true }}
-        camera={{ position: [2.5, 2.5, 4.5], fov: 46 }}
+        gl={{ alpha: true, antialias: true, outputColorSpace: THREE.SRGBColorSpace }}
+        camera={{ position: [4.0, 3.5, 7.5], fov: 40 }}
         style={{ background: "transparent" }}
       >
-        <ambientLight intensity={1.0} />
-        <directionalLight position={[5, 5, 5]} intensity={1.5} />
-        <directionalLight position={[-5, 3, 3]} intensity={1.0} />
+        {/* Strong white ambient so all surfaces show their true colors */}
+        <ambientLight intensity={2.5} color="#ffffff" />
+        {/* Key light from upper-front-right */}
+        <directionalLight position={[4, 6, 5]} intensity={3.0} color="#ffffff" />
+        {/* Fill light from left */}
+        <directionalLight position={[-4, 3, 4]} intensity={2.0} color="#cce8ff" />
+        {/* Rim light from behind to separate model from background */}
+        <directionalLight position={[0, -2, -5]} intensity={1.0} color="#00d4ff" />
         <Suspense fallback={null}>
           <Model />
         </Suspense>
