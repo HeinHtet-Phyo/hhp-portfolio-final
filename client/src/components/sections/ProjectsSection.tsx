@@ -157,31 +157,21 @@ function BrainModel({ selected }: { selected: Project | null }) {
   }), []);
 
   useEffect(() => {
-    // Bake X=+PI/2 rotation permanently into geometry vertices.
-    // Python render confirmed: X=+90deg makes brain upright (frontal lobe left, brainstem down).
-    // After baking, the brain is permanently upright so Y-axis spin = clean turntable.
-    const xRot = new THREE.Matrix4().makeRotationX(Math.PI / 2);
+    // Only assign custom teal shader material — no geometry rotation baking.
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        mesh.geometry = mesh.geometry.clone();
-        mesh.geometry.applyMatrix4(xRot);
-        mesh.geometry.computeVertexNormals();
         mesh.material = mat;
       }
     });
   }, [gltf, mat]);
 
-  // Brain geometry is now permanently upright (X=+PI/2 baked in).
-  // Y_OFFSET sets starting angle; Y-axis spin = clean turntable rotation.
-  const Y_OFFSET = -Math.PI / 2;  // -90° rotates to left lateral profile (frontal lobe left, brainstem down)
   const SPIN_SPEED = 0.30;  // rad/s
-  const SPIN_PAUSED = false;
 
   useFrame((state, _delta) => {
     if (!groupRef.current) return;
-    // Clean Y-axis turntable spin — geometry is already upright
-    groupRef.current.rotation.y = Y_OFFSET + (SPIN_PAUSED ? 0 : state.clock.elapsedTime * SPIN_SPEED);
+    // Y-axis turntable spin on outer group
+    groupRef.current.rotation.y = state.clock.elapsedTime * SPIN_SPEED;
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
@@ -192,8 +182,8 @@ function BrainModel({ selected }: { selected: Project | null }) {
 
   return (
     <group ref={groupRef}>
-      {/* Geometry is permanently upright (X=+PI/2 baked in useEffect). Y spin = clean turntable. */}
-      <group position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
+      {/* rotation.x = Math.PI/2 stands the brain upright (Z-up OBJ → Y-up Three.js) */}
+      <group rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]} scale={[0.0016, 0.0016, 0.0016]}>
         <primitive object={gltf.scene} />
       </group>
     </group>
