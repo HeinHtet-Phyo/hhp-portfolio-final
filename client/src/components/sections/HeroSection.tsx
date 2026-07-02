@@ -2,7 +2,7 @@
 // Split-char name animation, typing roles, count-up stats, magnetic buttons, 3D neural network
 import { useEffect, useRef, useState } from "react";
 import { FiGithub, FiLinkedin, FiMail, FiArrowRight, FiDownload } from "react-icons/fi";
-import NeuralNetwork3D from "../NeuralNetwork3D";
+import RobotViewer from "../RobotViewer";
 
 const ROLES = ["Data Scientist", "AI Engineer", "ML Developer", "Data Analyst"];
 const NAME = "Hein Htet Phyo";
@@ -319,15 +319,16 @@ export default function HeroSection() {
 
           {/* Right Column */}
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
-            {/* 3D Neural Network */}
+            {/* 3D Robot */}
             <div style={{
               width: "100%",
               borderRadius: "12px",
-              border: "1px solid rgba(0,212,255,0.1)",
+              border: "1px solid rgba(0,212,255,0.12)",
               overflow: "hidden",
-              background: "rgba(0,0,0,0.5)",
+              background: "rgba(0,5,15,0.6)",
+              boxShadow: "0 0 40px rgba(0,180,255,0.08), inset 0 0 60px rgba(0,100,180,0.04)",
             }}>
-              <NeuralNetwork3D />
+              <RobotViewer />
             </div>
 
             {/* Profile Photo Placeholder */}
