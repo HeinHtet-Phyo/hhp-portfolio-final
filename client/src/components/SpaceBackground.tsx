@@ -1,65 +1,51 @@
-// SpaceBackground — True 3D X-axis rotation
-// Stars are placed in 3D space (x, y, z).
-// The whole field rotates around the X axis — like a wheel rolling toward you.
-// Stars come from the top, pass through the center, disappear behind.
-// Perspective projection makes near stars appear bigger/brighter.
-// 6000+ dots, very bright, slow graceful shooting stars.
+// SpaceBackground — Y-axis 3D rotation, whole screen filled, very bright dots
+// Stars rotate around Y axis (carousel/globe spin — left to right).
+// Stars are distributed across the FULL screen including edges.
+// Very bright opacity. Slow graceful shooting stars.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
-interface Star {
-  x: number;  // 3D x
-  y: number;  // 3D y
-  z: number;  // 3D z (depth)
+// 5 depth layers — different rotation speeds for parallax
+const LAYERS = [
+  { count: 2500, rotSpeed: 0.00012, rMin: 0.15, rMax: 0.30, oMin: 0.55, oMax: 0.85 },
+  { count: 1600, rotSpeed: 0.00020, rMin: 0.20, rMax: 0.42, oMin: 0.60, oMax: 0.90 },
+  { count: 1000, rotSpeed: 0.00030, rMin: 0.28, rMax: 0.56, oMin: 0.65, oMax: 0.92 },
+  { count:  600, rotSpeed: 0.00042, rMin: 0.36, rMax: 0.72, oMin: 0.70, oMax: 0.95 },
+  { count:  350, rotSpeed: 0.00058, rMin: 0.48, rMax: 0.95, oMin: 0.75, oMax: 1.00 },
+];
+
+interface Star3D {
+  // Y-axis rotation: star sweeps in XZ plane
+  // y is fixed (vertical position on screen)
+  y: number;          // fixed vertical position (-H/2 .. H/2)
+  rotAngle: number;   // current angle in XZ plane
+  rotRadius: number;  // distance from Y axis
   r: number;
   opacity: number;
   twinkleFreq: number;
   twinklePhase: number;
-}
-
-// 5 depth layers — different rotation speeds for parallax
-const LAYERS = [
-  { count: 2500, rotSpeed: 0.00012, rMin: 0.15, rMax: 0.32, oMin: 0.35, oMax: 0.65, spread: 1.0 },
-  { count: 1600, rotSpeed: 0.00020, rMin: 0.20, rMax: 0.44, oMin: 0.50, oMax: 0.75, spread: 0.8 },
-  { count: 1000, rotSpeed: 0.00030, rMin: 0.28, rMax: 0.58, oMin: 0.60, oMax: 0.85, spread: 0.6 },
-  { count:  600, rotSpeed: 0.00042, rMin: 0.38, rMax: 0.74, oMin: 0.65, oMax: 0.90, spread: 0.4 },
-  { count:  350, rotSpeed: 0.00058, rMin: 0.50, rMax: 1.00, oMin: 0.70, oMax: 0.95, spread: 0.25 },
-];
-
-interface Star3D {
-  x: number; y: number; z: number;
-  r: number; opacity: number;
-  twinkleFreq: number; twinklePhase: number;
   layer: number;
-  rotAngle: number; // current rotation angle around X axis
-  rotRadius: number; // distance from X axis (sqrt(y²+z²))
-  initAngle: number; // initial angle in YZ plane
 }
 
 function buildStars(W: number, H: number): Star3D[] {
   const stars: Star3D[] = [];
-  const maxSpread = Math.max(W, H) * 0.7;
+  // Use a large radius so stars fill the whole screen
+  const maxRadius = Math.sqrt(W * W + H * H) * 0.6;
 
   LAYERS.forEach((cfg, li) => {
     for (let i = 0; i < cfg.count; i++) {
-      // Random X position across full width
-      const x = (Math.random() - 0.5) * maxSpread * 2;
-      // Random position in YZ plane (defines circle of rotation)
-      const initAngle = Math.random() * Math.PI * 2;
-      const rotRadius = Math.sqrt(Math.random()) * maxSpread * cfg.spread;
-      const y = Math.cos(initAngle) * rotRadius;
-      const z = Math.sin(initAngle) * rotRadius;
-
       stars.push({
-        x, y, z,
+        // Spread Y across full screen height
+        y: (Math.random() - 0.5) * H * 1.1,
+        // Random starting angle in XZ plane
+        rotAngle: Math.random() * Math.PI * 2,
+        // Uniform distribution of radii — fills from center to edges
+        rotRadius: Math.sqrt(Math.random()) * maxRadius,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
         twinkleFreq: 0.003 + Math.random() * 0.010,
         twinklePhase: Math.random() * Math.PI * 2,
         layer: li,
-        rotAngle: initAngle,
-        rotRadius,
-        initAngle,
       });
     }
   });
@@ -112,26 +98,25 @@ export default function SpaceBackground() {
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
 
-    const FOV = 600; // perspective field of view
+    const FOV = 500;
 
     const draw = () => {
       t++;
       frame++;
 
       const isDark = theme === "dark";
-      ctx.fillStyle = isDark ? "#000000" : "#eeeeee";
+      ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
       const cx = W / 2;
       const cy = H / 2;
 
-      // Rotate each star around X axis
       for (const s of stars) {
         const cfg = LAYERS[s.layer];
         s.rotAngle += cfg.rotSpeed;
 
-        // New Y and Z from rotation around X axis
-        const newY = Math.cos(s.rotAngle) * s.rotRadius;
+        // Y-axis rotation: X and Z change, Y stays fixed
+        const newX = Math.cos(s.rotAngle) * s.rotRadius;
         const newZ = Math.sin(s.rotAngle) * s.rotRadius;
 
         // Perspective projection
@@ -139,20 +124,23 @@ export default function SpaceBackground() {
         if (depth <= 0) continue;
         const scale = FOV / depth;
 
-        const px = cx + s.x * scale;
-        const py = cy + newY * scale;
+        const px = cx + newX * scale;
+        const py = cy + s.y * scale;
 
-        // Depth-based alpha: stars in front (newZ < 0) are brighter
-        const depthAlpha = 0.4 + (1 - (newZ + W * 0.7) / (W * 1.4)) * 0.6;
-        const twinkle = 0.78 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.22;
+        // Only draw if on screen (with margin)
+        if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
+
+        // Depth alpha: front stars brighter
+        const depthAlpha = 0.5 + (0.5 * (FOV - newZ) / (FOV + Math.sqrt(W * W + H * H) * 0.6));
+        const twinkle = 0.82 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.18;
         const alpha = Math.min(1, s.opacity * twinkle * depthAlpha);
-        const dotR = Math.max(0.1, s.r * scale);
+        const dotR = Math.max(0.15, s.r * scale * 0.9);
 
         ctx.beginPath();
         ctx.arc(px, py, dotR, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
-          : `rgba(8,8,8,${alpha * 0.65})`;
+          : `rgba(10,10,10,${alpha * 0.7})`;
         ctx.fill();
       }
 
