@@ -31,8 +31,8 @@ function TypingRole({ isDark }: { isDark: boolean }) {
   }, [text, deleting, roleIdx]);
 
   return (
-    <span style={{ color: "#60a5fa" }}>
-      {text}<span className="typing-cursor" style={{ color: "#60a5fa" }} />
+    <span style={{ color: isDark ? "rgba(255,255,255,0.9)" : "#0a0a0a" }}>
+      {text}<span className="typing-cursor" style={{ color: isDark ? "rgba(255,255,255,0.9)" : "#0a0a0a" }} />
     </span>
   );
 }
@@ -42,20 +42,20 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
   const [linesDone, setLinesDone] = useState(0);
 
   const lines = [
-    { text: "const Developer = {", color: isDark ? "rgba(255,255,255,0.9)" : "#1e293b" },
-    { text: '  name: "Hein Htet Phyo",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  location: "London, UK",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  degree: "BSc Data Science & AI",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  university: "UWE Bristol",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  roles: [', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '    "Data Scientist",', color: "#86efac" },
-    { text: '    "AI Engineer",', color: "#86efac" },
-    { text: '    "ML Engineer",', color: "#86efac" },
-    { text: '  ],', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  skills: ["Python", "TensorFlow",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '    "PyTorch", "React", "SQL"],', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
-    { text: '  status: "Open to work 🚀",', color: "#fbbf24" },
-    { text: "};", color: isDark ? "rgba(255,255,255,0.9)" : "#1e293b" },
+    { text: "const Developer = {", color: "rgba(255,255,255,0.90)" },
+    { text: '  name: "Hein Htet Phyo",', color: "rgba(255,255,255,0.70)" },
+    { text: '  location: "London, UK",', color: "rgba(255,255,255,0.70)" },
+    { text: '  degree: "BSc Data Science & AI",', color: "rgba(255,255,255,0.70)" },
+    { text: '  university: "UWE Bristol",', color: "rgba(255,255,255,0.70)" },
+    { text: '  roles: [', color: "rgba(255,255,255,0.70)" },
+    { text: '    "Data Scientist",', color: "rgba(255,255,255,0.50)" },
+    { text: '    "AI Engineer",', color: "rgba(255,255,255,0.50)" },
+    { text: '    "ML Engineer",', color: "rgba(255,255,255,0.50)" },
+    { text: '  ],', color: "rgba(255,255,255,0.70)" },
+    { text: '  skills: ["Python", "TensorFlow",', color: "rgba(255,255,255,0.70)" },
+    { text: '    "PyTorch", "React", "SQL"],', color: "rgba(255,255,255,0.70)" },
+    { text: '  status: "Open to work 🚀",', color: "rgba(255,255,255,0.90)" },
+    { text: "};", color: "rgba(255,255,255,0.90)" },
   ];
 
   useEffect(() => {
@@ -71,30 +71,29 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
       transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
       style={{
-        background: isDark ? "rgba(15,15,20,0.85)" : "rgba(15,23,42,0.92)",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)"}`,
+        background: "rgba(5,5,10,0.88)",
+        border: "1px solid rgba(255,255,255,0.10)",
         borderRadius: "12px",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
-        boxShadow: isDark
-          ? "0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)"
-          : "0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
         overflow: "hidden",
         width: "100%",
         maxWidth: 480,
+        position: "relative" as const,
       }}
     >
       {/* Title bar */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 16px",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
-        background: "rgba(255,255,255,0.03)",
+        borderBottom: "1px solid rgba(255,255,255,0.07)",
+        background: "rgba(255,255,255,0.025)",
       }}>
         <div style={{ display: "flex", gap: 7 }}>
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.15)" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.12)" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.10)" }} />
         </div>
         <span style={{
           fontFamily: "'JetBrains Mono', monospace",
@@ -243,8 +242,8 @@ export default function HeroSection() {
               style={{
                 display: "flex", alignItems: "center", gap: "0.5rem",
                 padding: "0.75rem 1.5rem",
-                background: "#3b82f6",
-                color: "white", border: "none",
+                background: isDark ? "white" : "#0a0a0a",
+                color: isDark ? "black" : "white", border: "none",
                 fontFamily: "'Space Grotesk', sans-serif",
                 fontSize: "0.85rem", fontWeight: 700,
                 letterSpacing: "0.04em", cursor: "pointer",
