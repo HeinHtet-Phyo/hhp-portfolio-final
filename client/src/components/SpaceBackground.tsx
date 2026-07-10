@@ -1,45 +1,44 @@
-// SpaceBackground — Dense rotating 3D star field
-// The ENTIRE star field slowly rotates as one unit (circular 3D motion).
-// Multiple layers rotate at different speeds = depth illusion.
-// Stars are placed in a sphere projected onto screen — true 3D circular feel.
-// Shooting stars are slow and graceful with long glowing tails.
+// SpaceBackground — Full-screen star field, whole canvas drifts together
+// Stars fill the ENTIRE screen. The whole field slowly drifts as one unit
+// using a global offset that moves in a slow circular path (3D feel).
+// Each depth layer has a different drift multiplier = parallax depth.
+// Shooting stars cross the full screen slowly with glowing tails.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  // 3D position on a sphere
-  theta: number;  // azimuth angle
-  phi: number;    // polar angle
-  radius: number; // sphere radius (depth layer)
-  r: number;      // dot size
+  x: number;   // base x (0..W)
+  y: number;   // base y (0..H)
+  r: number;
   opacity: number;
+  layer: number; // 0=far, 4=near
   twinkleFreq: number;
   twinklePhase: number;
-  layer: number;
 }
 
-// 5 depth layers — different rotation speeds and sizes
-const LAYERS = [
-  { count: 350, rotSpeed: 0.00006, rMin: 0.10, rMax: 0.30, oMin: 0.04, oMax: 0.18, radiusMin: 0.75, radiusMax: 1.0  },
-  { count: 280, rotSpeed: 0.00010, rMin: 0.18, rMax: 0.42, oMin: 0.10, oMax: 0.28, radiusMin: 0.55, radiusMax: 0.75 },
-  { count: 200, rotSpeed: 0.00016, rMin: 0.26, rMax: 0.58, oMin: 0.18, oMax: 0.42, radiusMin: 0.38, radiusMax: 0.55 },
-  { count: 130, rotSpeed: 0.00024, rMin: 0.36, rMax: 0.76, oMin: 0.28, oMax: 0.55, radiusMin: 0.22, radiusMax: 0.38 },
-  { count:  80, rotSpeed: 0.00036, rMin: 0.50, rMax: 1.00, oMin: 0.40, oMax: 0.68, radiusMin: 0.08, radiusMax: 0.22 },
+// Layer drift multipliers: far barely moves, near moves more
+const LAYER_DRIFT = [0.08, 0.18, 0.32, 0.52, 0.80];
+
+const LAYER_CONFIGS = [
+  { count: 350, rMin: 0.10, rMax: 0.28, oMin: 0.04, oMax: 0.18 },
+  { count: 280, rMin: 0.18, rMax: 0.40, oMin: 0.10, oMax: 0.28 },
+  { count: 200, rMin: 0.26, rMax: 0.55, oMin: 0.18, oMax: 0.42 },
+  { count: 130, rMin: 0.36, rMax: 0.72, oMin: 0.28, oMax: 0.55 },
+  { count:  80, rMin: 0.50, rMax: 0.95, oMin: 0.40, oMax: 0.68 },
 ];
 
-function buildStars(): Star[] {
+function buildStars(W: number, H: number): Star[] {
   const stars: Star[] = [];
-  LAYERS.forEach((cfg, li) => {
+  LAYER_CONFIGS.forEach((cfg, li) => {
     for (let i = 0; i < cfg.count; i++) {
       stars.push({
-        theta: Math.random() * Math.PI * 2,
-        phi: Math.acos(2 * Math.random() - 1), // uniform sphere distribution
-        radius: cfg.radiusMin + Math.random() * (cfg.radiusMax - cfg.radiusMin),
+        x: Math.random() * W,
+        y: Math.random() * H,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
+        layer: li,
         twinkleFreq: 0.003 + Math.random() * 0.010,
         twinklePhase: Math.random() * Math.PI * 2,
-        layer: li,
       });
     }
   });
@@ -54,16 +53,16 @@ interface ShootingStar {
 }
 
 function spawnShoot(W: number, H: number): ShootingStar {
-  const angle = (12 + Math.random() * 30) * (Math.PI / 180);
-  const speed = 3.5 + Math.random() * 5; // slower, more graceful
+  const angle = (10 + Math.random() * 32) * (Math.PI / 180);
+  const speed = 3 + Math.random() * 4.5; // slow and graceful
   return {
     x: Math.random() * W * 0.8,
     y: Math.random() * H * 0.5,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     life: 0,
-    maxLife: 55 + Math.random() * 70, // longer life = slower feel
-    len: 90 + Math.random() * 180,
+    maxLife: 60 + Math.random() * 80,
+    len: 100 + Math.random() * 200,
     glowR: 1.8 + Math.random() * 2.5,
   };
 }
@@ -84,12 +83,15 @@ export default function SpaceBackground() {
     canvas.width = W;
     canvas.height = H;
 
-    const stars = buildStars();
+    let stars = buildStars(W, H);
     let t = 0;
     let frame = 0;
 
-    // Layer rotation offsets
-    const layerAngles = LAYERS.map(() => Math.random() * Math.PI * 2);
+    // Global drift: moves in a slow elliptical path
+    // driftX and driftY are the current global offset
+    const DRIFT_RADIUS_X = 35; // pixels the whole field drifts horizontally
+    const DRIFT_RADIUS_Y = 22; // pixels the whole field drifts vertically
+    const DRIFT_SPEED = 0.0004; // how fast the drift cycles
 
     const shoots: ShootingStar[] = [];
     shoots.push(spawnShoot(W, H));
@@ -103,49 +105,26 @@ export default function SpaceBackground() {
       ctx.fillStyle = isDark ? "#000000" : "#eeeeee";
       ctx.fillRect(0, 0, W, H);
 
-      const cx = W / 2;
-      const cy = H / 2;
-      const scale = Math.min(W, H) * 0.65;
+      // Global drift offset (slow elliptical path = 3D circular feel)
+      const globalDX = Math.sin(t * DRIFT_SPEED) * DRIFT_RADIUS_X;
+      const globalDY = Math.cos(t * DRIFT_SPEED * 0.7) * DRIFT_RADIUS_Y;
 
-      // Advance each layer's rotation angle
-      LAYERS.forEach((cfg, li) => {
-        layerAngles[li] += cfg.rotSpeed;
-      });
-
-      // Draw stars — project 3D sphere coords to 2D screen
+      // Draw stars
       for (const s of stars) {
-        const cfg = LAYERS[s.layer];
-        const rotAngle = layerAngles[s.layer];
+        const mult = LAYER_DRIFT[s.layer];
+        // Each layer moves a fraction of the global drift
+        const ox = globalDX * mult;
+        const oy = globalDY * mult;
 
-        // Rotate theta by layer's current angle
-        const rotTheta = s.theta + rotAngle;
+        // Wrap around edges so no empty corners
+        let px = ((s.x + ox) % (W + 4) + W + 4) % (W + 4) - 2;
+        let py = ((s.y + oy) % (H + 4) + H + 4) % (H + 4) - 2;
 
-        // 3D sphere → Cartesian
-        const x3 = s.radius * Math.sin(s.phi) * Math.cos(rotTheta);
-        const y3 = s.radius * Math.sin(s.phi) * Math.sin(rotTheta);
-        const z3 = s.radius * Math.cos(s.phi);
-
-        // Simple perspective projection (z goes into screen)
-        // Tilt the sphere slightly so we see the rotation as circular
-        const tiltAngle = 0.35; // ~20 degrees tilt
-        const yt = y3 * Math.cos(tiltAngle) - z3 * Math.sin(tiltAngle);
-        const zt = y3 * Math.sin(tiltAngle) + z3 * Math.cos(tiltAngle);
-
-        const perspective = 1.8 / (1.8 + zt);
-        const px = cx + x3 * scale * perspective;
-        const py = cy + yt * scale * perspective * 0.55; // flatten Y a bit
-
-        // Cull stars behind the viewer
-        if (zt < -0.9) continue;
-
-        // Depth-based opacity boost
-        const depthAlpha = 0.4 + perspective * 0.6;
         const twinkle = 0.78 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.22;
-        const alpha = s.opacity * twinkle * depthAlpha;
-        const dotR = s.r * perspective;
+        const alpha = s.opacity * twinkle;
 
         ctx.beginPath();
-        ctx.arc(px, py, Math.max(0.1, dotR), 0, Math.PI * 2);
+        ctx.arc(px, py, s.r, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
           : `rgba(8,8,8,${alpha * 0.6})`;
@@ -155,7 +134,7 @@ export default function SpaceBackground() {
       // Shooting stars
       if (frame >= nextShoot) {
         shoots.push(spawnShoot(W, H));
-        nextShoot = frame + 100 + Math.floor(Math.random() * 160);
+        nextShoot = frame + 100 + Math.floor(Math.random() * 150);
       }
 
       for (let i = shoots.length - 1; i >= 0; i--) {
@@ -173,7 +152,6 @@ export default function SpaceBackground() {
         const tx = ss.x - nx * ss.len;
         const ty = ss.y - ny * ss.len;
 
-        // Long gradient tail
         const g = ctx.createLinearGradient(tx, ty, ss.x, ss.y);
         if (isDark) {
           g.addColorStop(0,    `rgba(255,255,255,0)`);
@@ -193,7 +171,6 @@ export default function SpaceBackground() {
         ctx.stroke();
 
         if (isDark) {
-          // Soft outer glow
           const glow = ctx.createRadialGradient(ss.x, ss.y, 0, ss.x, ss.y, ss.glowR * 4);
           glow.addColorStop(0,   `rgba(210,225,255,${alpha * 0.75})`);
           glow.addColorStop(0.5, `rgba(180,210,255,${alpha * 0.25})`);
@@ -202,7 +179,6 @@ export default function SpaceBackground() {
           ctx.arc(ss.x, ss.y, ss.glowR * 4, 0, Math.PI * 2);
           ctx.fillStyle = glow;
           ctx.fill();
-          // Bright core
           ctx.beginPath();
           ctx.arc(ss.x, ss.y, ss.glowR * 0.55, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(255,255,255,${alpha})`;
@@ -227,6 +203,7 @@ export default function SpaceBackground() {
       H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
+      stars = buildStars(W, H);
     };
 
     window.addEventListener("resize", onResize, { passive: true });
