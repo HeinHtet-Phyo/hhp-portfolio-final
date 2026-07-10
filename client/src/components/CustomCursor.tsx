@@ -1,69 +1,95 @@
-// Dark Space Theme — Custom Cursor with lerp lag
-import { useEffect, useRef } from "react";
+// Custom Cursor — Motionfolio-style mix-blend-difference dot
+// Uses RAF + direct DOM mutation for zero React re-renders
+import { useEffect, useRef, useState, memo } from "react";
 
-export default function CustomCursor() {
-  const outerRef = useRef<HTMLDivElement>(null);
-  const innerRef = useRef<HTMLDivElement>(null);
+const hasPointer = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+const CustomCursor = memo(function CustomCursor() {
+  const dotRef = useRef<HTMLDivElement>(null);
   const posRef = useRef({ x: 0, y: 0 });
-  const targetRef = useRef({ x: 0, y: 0 });
-  const rafRef = useRef<number>(0);
+  const hoveredRef = useRef(false);
+  const [hovered, setHovered] = useState(false);
 
   useEffect(() => {
+    if (!hasPointer()) return;
+
+    let rafId: number | null = null;
+
     const onMouseMove = (e: MouseEvent) => {
-      targetRef.current = { x: e.clientX, y: e.clientY };
-      if (innerRef.current) {
-        innerRef.current.style.left = e.clientX + "px";
-        innerRef.current.style.top = e.clientY + "px";
+      posRef.current = { x: e.clientX, y: e.clientY };
+      if (rafId === null) {
+        rafId = requestAnimationFrame(() => {
+          if (dotRef.current) {
+            const offset = 5; // half of 10px
+            dotRef.current.style.transform = `translate3d(${posRef.current.x - offset}px, ${posRef.current.y - offset}px, 0)`;
+          }
+          rafId = null;
+        });
       }
     };
 
-    const onMouseEnterLink = () => {
-      outerRef.current?.classList.add("cursor-hover");
-      innerRef.current?.classList.add("cursor-hover");
+    const updateHovered = (next: boolean) => {
+      if (hoveredRef.current === next) return;
+      hoveredRef.current = next;
+      setHovered(next);
     };
 
-    const onMouseLeaveLink = () => {
-      outerRef.current?.classList.remove("cursor-hover");
-      innerRef.current?.classList.remove("cursor-hover");
-    };
-
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-    const animate = () => {
-      posRef.current.x = lerp(posRef.current.x, targetRef.current.x, 0.12);
-      posRef.current.y = lerp(posRef.current.y, targetRef.current.y, 0.12);
-      if (outerRef.current) {
-        outerRef.current.style.left = posRef.current.x + "px";
-        outerRef.current.style.top = posRef.current.y + "px";
+    const onOver = (e: MouseEvent) => {
+      if ((e.target as Element).closest("a, button, [role='button'], .cursor-hover")) {
+        updateHovered(true);
       }
-      rafRef.current = requestAnimationFrame(animate);
     };
 
-    const addHoverListeners = () => {
-      document.querySelectorAll("a, button, [data-cursor-hover]").forEach((el) => {
-        el.addEventListener("mouseenter", onMouseEnterLink);
-        el.addEventListener("mouseleave", onMouseLeaveLink);
-      });
+    const onOut = (e: MouseEvent) => {
+      if ((e.target as Element).closest("a, button, [role='button'], .cursor-hover")) {
+        updateHovered(false);
+      }
     };
 
-    window.addEventListener("mousemove", onMouseMove);
-    rafRef.current = requestAnimationFrame(animate);
-    addHoverListeners();
-
-    const observer = new MutationObserver(addHoverListeners);
-    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    document.addEventListener("mouseover", onOver, { passive: true });
+    document.addEventListener("mouseout", onOut, { passive: true });
 
     return () => {
       window.removeEventListener("mousemove", onMouseMove);
-      cancelAnimationFrame(rafRef.current);
-      observer.disconnect();
+      document.removeEventListener("mouseover", onOver);
+      document.removeEventListener("mouseout", onOut);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 
+  if (!hasPointer()) return null;
+
   return (
-    <>
-      <div ref={outerRef} className="cursor-outer" />
-      <div ref={innerRef} className="cursor-inner" />
-    </>
+    <div
+      ref={dotRef}
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: 10,
+        height: 10,
+        pointerEvents: "none",
+        zIndex: 9999,
+        mixBlendMode: "difference",
+        willChange: "transform",
+      }}
+      className="hidden md:block"
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "white",
+          borderRadius: "50%",
+          transform: hovered ? "scale(5)" : "scale(1)",
+          transition: "transform 0.15s ease-out",
+        }}
+      />
+    </div>
   );
-}
+});
+
+export default CustomCursor;
