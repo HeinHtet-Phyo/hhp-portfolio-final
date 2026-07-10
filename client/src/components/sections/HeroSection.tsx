@@ -151,25 +151,39 @@ export default function HeroSection() {
           <OrbitingDecoration icon={BrainCircuit} delay={0.58} revealed={revealed} style={{ right: "8%", bottom: "10%" }} />
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.05em" }}>
-            {["HEIN", "HTET", "PHYO"].map((word, wi) => (
-              <motion.div
-                key={wi}
-                initial={{ opacity: 0, y: 28 }}
-                animate={revealed ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.75, delay: 0.15 + wi * 0.1, ease: [0.22, 1, 0.36, 1] }}
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "clamp(4rem, 14vw, 9.5rem)",
-                  fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.03em",
-                  textTransform: "uppercase",
-                  ...(wi === 1
-                    ? { WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a", color: "transparent" }
-                    : { color: isDark ? "white" : "#0a0a0a" }),
-                }}
-              >
-                {word}
-              </motion.div>
-            ))}
+            {/* Line 1: HEIN HTET — solid */}
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              animate={revealed ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "clamp(3.2rem, 11vw, 8rem)",
+                fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.03em",
+                textTransform: "uppercase",
+                color: isDark ? "white" : "#0a0a0a",
+                whiteSpace: "nowrap",
+              }}
+            >
+              HEIN HTET
+            </motion.div>
+            {/* Line 2: PHYO — outline */}
+            <motion.div
+              initial={{ opacity: 0, y: 28 }}
+              animate={revealed ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.75, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "clamp(3.2rem, 11vw, 8rem)",
+                fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.03em",
+                textTransform: "uppercase",
+                WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
+                color: "transparent",
+                whiteSpace: "nowrap",
+              }}
+            >
+              PHYO
+            </motion.div>
           </div>
         </div>
 

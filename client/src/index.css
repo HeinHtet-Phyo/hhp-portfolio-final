@@ -539,3 +539,10 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Show hamburger only on mobile */
+@media (max-width: 1023px) {
+  #mobile-hamburger {
+    display: flex !important;
+  }
+}

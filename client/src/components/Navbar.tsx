@@ -142,9 +142,11 @@ const Navbar = memo(function Navbar() {
             </div>
           </motion.a>
 
-          {/* Mobile hamburger */}
+          {/* Mobile hamburger — ONLY on mobile (hidden via CSS media query) */}
           <button
-            className="hamburger-btn lg:hidden"
+            className="hamburger-btn"
+            style={{ display: 'none' }}
+            id="mobile-hamburger"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
           >
