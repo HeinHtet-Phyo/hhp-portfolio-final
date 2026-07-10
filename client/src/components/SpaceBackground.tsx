@@ -1,45 +1,57 @@
-// SpaceBackground — Whole-field rotation + depth parallax
-// The ENTIRE star field rotates slowly together as one unit around the center.
-// Multiple layers rotate at slightly different speeds = 3D depth illusion.
-// Mouse gently tilts the rotation axis.
-// Feels like floating in space watching the universe slowly turn around you.
+// SpaceBackground — 3D Floating Star Field
+// Stars drift organically using sine-based noise offsets on X and Y independently.
+// Each star has a unique phase and frequency so motion looks random, not circular.
+// 5 depth layers: far stars barely move, near stars drift more — true 3D depth.
+// More stars, tiny dots, clean space feel.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  angle: number;   // current angle in radians (polar coords from center)
-  dist: number;    // distance from center (0..1 normalized)
-  r: number;       // dot radius
+  bx: number;      // base x (pixels)
+  by: number;      // base y (pixels)
+  r: number;       // radius
   opacity: number;
-  twinkleSpeed: number;
+  // Independent X and Y oscillation params (different freq/phase = non-circular)
+  freqX: number;
+  freqY: number;
+  phaseX: number;
+  phaseY: number;
+  ampX: number;    // amplitude in pixels
+  ampY: number;
+  twinkleFreq: number;
   twinklePhase: number;
-  layer: number;   // 0=far, 4=near
 }
 
-// Layer configs: rotation speed, size, opacity
-const LAYERS = [
-  { count: 180, rotSpeed: 0.00008, rMin: 0.15, rMax: 0.40, oMin: 0.07, oMax: 0.20 },
-  { count: 140, rotSpeed: 0.00014, rMin: 0.25, rMax: 0.55, oMin: 0.13, oMax: 0.32 },
-  { count: 100, rotSpeed: 0.00022, rMin: 0.35, rMax: 0.72, oMin: 0.22, oMax: 0.48 },
-  { count:  70, rotSpeed: 0.00034, rMin: 0.50, rMax: 0.90, oMin: 0.32, oMax: 0.60 },
-  { count:  40, rotSpeed: 0.00050, rMin: 0.65, rMax: 1.20, oMin: 0.45, oMax: 0.75 },
+const LAYER_CONFIGS = [
+  { count: 220, rMin: 0.12, rMax: 0.35, oMin: 0.06, oMax: 0.18, ampScale: 4  },
+  { count: 180, rMin: 0.22, rMax: 0.50, oMin: 0.12, oMax: 0.30, ampScale: 9  },
+  { count: 130, rMin: 0.32, rMax: 0.68, oMin: 0.20, oMax: 0.45, ampScale: 16 },
+  { count:  90, rMin: 0.45, rMax: 0.88, oMin: 0.30, oMax: 0.58, ampScale: 26 },
+  { count:  55, rMin: 0.60, rMax: 1.15, oMin: 0.42, oMax: 0.72, ampScale: 40 },
 ];
 
-function buildStars(): Star[] {
+function buildStars(W: number, H: number): Star[] {
   const stars: Star[] = [];
-  LAYERS.forEach((cfg, li) => {
+  for (const cfg of LAYER_CONFIGS) {
     for (let i = 0; i < cfg.count; i++) {
+      // Use very different frequencies for X and Y so motion is never circular
+      const baseFreq = 0.0003 + Math.random() * 0.0008;
       stars.push({
-        angle: Math.random() * Math.PI * 2,
-        dist: 0.05 + Math.random() * 0.95,
+        bx: Math.random() * W,
+        by: Math.random() * H,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
-        twinkleSpeed: 0.004 + Math.random() * 0.012,
+        freqX: baseFreq * (0.6 + Math.random() * 0.8),
+        freqY: baseFreq * (0.6 + Math.random() * 0.8) * (Math.random() > 0.5 ? 1.3 : 0.7),
+        phaseX: Math.random() * Math.PI * 2,
+        phaseY: Math.random() * Math.PI * 2,
+        ampX: cfg.ampScale * (0.5 + Math.random()),
+        ampY: cfg.ampScale * (0.5 + Math.random()) * (0.6 + Math.random() * 0.8),
+        twinkleFreq: 0.004 + Math.random() * 0.012,
         twinklePhase: Math.random() * Math.PI * 2,
-        layer: li,
       });
     }
-  });
+  }
   return stars;
 }
 
@@ -59,13 +71,14 @@ export default function SpaceBackground() {
     canvas.width = W;
     canvas.height = H;
 
-    const stars = buildStars();
-    let frame = 0;
+    let stars = buildStars(W, H);
+    let t = 0; // time counter
 
     // Shooting stars
     interface Shoot { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; len: number; }
     const shoots: Shoot[] = [];
     let nextShoot = 200;
+    let frame = 0;
 
     const spawnShoot = () => {
       const angle = (10 + Math.random() * 35) * (Math.PI / 180);
@@ -82,40 +95,37 @@ export default function SpaceBackground() {
     };
 
     const draw = () => {
+      t++;
       frame++;
 
       const isDark = theme === "dark";
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
-      const cx = W / 2;
-      const cy = H / 2;
-      // Use the longer diagonal so stars fill the whole screen even when rotated
-      const maxDist = Math.sqrt(cx * cx + cy * cy) * 1.1;
+      for (const s of stars) {
+        // Organic 3D float: X and Y use independent sine waves with different freq/phase
+        // This creates figure-8, elliptical, and irregular paths — never a circle
+        const dx = Math.sin(t * s.freqX + s.phaseX) * s.ampX;
+        const dy = Math.sin(t * s.freqY + s.phaseY) * s.ampY;
 
-      // Rotate each layer at its own speed
-      LAYERS.forEach((cfg, li) => {
-        const layerStars = stars.filter(s => s.layer === li);
-        for (const s of layerStars) {
-          // Advance rotation
-          s.angle += cfg.rotSpeed;
+        let px = s.bx + dx;
+        let py = s.by + dy;
 
-          // Convert polar → screen coords
-          const px = cx + Math.cos(s.angle) * s.dist * maxDist;
-          const py = cy + Math.sin(s.angle) * s.dist * maxDist;
+        // Wrap
+        px = ((px % (W + 4)) + W + 4) % (W + 4) - 2;
+        py = ((py % (H + 4)) + H + 4) % (H + 4) - 2;
 
-          // Twinkle
-          const twinkle = 0.78 + Math.sin(frame * s.twinkleSpeed + s.twinklePhase) * 0.22;
-          const alpha = s.opacity * twinkle;
+        // Twinkle
+        const twinkle = 0.78 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.22;
+        const alpha = s.opacity * twinkle;
 
-          ctx.beginPath();
-          ctx.arc(px, py, s.r, 0, Math.PI * 2);
-          ctx.fillStyle = isDark
-            ? `rgba(255,255,255,${alpha})`
-            : `rgba(10,10,10,${alpha * 0.55})`;
-          ctx.fill();
-        }
-      });
+        ctx.beginPath();
+        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = isDark
+          ? `rgba(255,255,255,${alpha})`
+          : `rgba(10,10,10,${alpha * 0.55})`;
+        ctx.fill();
+      }
 
       // Shooting stars
       if (frame >= nextShoot) {
@@ -165,6 +175,7 @@ export default function SpaceBackground() {
       H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
+      stars = buildStars(W, H);
     };
 
     window.addEventListener("resize", onResize, { passive: true });
