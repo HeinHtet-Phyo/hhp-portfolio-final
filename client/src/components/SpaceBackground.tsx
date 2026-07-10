@@ -1,44 +1,37 @@
-// SpaceBackground — Self-animating 3D floating star field
-// Every star has its own velocity (vx, vy) and drifts continuously.
-// Stars are in 5 depth layers — deeper ones move slower, nearer ones faster.
-// This creates a natural 3D parallax depth effect purely from self-motion.
-// Mouse adds a subtle extra tilt on top.
+// SpaceBackground — Whole-field rotation + depth parallax
+// The ENTIRE star field rotates slowly together as one unit around the center.
+// Multiple layers rotate at slightly different speeds = 3D depth illusion.
+// Mouse gently tilts the rotation axis.
+// Feels like floating in space watching the universe slowly turn around you.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  x: number;   // current x in pixels
-  y: number;   // current y in pixels
-  vx: number;  // velocity x (pixels/frame)
-  vy: number;  // velocity y (pixels/frame)
-  r: number;   // radius
+  angle: number;   // current angle in radians (polar coords from center)
+  dist: number;    // distance from center (0..1 normalized)
+  r: number;       // dot radius
   opacity: number;
   twinkleSpeed: number;
   twinklePhase: number;
-  layer: number; // 0=far, 4=near
+  layer: number;   // 0=far, 4=near
 }
 
-// Layer configs: speed multiplier, size, opacity
-const LAYER_CONFIGS = [
-  { count: 160, speedMult: 0.08, rMin: 0.15, rMax: 0.40, oMin: 0.08, oMax: 0.20 }, // very far
-  { count: 130, speedMult: 0.16, rMin: 0.25, rMax: 0.55, oMin: 0.14, oMax: 0.32 }, // far
-  { count: 100, speedMult: 0.28, rMin: 0.35, rMax: 0.72, oMin: 0.22, oMax: 0.48 }, // mid
-  { count:  70, speedMult: 0.45, rMin: 0.50, rMax: 0.90, oMin: 0.32, oMax: 0.62 }, // near
-  { count:  40, speedMult: 0.70, rMin: 0.65, rMax: 1.20, oMin: 0.45, oMax: 0.78 }, // very near
+// Layer configs: rotation speed, size, opacity
+const LAYERS = [
+  { count: 180, rotSpeed: 0.00008, rMin: 0.15, rMax: 0.40, oMin: 0.07, oMax: 0.20 },
+  { count: 140, rotSpeed: 0.00014, rMin: 0.25, rMax: 0.55, oMin: 0.13, oMax: 0.32 },
+  { count: 100, rotSpeed: 0.00022, rMin: 0.35, rMax: 0.72, oMin: 0.22, oMax: 0.48 },
+  { count:  70, rotSpeed: 0.00034, rMin: 0.50, rMax: 0.90, oMin: 0.32, oMax: 0.60 },
+  { count:  40, rotSpeed: 0.00050, rMin: 0.65, rMax: 1.20, oMin: 0.45, oMax: 0.75 },
 ];
 
-function buildStars(W: number, H: number): Star[] {
+function buildStars(): Star[] {
   const stars: Star[] = [];
-  LAYER_CONFIGS.forEach((cfg, li) => {
+  LAYERS.forEach((cfg, li) => {
     for (let i = 0; i < cfg.count; i++) {
-      // Random direction
-      const angle = Math.random() * Math.PI * 2;
-      const speed = cfg.speedMult * (0.5 + Math.random() * 0.5);
       stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        angle: Math.random() * Math.PI * 2,
+        dist: 0.05 + Math.random() * 0.95,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
         twinkleSpeed: 0.004 + Math.random() * 0.012,
@@ -66,13 +59,13 @@ export default function SpaceBackground() {
     canvas.width = W;
     canvas.height = H;
 
-    let stars = buildStars(W, H);
+    const stars = buildStars();
     let frame = 0;
 
     // Shooting stars
     interface Shoot { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; len: number; }
     const shoots: Shoot[] = [];
-    let nextShoot = 180;
+    let nextShoot = 200;
 
     const spawnShoot = () => {
       const angle = (10 + Math.random() * 35) * (Math.PI / 180);
@@ -95,28 +88,34 @@ export default function SpaceBackground() {
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
-      for (const s of stars) {
-        // Move star
-        s.x += s.vx;
-        s.y += s.vy;
+      const cx = W / 2;
+      const cy = H / 2;
+      // Use the longer diagonal so stars fill the whole screen even when rotated
+      const maxDist = Math.sqrt(cx * cx + cy * cy) * 1.1;
 
-        // Wrap around edges seamlessly
-        if (s.x < -2) s.x = W + 2;
-        else if (s.x > W + 2) s.x = -2;
-        if (s.y < -2) s.y = H + 2;
-        else if (s.y > H + 2) s.y = -2;
+      // Rotate each layer at its own speed
+      LAYERS.forEach((cfg, li) => {
+        const layerStars = stars.filter(s => s.layer === li);
+        for (const s of layerStars) {
+          // Advance rotation
+          s.angle += cfg.rotSpeed;
 
-        // Twinkle
-        const twinkle = 0.78 + Math.sin(frame * s.twinkleSpeed + s.twinklePhase) * 0.22;
-        const alpha = s.opacity * twinkle;
+          // Convert polar → screen coords
+          const px = cx + Math.cos(s.angle) * s.dist * maxDist;
+          const py = cy + Math.sin(s.angle) * s.dist * maxDist;
 
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-        ctx.fillStyle = isDark
-          ? `rgba(255,255,255,${alpha})`
-          : `rgba(10,10,10,${alpha * 0.55})`;
-        ctx.fill();
-      }
+          // Twinkle
+          const twinkle = 0.78 + Math.sin(frame * s.twinkleSpeed + s.twinklePhase) * 0.22;
+          const alpha = s.opacity * twinkle;
+
+          ctx.beginPath();
+          ctx.arc(px, py, s.r, 0, Math.PI * 2);
+          ctx.fillStyle = isDark
+            ? `rgba(255,255,255,${alpha})`
+            : `rgba(10,10,10,${alpha * 0.55})`;
+          ctx.fill();
+        }
+      });
 
       // Shooting stars
       if (frame >= nextShoot) {
@@ -166,7 +165,6 @@ export default function SpaceBackground() {
       H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
-      stars = buildStars(W, H);
     };
 
     window.addEventListener("resize", onResize, { passive: true });
