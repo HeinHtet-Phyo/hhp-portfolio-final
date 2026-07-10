@@ -1,51 +1,52 @@
-// SpaceBackground — Y-axis 3D rotation, whole screen filled, very bright dots
-// Stars rotate around Y axis (carousel/globe spin — left to right).
-// Stars are distributed across the FULL screen including edges.
-// Very bright opacity. Slow graceful shooting stars.
+// SpaceBackground — Static star field, no rotation
+// 6000+ bright dots fill the entire screen.
+// Each dot slowly drifts with its own organic motion (sine waves).
+// Slow graceful shooting stars with glowing tails.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
-// 5 depth layers — different rotation speeds for parallax
-const LAYERS = [
-  { count: 2500, rotSpeed: 0.00012, rMin: 0.15, rMax: 0.30, oMin: 0.55, oMax: 0.85 },
-  { count: 1600, rotSpeed: 0.00020, rMin: 0.20, rMax: 0.42, oMin: 0.60, oMax: 0.90 },
-  { count: 1000, rotSpeed: 0.00030, rMin: 0.28, rMax: 0.56, oMin: 0.65, oMax: 0.92 },
-  { count:  600, rotSpeed: 0.00042, rMin: 0.36, rMax: 0.72, oMin: 0.70, oMax: 0.95 },
-  { count:  350, rotSpeed: 0.00058, rMin: 0.48, rMax: 0.95, oMin: 0.75, oMax: 1.00 },
-];
-
-interface Star3D {
-  // Y-axis rotation: star sweeps in XZ plane
-  // y is fixed (vertical position on screen)
-  y: number;          // fixed vertical position (-H/2 .. H/2)
-  rotAngle: number;   // current angle in XZ plane
-  rotRadius: number;  // distance from Y axis
+interface Star {
+  x: number;
+  y: number;
   r: number;
   opacity: number;
+  // Drift params
+  driftX: number;   // drift amplitude X
+  driftY: number;   // drift amplitude Y
+  freqX: number;    // drift frequency X
+  freqY: number;    // drift frequency Y
+  phaseX: number;
+  phaseY: number;
+  // Twinkle
   twinkleFreq: number;
   twinklePhase: number;
-  layer: number;
 }
 
-function buildStars(W: number, H: number): Star3D[] {
-  const stars: Star3D[] = [];
-  // Use a large radius so stars fill the whole screen
-  const maxRadius = Math.sqrt(W * W + H * H) * 0.6;
+const LAYERS = [
+  { count: 1100, rMin: 0.15, rMax: 0.30, oMin: 0.55, oMax: 0.80, drift: 2.5 },
+  { count:  700, rMin: 0.20, rMax: 0.42, oMin: 0.60, oMax: 0.85, drift: 4.0 },
+  { count:  450, rMin: 0.28, rMax: 0.55, oMin: 0.65, oMax: 0.90, drift: 6.0 },
+  { count:  250, rMin: 0.36, rMax: 0.70, oMin: 0.70, oMax: 0.93, drift: 8.5 },
+  { count:  150, rMin: 0.48, rMax: 0.92, oMin: 0.75, oMax: 1.00, drift: 12.0 },
+];
 
-  LAYERS.forEach((cfg, li) => {
+function buildStars(W: number, H: number): Star[] {
+  const stars: Star[] = [];
+  LAYERS.forEach((cfg) => {
     for (let i = 0; i < cfg.count; i++) {
       stars.push({
-        // Spread Y across full screen height
-        y: (Math.random() - 0.5) * H * 1.1,
-        // Random starting angle in XZ plane
-        rotAngle: Math.random() * Math.PI * 2,
-        // Uniform distribution of radii — fills from center to edges
-        rotRadius: Math.sqrt(Math.random()) * maxRadius,
+        x: Math.random() * W,
+        y: Math.random() * H,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
-        twinkleFreq: 0.003 + Math.random() * 0.010,
+        driftX: (Math.random() * 0.6 + 0.4) * cfg.drift,
+        driftY: (Math.random() * 0.6 + 0.4) * cfg.drift,
+        freqX: 0.0003 + Math.random() * 0.0006,
+        freqY: 0.0002 + Math.random() * 0.0005,
+        phaseX: Math.random() * Math.PI * 2,
+        phaseY: Math.random() * Math.PI * 2,
+        twinkleFreq: 0.004 + Math.random() * 0.010,
         twinklePhase: Math.random() * Math.PI * 2,
-        layer: li,
       });
     }
   });
@@ -64,7 +65,7 @@ function spawnShoot(W: number, H: number): ShootingStar {
   const speed = 1.5 + Math.random() * 2.5;
   return {
     x: Math.random() * W * 0.8,
-    y: Math.random() * H * 0.5,
+    y: Math.random() * H * 0.4,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     life: 0,
@@ -98,8 +99,6 @@ export default function SpaceBackground() {
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
 
-    const FOV = 500;
-
     const draw = () => {
       t++;
       frame++;
@@ -108,36 +107,15 @@ export default function SpaceBackground() {
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
-      const cx = W / 2;
-      const cy = H / 2;
-
       for (const s of stars) {
-        const cfg = LAYERS[s.layer];
-        s.rotAngle += cfg.rotSpeed;
+        const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
+        const py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
 
-        // Y-axis rotation: X and Z change, Y stays fixed
-        const newX = Math.cos(s.rotAngle) * s.rotRadius;
-        const newZ = Math.sin(s.rotAngle) * s.rotRadius;
-
-        // Perspective projection
-        const depth = FOV + newZ;
-        if (depth <= 0) continue;
-        const scale = FOV / depth;
-
-        const px = cx + newX * scale;
-        const py = cy + s.y * scale;
-
-        // Only draw if on screen (with margin)
-        if (px < -20 || px > W + 20 || py < -20 || py > H + 20) continue;
-
-        // Depth alpha: front stars brighter
-        const depthAlpha = 0.5 + (0.5 * (FOV - newZ) / (FOV + Math.sqrt(W * W + H * H) * 0.6));
         const twinkle = 0.82 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.18;
-        const alpha = Math.min(1, s.opacity * twinkle * depthAlpha);
-        const dotR = Math.max(0.15, s.r * scale * 0.9);
+        const alpha = Math.min(1, s.opacity * twinkle);
 
         ctx.beginPath();
-        ctx.arc(px, py, dotR, 0, Math.PI * 2);
+        ctx.arc(px, py, s.r, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
           : `rgba(10,10,10,${alpha * 0.7})`;

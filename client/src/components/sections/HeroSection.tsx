@@ -1,87 +1,13 @@
-// Hero Section — Motionfolio-inspired layout for Hein Htet Phyo
-// Massive centered name with outline second line, typing role, CTA buttons, orbiting decorations
-import { useEffect, useRef, useState, memo } from "react";
+// Hero Section — Split layout: left text + right terminal code window
+// Inspired by reference: left has name/title/bio/buttons/socials
+// Right has a macOS-style terminal window showing developer info as JS object
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Download, Code2, Database, Cpu, BrainCircuit } from "lucide-react";
+import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
-// ── Location & Time Badge ──
-const londonFormatter = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Europe/London",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: false,
-});
-
-function LocationTimeBadge() {
-  const timeRef = useRef<HTMLSpanElement>(null);
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-
-  useEffect(() => {
-    const update = () => {
-      if (timeRef.current) timeRef.current.textContent = londonFormatter.format(new Date());
-    };
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
-      gap: "1.25rem", fontFamily: "'JetBrains Mono', monospace",
-      fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.15em",
-      color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.4)",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-        <span style={{
-          width: 6, height: 6, borderRadius: "50%", background: "#22c55e",
-          boxShadow: "0 0 6px #22c55e", display: "inline-block",
-        }} />
-        <span style={{ fontWeight: 700, color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.65)" }}>
-          London, UK
-        </span>
-      </div>
-      <div style={{ width: 1, height: 12, background: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
-        <span>LOCAL:</span>
-        <span ref={timeRef} style={{ fontWeight: 700, color: isDark ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.65)" }} />
-      </div>
-    </div>
-  );
-}
-
-// ── Orbiting Decoration ──
-const OrbitingDecoration = memo(function OrbitingDecoration({
-  icon: Icon, delay, style, revealed
-}: { icon: React.FC<{ size?: number; style?: React.CSSProperties }>; delay: number; style: React.CSSProperties; revealed: boolean }) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.9 }}
-      animate={revealed ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 12, scale: 0.9 }}
-      transition={{ duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] }}
-      style={{
-        position: "absolute", width: 44, height: 44, borderRadius: "50%",
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
-        background: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.7)",
-        backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: isDark ? "0 8px 24px rgba(0,0,0,0.3)" : "0 8px 24px rgba(0,0,0,0.06)",
-        animation: revealed ? `hero-float 5.8s ${delay + 0.35}s ease-in-out infinite` : "none",
-        willChange: "transform", ...style,
-      }}
-    >
-      <Icon size={17} style={{ color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)" }} />
-    </motion.div>
-  );
-});
-
 // ── Typing Role ──
-const ROLES = ["Data Scientist", "AI Engineer", "ML Developer", "Data Analyst"];
+const ROLES = ["Data Scientist", "AI Engineer", "ML Engineer", "Software Engineer"];
 
 function TypingRole({ isDark }: { isDark: boolean }) {
   const [roleIdx, setRoleIdx] = useState(0);
@@ -105,9 +31,104 @@ function TypingRole({ isDark }: { isDark: boolean }) {
   }, [text, deleting, roleIdx]);
 
   return (
-    <span style={{ color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)" }}>
-      {text}<span className="typing-cursor" />
+    <span style={{ color: "#60a5fa" }}>
+      {text}<span className="typing-cursor" style={{ color: "#60a5fa" }} />
     </span>
+  );
+}
+
+// ── Terminal Code Window ──
+function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boolean }) {
+  const [linesDone, setLinesDone] = useState(0);
+
+  const lines = [
+    { text: "const Developer = {", color: isDark ? "rgba(255,255,255,0.9)" : "#1e293b" },
+    { text: '  name: "Hein Htet Phyo",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  location: "London, UK",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  degree: "BSc Data Science & AI",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  university: "UWE Bristol",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  roles: [', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '    "Data Scientist",', color: "#86efac" },
+    { text: '    "AI Engineer",', color: "#86efac" },
+    { text: '    "ML Engineer",', color: "#86efac" },
+    { text: '  ],', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  skills: ["Python", "TensorFlow",', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '    "PyTorch", "React", "SQL"],', color: isDark ? "rgba(255,255,255,0.75)" : "#334155" },
+    { text: '  status: "Open to work 🚀",', color: "#fbbf24" },
+    { text: "};", color: isDark ? "rgba(255,255,255,0.9)" : "#1e293b" },
+  ];
+
+  useEffect(() => {
+    if (!revealed) return;
+    if (linesDone >= lines.length) return;
+    const t = setTimeout(() => setLinesDone((n) => n + 1), 90);
+    return () => clearTimeout(t);
+  }, [revealed, linesDone, lines.length]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 40, y: 20 }}
+      animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
+      transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      style={{
+        background: isDark ? "rgba(15,15,20,0.85)" : "rgba(15,23,42,0.92)",
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.1)"}`,
+        borderRadius: "12px",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        boxShadow: isDark
+          ? "0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)"
+          : "0 25px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.08)",
+        overflow: "hidden",
+        width: "100%",
+        maxWidth: 480,
+      }}
+    >
+      {/* Title bar */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 16px",
+        borderBottom: "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(255,255,255,0.03)",
+      }}>
+        <div style={{ display: "flex", gap: 7 }}>
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
+        </div>
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "0.7rem", color: "rgba(255,255,255,0.35)",
+          letterSpacing: "0.05em",
+        }}>portfolio.js</span>
+        <div style={{ width: 52 }} />
+      </div>
+
+      {/* Code content */}
+      <div style={{
+        padding: "20px 24px 24px",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: "clamp(0.72rem, 1.4vw, 0.82rem)",
+        lineHeight: 1.75,
+      }}>
+        {lines.slice(0, linesDone).map((line, i) => (
+          <div key={i} style={{ color: line.color, whiteSpace: "pre" }}>
+            <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            {line.text}
+          </div>
+        ))}
+        {linesDone < lines.length && (
+          <div style={{ color: "rgba(255,255,255,0.5)", whiteSpace: "pre" }}>
+            <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+              {String(linesDone + 1).padStart(2, "0")}
+            </span>
+            <span className="typing-cursor" style={{ color: "#60a5fa" }} />
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
@@ -118,169 +139,186 @@ export default function HeroSection() {
   const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(() => setRevealed(true), 300);
+    const t = setTimeout(() => setRevealed(true), 200);
     return () => clearTimeout(t);
   }, []);
 
+  const fadeUp = (delay: number) => ({
+    initial: { opacity: 0, y: 24 },
+    animate: revealed ? { opacity: 1, y: 0 } : {},
+    transition: { duration: 0.75, delay, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  });
+
   return (
-    <section id="hero" className="hero-section" style={{ position: "relative", zIndex: 2 }}>
-      <motion.div
-        initial={{ opacity: 0, y: 20, filter: "blur(4px)" }}
-        animate={revealed ? { opacity: 1, y: 0, filter: "blur(0px)" } : {}}
-        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        style={{
-          width: "100%", maxWidth: 1100, padding: "0 1.5rem",
-          display: "flex", flexDirection: "column", alignItems: "center",
-          textAlign: "center", gap: "1.25rem",
-        }}
+    <section
+      id="hero"
+      style={{
+        position: "relative", zIndex: 2,
+        minHeight: "100vh",
+        display: "flex", alignItems: "center",
+        padding: "0 clamp(1.5rem, 6vw, 5rem)",
+      }}
+    >
+      <div style={{
+        width: "100%", maxWidth: 1200, margin: "0 auto",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "clamp(2rem, 5vw, 4rem)",
+        alignItems: "center",
+      }}
+      className="hero-grid"
       >
-        {/* Location & Time */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={revealed ? { opacity: 1 } : {}}
-          transition={{ delay: 0.5, duration: 0.8 }}
-        >
-          <LocationTimeBadge />
-        </motion.div>
+        {/* ── LEFT: Text ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
-        {/* Name — massive typography */}
-        <div style={{ position: "relative", width: "100%", marginBottom: "0.25rem" }}>
-          <OrbitingDecoration icon={Code2} delay={0.15} revealed={revealed} style={{ left: "2%", top: "10%" }} />
-          <OrbitingDecoration icon={Database} delay={0.45} revealed={revealed} style={{ left: "8%", bottom: "10%" }} />
-          <OrbitingDecoration icon={Cpu} delay={0.28} revealed={revealed} style={{ right: "2%", top: "10%" }} />
-          <OrbitingDecoration icon={BrainCircuit} delay={0.58} revealed={revealed} style={{ right: "8%", bottom: "10%" }} />
+          {/* Available badge */}
+          <motion.div {...fadeUp(0.1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.5rem",
+              padding: "0.35rem 0.9rem",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`,
+              borderRadius: 999,
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.7rem", letterSpacing: "0.08em",
+              color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)",
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", display: "inline-block" }} />
+              Available for opportunities
+            </div>
+          </motion.div>
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.05em" }}>
-            {/* Line 1: HEIN HTET — solid */}
-            <motion.div
-              initial={{ opacity: 0, y: 28 }}
-              animate={revealed ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.75, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(3.2rem, 11vw, 8rem)",
-                fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.03em",
-                textTransform: "uppercase",
-                color: isDark ? "white" : "#0a0a0a",
-                whiteSpace: "nowrap",
-              }}
-            >
-              HEIN HTET
+          {/* Name */}
+          <div>
+            <motion.div {...fadeUp(0.2)} style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(2.8rem, 7vw, 5.5rem)",
+              fontWeight: 900, lineHeight: 0.95,
+              letterSpacing: "-0.03em",
+              color: isDark ? "white" : "#0a0a0a",
+              textTransform: "uppercase",
+            }}>
+              Hein Htet
             </motion.div>
-            {/* Line 2: PHYO — outline */}
-            <motion.div
-              initial={{ opacity: 0, y: 28 }}
-              animate={revealed ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.75, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(3.2rem, 11vw, 8rem)",
-                fontWeight: 900, lineHeight: 0.9, letterSpacing: "-0.03em",
-                textTransform: "uppercase",
-                WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
-                color: "transparent",
-                whiteSpace: "nowrap",
-              }}
-            >
-              PHYO
+            <motion.div {...fadeUp(0.28)} style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(2.8rem, 7vw, 5.5rem)",
+              fontWeight: 900, lineHeight: 0.95,
+              letterSpacing: "-0.03em",
+              WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
+              color: "transparent",
+              textTransform: "uppercase",
+            }}>
+              Phyo
             </motion.div>
           </div>
+
+          {/* Typing role */}
+          <motion.p {...fadeUp(0.36)} style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
+            fontWeight: 600,
+            color: isDark ? "rgba(255,255,255,0.85)" : "#1e293b",
+          }}>
+            <TypingRole isDark={isDark} />
+          </motion.p>
+
+          {/* Bio */}
+          <motion.p {...fadeUp(0.44)} style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "clamp(0.875rem, 1.6vw, 1rem)",
+            lineHeight: 1.8, fontWeight: 300,
+            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.55)",
+            maxWidth: 440,
+          }}>
+            BSc Data Science & AI — UWE Bristol. Specialising in machine learning,
+            deep learning, and building intelligent systems that solve real problems.
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div {...fadeUp(0.52)} style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+            <motion.button
+              onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.75rem 1.5rem",
+                background: "#3b82f6",
+                color: "white", border: "none",
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "0.85rem", fontWeight: 700,
+                letterSpacing: "0.04em", cursor: "pointer",
+                borderRadius: "6px",
+              }}
+            >
+              View Projects <ArrowUpRight size={15} />
+            </motion.button>
+
+            <motion.a
+              href="mailto:heinhtetphyo@email.com"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.75rem 1.5rem",
+                background: "transparent",
+                color: isDark ? "rgba(255,255,255,0.8)" : "#1e293b",
+                border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"}`,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "0.85rem", fontWeight: 600,
+                letterSpacing: "0.04em", cursor: "pointer",
+                borderRadius: "6px", textDecoration: "none",
+              }}
+            >
+              Let's Talk <Mail size={15} />
+            </motion.a>
+          </motion.div>
+
+          {/* Social Links */}
+          <motion.div {...fadeUp(0.60)} style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
+            {[
+              { icon: Github, href: "https://github.com/heinhtetphyo", label: "GitHub" },
+              { icon: Linkedin, href: "https://linkedin.com/in/heinhtetphyo", label: "LinkedIn" },
+              { icon: Twitter, href: "https://twitter.com/heinhtetphyo", label: "Twitter" },
+              { icon: Mail, href: "mailto:heinhtetphyo@email.com", label: "Email" },
+            ].map(({ icon: Icon, href, label }) => (
+              <motion.a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.1, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                title={label}
+                style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`,
+                  background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)",
+                  textDecoration: "none", transition: "all 0.2s",
+                }}
+              >
+                <Icon size={16} />
+              </motion.a>
+            ))}
+          </motion.div>
         </div>
 
-        {/* Subtitle */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={revealed ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.45, duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "clamp(1.1rem, 3.5vw, 1.75rem)", fontWeight: 600,
-            color: isDark ? "rgba(255,255,255,0.85)" : "rgba(0,0,0,0.8)",
-            letterSpacing: "-0.01em", display: "flex", alignItems: "center",
-            gap: "0.5rem", flexWrap: "wrap", justifyContent: "center",
-          }}
-        >
-          <span>Architecting</span>
-          <span style={{
-            background: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
-            border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.1)"}`,
-            borderRadius: "0.375rem", padding: "0.1em 0.5em",
-          }}>Intelligent</span>
-          <span>Systems</span>
-          <span style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)", fontWeight: 900 }}>.</span>
-        </motion.div>
+        {/* ── RIGHT: Terminal Window ── */}
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+          <TerminalWindow isDark={isDark} revealed={revealed} />
+        </div>
+      </div>
 
-        {/* Typing role */}
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={revealed ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.52, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.875rem",
-            letterSpacing: "0.05em", color: isDark ? "rgba(255,255,255,0.45)" : "rgba(0,0,0,0.4)" }}
-        >
-          &gt; <TypingRole isDark={isDark} />
-        </motion.p>
-
-        {/* Bio */}
-        <motion.p
-          initial={{ opacity: 0, y: 12 }}
-          animate={revealed ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.58, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "clamp(0.875rem, 1.8vw, 1rem)", fontWeight: 300,
-            lineHeight: 1.75, color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)",
-            maxWidth: 520,
-          }}
-        >
-          BSc Data Science & AI — UWE Bristol. Specialising in machine learning,
-          deep learning, and building intelligent systems that solve real problems.
-        </motion.p>
-
-        {/* CTA Buttons */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={revealed ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.65, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          style={{ display: "flex", flexWrap: "wrap", gap: "0.875rem", justifyContent: "center", marginTop: "0.5rem" }}
-        >
-          <motion.button
-            onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.75rem 1.5rem",
-              background: isDark ? "white" : "#0a0a0a",
-              color: isDark ? "black" : "white",
-              border: "none", fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: "0.1em", cursor: "pointer",
-            }}
-          >
-            View Projects <ArrowUpRight size={15} />
-          </motion.button>
-
-          <motion.a
-            href="/cv.pdf" download
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-            style={{
-              display: "flex", alignItems: "center", gap: "0.5rem",
-              padding: "0.75rem 1.5rem", background: "transparent",
-              color: isDark ? "white" : "#0a0a0a",
-              border: `2px solid ${isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)"}`,
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: "0.1em", cursor: "pointer", textDecoration: "none",
-            }}
-          >
-            Download CV <Download size={15} />
-          </motion.a>
-        </motion.div>
-      </motion.div>
+      {/* Responsive styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          .hero-grid {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </section>
   );
 }
