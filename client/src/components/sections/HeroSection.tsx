@@ -41,21 +41,68 @@ function TypingRole({ isDark }: { isDark: boolean }) {
 function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boolean }) {
   const [linesDone, setLinesDone] = useState(0);
 
-  const lines = [
-    { text: "const Developer = {", color: "rgba(255,255,255,0.90)" },
-    { text: '  name: "Hein Htet Phyo",', color: "rgba(255,255,255,0.70)" },
-    { text: '  location: "London, UK",', color: "rgba(255,255,255,0.70)" },
-    { text: '  degree: "BSc Data Science & AI",', color: "rgba(255,255,255,0.70)" },
-    { text: '  university: "UWE Bristol",', color: "rgba(255,255,255,0.70)" },
-    { text: '  roles: [', color: "rgba(255,255,255,0.70)" },
-    { text: '    "Data Scientist",', color: "rgba(255,255,255,0.50)" },
-    { text: '    "AI Engineer",', color: "rgba(255,255,255,0.50)" },
-    { text: '    "ML Engineer",', color: "rgba(255,255,255,0.50)" },
-    { text: '  ],', color: "rgba(255,255,255,0.70)" },
-    { text: '  skills: ["Python", "TensorFlow",', color: "rgba(255,255,255,0.70)" },
-    { text: '    "PyTorch", "React", "SQL"],', color: "rgba(255,255,255,0.70)" },
-    { text: '  status: "Open to work 🚀",', color: "rgba(255,255,255,0.90)" },
-    { text: "};", color: "rgba(255,255,255,0.90)" },
+  // Each line: array of {text, color} spans for syntax highlighting
+  const lines: { spans: { text: string; color: string }[] }[] = [
+    { spans: [
+      { text: "developer", color: "rgba(255,255,255,0.90)" },
+      { text: " = {", color: "rgba(255,255,255,0.60)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"name"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"Hein Htet Phyo"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"location"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"London, UK"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"degree"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"BSc Data Science & AI"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"university"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"UWE Bristol"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"open_to"', color: "#4ade80" },
+      { text: ": [", color: "rgba(255,255,255,0.60)" },
+      { text: '"AI Engineer"', color: "#4ade80" },
+      { text: ", ", color: "rgba(255,255,255,0.40)" },
+      { text: '"Data Scientist"', color: "#4ade80" },
+      { text: ", ", color: "rgba(255,255,255,0.40)" },
+      { text: '"ML Engineer"', color: "#4ade80" },
+      { text: "],", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"seeking"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"Full-time roles in AI & Data"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"status"', color: "#4ade80" },
+      { text: ": ", color: "rgba(255,255,255,0.60)" },
+      { text: '"Open to work 🚀"', color: "#4ade80" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "}", color: "rgba(255,255,255,0.60)" },
+    ]},
   ];
 
   useEffect(() => {
@@ -91,15 +138,15 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         background: "rgba(255,255,255,0.025)",
       }}>
         <div style={{ display: "flex", gap: 7 }}>
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.25)", border: "1px solid rgba(255,255,255,0.15)" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.18)", border: "1px solid rgba(255,255,255,0.12)" }} />
-          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.10)" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
         </div>
         <span style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: "0.7rem", color: "rgba(255,255,255,0.35)",
           letterSpacing: "0.05em",
-        }}>portfolio.js</span>
+        }}>portfolio.py</span>
         <div style={{ width: 52 }} />
       </div>
 
@@ -111,11 +158,13 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         lineHeight: 1.75,
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
-          <div key={i} style={{ color: line.color, whiteSpace: "pre" }}>
+          <div key={i} style={{ whiteSpace: "pre" }}>
             <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(i + 1).padStart(2, "0")}
             </span>
-            {line.text}
+            {line.spans.map((span, j) => (
+              <span key={j} style={{ color: span.color }}>{span.text}</span>
+            ))}
           </div>
         ))}
         {linesDone < lines.length && (
