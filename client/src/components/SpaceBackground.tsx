@@ -1,49 +1,65 @@
-// SpaceBackground — 2000+ dots, whole field rotates together in 3D circular motion
-// Stars fill the ENTIRE screen. The whole canvas rotates as one unit around
-// a tilted axis — giving a true 3D circular spinning galaxy feel.
-// Each depth layer rotates at a slightly different speed for parallax depth.
+// SpaceBackground — True 3D X-axis rotation
+// Stars are placed in 3D space (x, y, z).
+// The whole field rotates around the X axis — like a wheel rolling toward you.
+// Stars come from the top, pass through the center, disappear behind.
+// Perspective projection makes near stars appear bigger/brighter.
+// 6000+ dots, very bright, slow graceful shooting stars.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  // Position stored as angle + distance from center (polar)
-  // so rotation is just angle += speed
-  cx: number;   // center offset x from canvas center
-  cy: number;   // center offset y from canvas center
+  x: number;  // 3D x
+  y: number;  // 3D y
+  z: number;  // 3D z (depth)
   r: number;
   opacity: number;
-  layer: number;
   twinkleFreq: number;
   twinklePhase: number;
 }
 
-// Layer configs: more dots, each layer rotates at different speed
+// 5 depth layers — different rotation speeds for parallax
 const LAYERS = [
-  { count: 600, rotSpeed: 0.00005, rMin: 0.10, rMax: 0.26, oMin: 0.04, oMax: 0.17 },
-  { count: 480, rotSpeed: 0.00009, rMin: 0.16, rMax: 0.38, oMin: 0.09, oMax: 0.27 },
-  { count: 340, rotSpeed: 0.00015, rMin: 0.24, rMax: 0.52, oMin: 0.17, oMax: 0.40 },
-  { count: 220, rotSpeed: 0.00023, rMin: 0.34, rMax: 0.70, oMin: 0.27, oMax: 0.54 },
-  { count: 130, rotSpeed: 0.00034, rMin: 0.48, rMax: 0.92, oMin: 0.38, oMax: 0.66 },
+  { count: 2500, rotSpeed: 0.00012, rMin: 0.15, rMax: 0.32, oMin: 0.35, oMax: 0.65, spread: 1.0 },
+  { count: 1600, rotSpeed: 0.00020, rMin: 0.20, rMax: 0.44, oMin: 0.50, oMax: 0.75, spread: 0.8 },
+  { count: 1000, rotSpeed: 0.00030, rMin: 0.28, rMax: 0.58, oMin: 0.60, oMax: 0.85, spread: 0.6 },
+  { count:  600, rotSpeed: 0.00042, rMin: 0.38, rMax: 0.74, oMin: 0.65, oMax: 0.90, spread: 0.4 },
+  { count:  350, rotSpeed: 0.00058, rMin: 0.50, rMax: 1.00, oMin: 0.70, oMax: 0.95, spread: 0.25 },
 ];
 
-function buildStars(W: number, H: number): Star[] {
-  const stars: Star[] = [];
-  // Spread radius: use diagonal so corners are filled
-  const maxR = Math.sqrt(W * W + H * H) * 0.52;
+interface Star3D {
+  x: number; y: number; z: number;
+  r: number; opacity: number;
+  twinkleFreq: number; twinklePhase: number;
+  layer: number;
+  rotAngle: number; // current rotation angle around X axis
+  rotRadius: number; // distance from X axis (sqrt(y²+z²))
+  initAngle: number; // initial angle in YZ plane
+}
+
+function buildStars(W: number, H: number): Star3D[] {
+  const stars: Star3D[] = [];
+  const maxSpread = Math.max(W, H) * 0.7;
 
   LAYERS.forEach((cfg, li) => {
     for (let i = 0; i < cfg.count; i++) {
-      // Uniform random distribution across full screen area
-      const dist = Math.sqrt(Math.random()) * maxR;
-      const angle = Math.random() * Math.PI * 2;
+      // Random X position across full width
+      const x = (Math.random() - 0.5) * maxSpread * 2;
+      // Random position in YZ plane (defines circle of rotation)
+      const initAngle = Math.random() * Math.PI * 2;
+      const rotRadius = Math.sqrt(Math.random()) * maxSpread * cfg.spread;
+      const y = Math.cos(initAngle) * rotRadius;
+      const z = Math.sin(initAngle) * rotRadius;
+
       stars.push({
-        cx: Math.cos(angle) * dist,
-        cy: Math.sin(angle) * dist,
+        x, y, z,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
-        layer: li,
         twinkleFreq: 0.003 + Math.random() * 0.010,
         twinklePhase: Math.random() * Math.PI * 2,
+        layer: li,
+        rotAngle: initAngle,
+        rotRadius,
+        initAngle,
       });
     }
   });
@@ -92,16 +108,11 @@ export default function SpaceBackground() {
     let t = 0;
     let frame = 0;
 
-    // Per-layer rotation offsets
-    const layerAngles = LAYERS.map(() => Math.random() * Math.PI * 2);
-
-    // 3D tilt: the rotation axis is tilted so it looks 3D not flat
-    // We apply a slight Y-axis tilt when projecting
-    const TILT = 0.28; // radians (~16 degrees) — makes it look 3D
-
     const shoots: ShootingStar[] = [];
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
+
+    const FOV = 600; // perspective field of view
 
     const draw = () => {
       t++;
@@ -114,37 +125,34 @@ export default function SpaceBackground() {
       const cx = W / 2;
       const cy = H / 2;
 
-      // Advance each layer's rotation
-      LAYERS.forEach((cfg, li) => {
-        layerAngles[li] += cfg.rotSpeed;
-      });
-
-      // Draw stars
+      // Rotate each star around X axis
       for (const s of stars) {
         const cfg = LAYERS[s.layer];
-        const rot = layerAngles[s.layer];
+        s.rotAngle += cfg.rotSpeed;
 
-        // Rotate the star's position by the layer angle
-        const cosR = Math.cos(rot);
-        const sinR = Math.sin(rot);
-        const rx = s.cx * cosR - s.cy * sinR;
-        const ry = s.cx * sinR + s.cy * cosR;
+        // New Y and Z from rotation around X axis
+        const newY = Math.cos(s.rotAngle) * s.rotRadius;
+        const newZ = Math.sin(s.rotAngle) * s.rotRadius;
 
-        // Apply 3D tilt: compress Y axis slightly to simulate perspective tilt
-        const px = cx + rx;
-        const py = cy + ry * Math.cos(TILT);
+        // Perspective projection
+        const depth = FOV + newZ;
+        if (depth <= 0) continue;
+        const scale = FOV / depth;
 
-        // Depth cue from Y position after tilt
-        const depthFactor = 0.7 + (py / H) * 0.3;
+        const px = cx + s.x * scale;
+        const py = cy + newY * scale;
 
+        // Depth-based alpha: stars in front (newZ < 0) are brighter
+        const depthAlpha = 0.4 + (1 - (newZ + W * 0.7) / (W * 1.4)) * 0.6;
         const twinkle = 0.78 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.22;
-        const alpha = s.opacity * twinkle * depthFactor;
+        const alpha = Math.min(1, s.opacity * twinkle * depthAlpha);
+        const dotR = Math.max(0.1, s.r * scale);
 
         ctx.beginPath();
-        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.arc(px, py, dotR, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
-          : `rgba(8,8,8,${alpha * 0.6})`;
+          : `rgba(8,8,8,${alpha * 0.65})`;
         ctx.fill();
       }
 
