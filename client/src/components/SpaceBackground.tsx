@@ -1,8 +1,17 @@
-// Space Background — tiny uniform star dots
-// The entire star field slowly auto-drifts + parallax-shifts with cursor movement
-// No glow, no bold dots — just clean small stars like a real night sky
+// Space Background — True 3D parallax star field
+// Stars exist at multiple Z-depth layers. Mouse movement shifts each layer
+// by a different amount, creating genuine 3D depth illusion.
+// Lots of tiny dots, no glow, clean night-sky look.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
+
+const LAYERS = [
+  // { count per 1000px², size range, opacity range, parallax factor, drift speed }
+  { density: 0.0008, rMin: 0.15, rMax: 0.45, oMin: 0.12, oMax: 0.35, parallax: 0.012, drift: 0.06 }, // far
+  { density: 0.0006, rMin: 0.35, rMax: 0.70, oMin: 0.25, oMax: 0.55, parallax: 0.030, drift: 0.10 }, // mid-far
+  { density: 0.0004, rMin: 0.55, rMax: 0.95, oMin: 0.40, oMax: 0.75, parallax: 0.060, drift: 0.16 }, // mid
+  { density: 0.0002, rMin: 0.80, rMax: 1.30, oMin: 0.55, oMax: 0.90, parallax: 0.110, drift: 0.24 }, // near
+];
 
 interface Star {
   x: number;
@@ -11,17 +20,17 @@ interface Star {
   opacity: number;
   twinkleSpeed: number;
   twinkleOffset: number;
+  layer: number;
+  parallax: number;
+  drift: number;
 }
 
 interface ShootingStar {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
+  x: number; y: number;
+  vx: number; vy: number;
   length: number;
   opacity: number;
-  life: number;
-  maxLife: number;
+  life: number; maxLife: number;
 }
 
 export default function SpaceBackground() {
@@ -37,139 +46,141 @@ export default function SpaceBackground() {
     let animId: number;
     let W = window.innerWidth;
     let H = window.innerHeight;
-    // Target mouse position (normalized -0.5 to 0.5)
-    let targetMX = 0;
-    let targetMY = 0;
-    // Smoothed offset for parallax
-    let offsetX = 0;
-    let offsetY = 0;
-    // Auto-drift angle
-    let driftAngle = 0;
-    let time = 0;
+
+    // Smoothed mouse offset (pixels from center)
+    let rawMX = 0, rawMY = 0;
+    let smoothMX = 0, smoothMY = 0;
+
+    // Auto-drift accumulator
+    let driftT = 0;
 
     canvas.width = W;
     canvas.height = H;
 
-    // Dense small uniform dots — no size tiers, all tiny
-    const STAR_COUNT = Math.floor((W * H) / 1200);
-    const stars: Star[] = Array.from({ length: STAR_COUNT }, () => ({
-      x: Math.random() * (W + 200) - 100,
-      y: Math.random() * (H + 200) - 100,
-      r: Math.random() * 0.7 + 0.2,          // tiny: 0.2–0.9px
-      opacity: Math.random() * 0.55 + 0.15,  // subtle: 0.15–0.7
-      twinkleSpeed: Math.random() * 0.018 + 0.003,
-      twinkleOffset: Math.random() * Math.PI * 2,
-    }));
+    const buildStars = () => {
+      const stars: Star[] = [];
+      const area = W * H;
+      LAYERS.forEach((l, li) => {
+        const count = Math.floor(area * l.density);
+        for (let i = 0; i < count; i++) {
+          stars.push({
+            x: Math.random() * W,
+            y: Math.random() * H,
+            r: l.rMin + Math.random() * (l.rMax - l.rMin),
+            opacity: l.oMin + Math.random() * (l.oMax - l.oMin),
+            twinkleSpeed: 0.004 + Math.random() * 0.012,
+            twinkleOffset: Math.random() * Math.PI * 2,
+            layer: li,
+            parallax: l.parallax,
+            drift: l.drift,
+          });
+        }
+      });
+      return stars;
+    };
 
+    let stars = buildStars();
     const shootingStars: ShootingStar[] = [];
-    let nextShoot = 120;
+    let frame = 0;
+    let nextShoot = 140;
 
-    const spawnShootingStar = () => {
-      const angle = (Math.random() * 30 + 10) * (Math.PI / 180);
-      const speed = Math.random() * 9 + 7;
+    const spawnShoot = () => {
+      const angle = (10 + Math.random() * 35) * (Math.PI / 180);
+      const speed = 8 + Math.random() * 10;
       shootingStars.push({
         x: Math.random() * W * 0.8,
-        y: Math.random() * H * 0.4,
+        y: Math.random() * H * 0.45,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
-        length: Math.random() * 100 + 60,
-        opacity: 1,
-        life: 0,
-        maxLife: Math.random() * 50 + 30,
+        length: 60 + Math.random() * 110,
+        opacity: 1, life: 0,
+        maxLife: 30 + Math.random() * 45,
       });
     };
 
     const draw = () => {
-      time++;
+      frame++;
+      driftT += 0.0004;
 
-      // Smooth lerp offset toward mouse target (parallax)
-      // Max shift: 30px
-      const maxShift = 30;
-      const targetOX = targetMX * maxShift;
-      const targetOY = targetMY * maxShift;
-      offsetX += (targetOX - offsetX) * 0.04;
-      offsetY += (targetOY - offsetY) * 0.04;
-
-      // Auto-drift — very slow circular drift
-      driftAngle += 0.0003;
-      const driftX = Math.cos(driftAngle) * 0.15;
-      const driftY = Math.sin(driftAngle * 0.7) * 0.1;
+      // Smooth mouse tracking — slow lerp for cinematic feel
+      smoothMX += (rawMX - smoothMX) * 0.05;
+      smoothMY += (rawMY - smoothMY) * 0.05;
 
       // Background
-      ctx.fillStyle = theme === "dark" ? "#000000" : "#f8f8f8";
+      ctx.fillStyle = theme === "dark" ? "#000000" : "#f6f6f6";
       ctx.fillRect(0, 0, W, H);
 
-      // Draw stars with combined parallax + drift offset
+      // Draw each star with its layer's parallax offset + slow auto-drift
       stars.forEach((s) => {
-        // Parallax depth — stars at different depths shift different amounts
-        const depth = s.r / 0.9; // 0.2–1.0 range
-        const px = ((s.x + offsetX * depth + driftX * time * depth) % (W + 200) + W + 200) % (W + 200) - 100;
-        const py = ((s.y + offsetY * depth + driftY * time * depth) % (H + 200) + H + 200) % (H + 200) - 100;
+        // Parallax: closer layers shift more
+        const maxShift = 55; // max px shift for nearest layer (parallax=0.11)
+        const px = smoothMX * (s.parallax / 0.11) * maxShift;
+        const py = smoothMY * (s.parallax / 0.11) * maxShift;
+
+        // Auto-drift: each layer drifts at slightly different speed/direction
+        const driftX = Math.cos(driftT * s.drift * 8 + s.layer * 1.2) * s.drift * 18;
+        const driftY = Math.sin(driftT * s.drift * 5 + s.layer * 0.9) * s.drift * 10;
+
+        // Final position with wrapping
+        let sx = ((s.x + px + driftX) % (W + 60) + W + 60) % (W + 60) - 30;
+        let sy = ((s.y + py + driftY) % (H + 60) + H + 60) % (H + 60) - 30;
 
         // Twinkle
-        const twinkle = Math.sin(time * s.twinkleSpeed + s.twinkleOffset) * 0.25 + 0.75;
+        const twinkle = 0.7 + Math.sin(frame * s.twinkleSpeed + s.twinkleOffset) * 0.3;
         const alpha = s.opacity * twinkle;
 
         ctx.beginPath();
-        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
         ctx.fillStyle = theme === "dark"
           ? `rgba(255,255,255,${alpha})`
-          : `rgba(20,20,20,${alpha * 0.5})`;
+          : `rgba(15,15,15,${alpha * 0.45})`;
         ctx.fill();
       });
 
       // Shooting stars
-      if (time >= nextShoot) {
-        spawnShootingStar();
-        nextShoot = time + Math.floor(Math.random() * 200 + 100);
+      if (frame >= nextShoot) {
+        spawnShoot();
+        nextShoot = frame + 120 + Math.floor(Math.random() * 200);
       }
 
-      shootingStars.forEach((ss) => {
+      for (let i = shootingStars.length - 1; i >= 0; i--) {
+        const ss = shootingStars[i];
         ss.life++;
         ss.x += ss.vx;
         ss.y += ss.vy;
-        const progress = ss.life / ss.maxLife;
-        ss.opacity = progress < 0.15
-          ? progress / 0.15
-          : progress > 0.7
-          ? 1 - (progress - 0.7) / 0.3
-          : 1;
+        const p = ss.life / ss.maxLife;
+        ss.opacity = p < 0.15 ? p / 0.15 : p > 0.65 ? 1 - (p - 0.65) / 0.35 : 1;
 
         const spd = Math.sqrt(ss.vx * ss.vx + ss.vy * ss.vy);
-        const tailX = ss.x - (ss.vx / spd) * ss.length;
-        const tailY = ss.y - (ss.vy / spd) * ss.length;
+        const tx = ss.x - (ss.vx / spd) * ss.length;
+        const ty = ss.y - (ss.vy / spd) * ss.length;
 
-        const grad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y);
+        const g = ctx.createLinearGradient(tx, ty, ss.x, ss.y);
         if (theme === "dark") {
-          grad.addColorStop(0, `rgba(255,255,255,0)`);
-          grad.addColorStop(0.7, `rgba(255,255,255,${ss.opacity * 0.45})`);
-          grad.addColorStop(1, `rgba(255,255,255,${ss.opacity * 0.9})`);
+          g.addColorStop(0, `rgba(255,255,255,0)`);
+          g.addColorStop(0.6, `rgba(255,255,255,${ss.opacity * 0.4})`);
+          g.addColorStop(1, `rgba(255,255,255,${ss.opacity * 0.9})`);
         } else {
-          grad.addColorStop(0, `rgba(50,50,50,0)`);
-          grad.addColorStop(0.7, `rgba(50,50,50,${ss.opacity * 0.3})`);
-          grad.addColorStop(1, `rgba(50,50,50,${ss.opacity * 0.65})`);
+          g.addColorStop(0, `rgba(40,40,40,0)`);
+          g.addColorStop(0.6, `rgba(40,40,40,${ss.opacity * 0.25})`);
+          g.addColorStop(1, `rgba(40,40,40,${ss.opacity * 0.6})`);
         }
-
         ctx.beginPath();
-        ctx.moveTo(tailX, tailY);
+        ctx.moveTo(tx, ty);
         ctx.lineTo(ss.x, ss.y);
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 1.1;
         ctx.stroke();
 
-        // Head dot
+        // Head
         ctx.beginPath();
-        ctx.arc(ss.x, ss.y, 1.2, 0, Math.PI * 2);
+        ctx.arc(ss.x, ss.y, 1.0, 0, Math.PI * 2);
         ctx.fillStyle = theme === "dark"
           ? `rgba(255,255,255,${ss.opacity})`
-          : `rgba(50,50,50,${ss.opacity * 0.7})`;
+          : `rgba(40,40,40,${ss.opacity * 0.65})`;
         ctx.fill();
-      });
 
-      for (let i = shootingStars.length - 1; i >= 0; i--) {
-        if (shootingStars[i].life >= shootingStars[i].maxLife) {
-          shootingStars.splice(i, 1);
-        }
+        if (ss.life >= ss.maxLife) shootingStars.splice(i, 1);
       }
 
       animId = requestAnimationFrame(draw);
@@ -178,9 +189,9 @@ export default function SpaceBackground() {
     draw();
 
     const onMouseMove = (e: MouseEvent) => {
-      // Normalize to -0.5 .. 0.5
-      targetMX = (e.clientX / W - 0.5);
-      targetMY = (e.clientY / H - 0.5);
+      // Normalize: -1 to +1 from center
+      rawMX = (e.clientX / W - 0.5) * 2;
+      rawMY = (e.clientY / H - 0.5) * 2;
     };
 
     const onResize = () => {
@@ -188,6 +199,7 @@ export default function SpaceBackground() {
       H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
+      stars = buildStars();
     };
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
