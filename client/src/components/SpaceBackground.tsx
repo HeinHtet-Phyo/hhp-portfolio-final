@@ -1,29 +1,53 @@
-// SpaceBackground — 3D Parallax Tilt Star Field
-// Hundreds of stars spread across the canvas at multiple depth layers.
-// Each layer has its own parallax multiplier — deeper layers barely move,
-// near layers shift significantly when the mouse moves.
-// The whole field also slowly auto-rotates/drifts on its own.
-// Result: feels like you're floating in 3D space, looking at stars at different depths.
+// SpaceBackground — Self-animating 3D floating star field
+// Every star has its own velocity (vx, vy) and drifts continuously.
+// Stars are in 5 depth layers — deeper ones move slower, nearer ones faster.
+// This creates a natural 3D parallax depth effect purely from self-motion.
+// Mouse adds a subtle extra tilt on top.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
-// 5 depth layers: each has count, size, opacity, and how much it shifts with mouse
-const LAYERS = [
-  { count: 180, rMin: 0.2, rMax: 0.5,  oMin: 0.08, oMax: 0.22, parallax: 8  },  // very far
-  { count: 140, rMin: 0.3, rMax: 0.65, oMin: 0.15, oMax: 0.38, parallax: 18 },  // far
-  { count: 100, rMin: 0.4, rMax: 0.80, oMin: 0.25, oMax: 0.55, parallax: 32 },  // mid
-  { count:  70, rMin: 0.5, rMax: 1.00, oMin: 0.35, oMax: 0.70, parallax: 52 },  // near
-  { count:  40, rMin: 0.7, rMax: 1.30, oMin: 0.50, oMax: 0.85, parallax: 80 },  // very near
-];
-
 interface Star {
-  bx: number;  // base x (0..1 normalized)
-  by: number;  // base y (0..1 normalized)
-  r: number;
+  x: number;   // current x in pixels
+  y: number;   // current y in pixels
+  vx: number;  // velocity x (pixels/frame)
+  vy: number;  // velocity y (pixels/frame)
+  r: number;   // radius
   opacity: number;
-  parallax: number;
   twinkleSpeed: number;
   twinklePhase: number;
+  layer: number; // 0=far, 4=near
+}
+
+// Layer configs: speed multiplier, size, opacity
+const LAYER_CONFIGS = [
+  { count: 160, speedMult: 0.08, rMin: 0.15, rMax: 0.40, oMin: 0.08, oMax: 0.20 }, // very far
+  { count: 130, speedMult: 0.16, rMin: 0.25, rMax: 0.55, oMin: 0.14, oMax: 0.32 }, // far
+  { count: 100, speedMult: 0.28, rMin: 0.35, rMax: 0.72, oMin: 0.22, oMax: 0.48 }, // mid
+  { count:  70, speedMult: 0.45, rMin: 0.50, rMax: 0.90, oMin: 0.32, oMax: 0.62 }, // near
+  { count:  40, speedMult: 0.70, rMin: 0.65, rMax: 1.20, oMin: 0.45, oMax: 0.78 }, // very near
+];
+
+function buildStars(W: number, H: number): Star[] {
+  const stars: Star[] = [];
+  LAYER_CONFIGS.forEach((cfg, li) => {
+    for (let i = 0; i < cfg.count; i++) {
+      // Random direction
+      const angle = Math.random() * Math.PI * 2;
+      const speed = cfg.speedMult * (0.5 + Math.random() * 0.5);
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
+        opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
+        twinkleSpeed: 0.004 + Math.random() * 0.012,
+        twinklePhase: Math.random() * Math.PI * 2,
+        layer: li,
+      });
+    }
+  });
+  return stars;
 }
 
 export default function SpaceBackground() {
@@ -42,93 +66,62 @@ export default function SpaceBackground() {
     canvas.width = W;
     canvas.height = H;
 
-    // Mouse: normalized -1..1 from center
-    let tMX = 0, tMY = 0;
-    let sMX = 0, sMY = 0;
-
-    // Build stars
-    const stars: Star[] = [];
-    for (const layer of LAYERS) {
-      for (let i = 0; i < layer.count; i++) {
-        stars.push({
-          bx: Math.random(),
-          by: Math.random(),
-          r: layer.rMin + Math.random() * (layer.rMax - layer.rMin),
-          opacity: layer.oMin + Math.random() * (layer.oMax - layer.oMin),
-          parallax: layer.parallax,
-          twinkleSpeed: 0.005 + Math.random() * 0.015,
-          twinklePhase: Math.random() * Math.PI * 2,
-        });
-      }
-    }
+    let stars = buildStars(W, H);
+    let frame = 0;
 
     // Shooting stars
     interface Shoot { x: number; y: number; vx: number; vy: number; life: number; maxLife: number; len: number; }
     const shoots: Shoot[] = [];
-    let frame = 0;
-    let nextShoot = 200;
+    let nextShoot = 180;
 
     const spawnShoot = () => {
-      const angle = (15 + Math.random() * 30) * (Math.PI / 180);
-      const speed = 6 + Math.random() * 8;
+      const angle = (10 + Math.random() * 35) * (Math.PI / 180);
+      const speed = 7 + Math.random() * 9;
       shoots.push({
-        x: Math.random() * W * 0.7,
-        y: Math.random() * H * 0.4,
+        x: Math.random() * W * 0.75,
+        y: Math.random() * H * 0.45,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         life: 0,
-        maxLife: 35 + Math.random() * 40,
-        len: 50 + Math.random() * 100,
+        maxLife: 30 + Math.random() * 45,
+        len: 55 + Math.random() * 100,
       });
     };
 
     const draw = () => {
       frame++;
 
-      // Smooth mouse
-      sMX += (tMX - sMX) * 0.04;
-      sMY += (tMY - sMY) * 0.04;
-
-      // Slow auto-drift (sinusoidal, very gentle)
-      const autoDX = Math.sin(frame * 0.0007) * 0.12;
-      const autoDY = Math.cos(frame * 0.0005) * 0.08;
-      const totalMX = sMX + autoDX;
-      const totalMY = sMY + autoDY;
-
       const isDark = theme === "dark";
-      ctx.fillStyle = isDark ? "#000000" : "#f2f2f2";
+      ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
-      // Draw stars
       for (const s of stars) {
-        // Base position in pixels
-        const basePX = s.bx * W;
-        const basePY = s.by * H;
+        // Move star
+        s.x += s.vx;
+        s.y += s.vy;
 
-        // Parallax offset: near stars shift more
-        const offsetX = totalMX * s.parallax;
-        const offsetY = totalMY * s.parallax;
-
-        // Final position with wrapping so stars fill the canvas edge-to-edge
-        const px = ((basePX + offsetX) % (W + 60) + W + 60) % (W + 60) - 30;
-        const py = ((basePY + offsetY) % (H + 60) + H + 60) % (H + 60) - 30;
+        // Wrap around edges seamlessly
+        if (s.x < -2) s.x = W + 2;
+        else if (s.x > W + 2) s.x = -2;
+        if (s.y < -2) s.y = H + 2;
+        else if (s.y > H + 2) s.y = -2;
 
         // Twinkle
-        const twinkle = 0.75 + Math.sin(frame * s.twinkleSpeed + s.twinklePhase) * 0.25;
+        const twinkle = 0.78 + Math.sin(frame * s.twinkleSpeed + s.twinklePhase) * 0.22;
         const alpha = s.opacity * twinkle;
 
         ctx.beginPath();
-        ctx.arc(px, py, s.r, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
-          : `rgba(10,10,10,${alpha * 0.5})`;
+          : `rgba(10,10,10,${alpha * 0.55})`;
         ctx.fill();
       }
 
       // Shooting stars
       if (frame >= nextShoot) {
         spawnShoot();
-        nextShoot = frame + 150 + Math.floor(Math.random() * 250);
+        nextShoot = frame + 160 + Math.floor(Math.random() * 220);
       }
       for (let i = shoots.length - 1; i >= 0; i--) {
         const ss = shoots[i];
@@ -136,18 +129,18 @@ export default function SpaceBackground() {
         ss.x += ss.vx;
         ss.y += ss.vy;
         const p = ss.life / ss.maxLife;
-        const alpha = p < 0.2 ? p / 0.2 : p > 0.6 ? 1 - (p - 0.6) / 0.4 : 1;
+        const alpha = p < 0.2 ? p / 0.2 : p > 0.65 ? 1 - (p - 0.65) / 0.35 : 1;
         const spd = Math.sqrt(ss.vx ** 2 + ss.vy ** 2);
         const tx = ss.x - (ss.vx / spd) * ss.len;
         const ty = ss.y - (ss.vy / spd) * ss.len;
         const g = ctx.createLinearGradient(tx, ty, ss.x, ss.y);
         if (isDark) {
           g.addColorStop(0, `rgba(255,255,255,0)`);
-          g.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.35})`);
+          g.addColorStop(0.5, `rgba(255,255,255,${alpha * 0.3})`);
           g.addColorStop(1, `rgba(255,255,255,${alpha * 0.85})`);
         } else {
           g.addColorStop(0, `rgba(20,20,20,0)`);
-          g.addColorStop(0.5, `rgba(20,20,20,${alpha * 0.2})`);
+          g.addColorStop(0.5, `rgba(20,20,20,${alpha * 0.18})`);
           g.addColorStop(1, `rgba(20,20,20,${alpha * 0.55})`);
         }
         ctx.beginPath();
@@ -168,24 +161,18 @@ export default function SpaceBackground() {
 
     draw();
 
-    const onMouseMove = (e: MouseEvent) => {
-      tMX = (e.clientX / W - 0.5) * 2;
-      tMY = (e.clientY / H - 0.5) * 2;
-    };
-
     const onResize = () => {
       W = window.innerWidth;
       H = window.innerHeight;
       canvas.width = W;
       canvas.height = H;
+      stars = buildStars(W, H);
     };
 
-    window.addEventListener("mousemove", onMouseMove, { passive: true });
     window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("resize", onResize);
     };
   }, [theme]);
