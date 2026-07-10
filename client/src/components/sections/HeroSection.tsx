@@ -256,7 +256,7 @@ export default function HeroSection() {
               color: isDark ? "black" : "white",
               border: "none", fontFamily: "'Space Grotesk', sans-serif",
               fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: "0.1em", cursor: "none",
+              letterSpacing: "0.1em", cursor: "pointer",
             }}
           >
             View Projects <ArrowUpRight size={15} />
@@ -274,72 +274,12 @@ export default function HeroSection() {
               border: `2px solid ${isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)"}`,
               fontFamily: "'Space Grotesk', sans-serif",
               fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase",
-              letterSpacing: "0.1em", cursor: "none", textDecoration: "none",
+              letterSpacing: "0.1em", cursor: "pointer", textDecoration: "none",
             }}
           >
             Download CV <Download size={15} />
           </motion.a>
         </motion.div>
-
-        {/* Stats row */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={revealed ? { opacity: 1, y: 0 } : {}}
-          transition={{ delay: 0.75, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            display: "flex", flexWrap: "wrap", gap: "2rem", justifyContent: "center",
-            marginTop: "1rem", paddingTop: "1.5rem",
-            borderTop: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.07)"}`,
-            width: "100%", maxWidth: 520,
-          }}
-        >
-          {[
-            { value: "99.75%", label: "ML Accuracy" },
-            { value: "80%", label: "API Optimised" },
-            { value: "40%", label: "Report Time Cut" },
-            { value: "1st", label: "Class Honours" },
-          ].map((stat, i) => (
-            <div key={i} style={{ textAlign: "center" }}>
-              <div style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(1.25rem, 3vw, 1.75rem)", fontWeight: 900,
-                color: isDark ? "white" : "#0a0a0a", letterSpacing: "-0.02em",
-              }}>{stat.value}</div>
-              <div style={{
-                fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem",
-                textTransform: "uppercase", letterSpacing: "0.12em",
-                color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)", marginTop: "0.2rem",
-              }}>{stat.label}</div>
-            </div>
-          ))}
-        </motion.div>
-      </motion.div>
-
-      {/* Scroll indicator */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={revealed ? { opacity: 1 } : {}}
-        transition={{ delay: 1.2, duration: 0.8 }}
-        style={{
-          position: "absolute", bottom: "2rem", left: "50%", transform: "translateX(-50%)",
-          display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem",
-        }}
-      >
-        <span style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem",
-          textTransform: "uppercase", letterSpacing: "0.2em",
-          color: isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.25)",
-        }}>Scroll</span>
-        <motion.div
-          animate={{ y: [0, 6, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-          style={{
-            width: 1, height: 32,
-            background: isDark
-              ? "linear-gradient(to bottom, rgba(255,255,255,0.3), transparent)"
-              : "linear-gradient(to bottom, rgba(0,0,0,0.25), transparent)",
-          }}
-        />
       </motion.div>
     </section>
   );

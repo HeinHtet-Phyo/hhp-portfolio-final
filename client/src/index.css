@@ -412,12 +412,12 @@
   color: black;
 }
 
-/* Mobile hamburger */
+/* Mobile hamburger — hidden by default, shown only on mobile */
 .hamburger-btn {
+  display: none;
   width: 2.75rem;
   height: 2.75rem;
   border-radius: 9999px;
-  display: flex;
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(12px);
