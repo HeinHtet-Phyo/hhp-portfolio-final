@@ -1,39 +1,44 @@
-// SpaceBackground — Full-screen star field, whole canvas drifts together
-// Stars fill the ENTIRE screen. The whole field slowly drifts as one unit
-// using a global offset that moves in a slow circular path (3D feel).
-// Each depth layer has a different drift multiplier = parallax depth.
-// Shooting stars cross the full screen slowly with glowing tails.
+// SpaceBackground — 2000+ dots, whole field rotates together in 3D circular motion
+// Stars fill the ENTIRE screen. The whole canvas rotates as one unit around
+// a tilted axis — giving a true 3D circular spinning galaxy feel.
+// Each depth layer rotates at a slightly different speed for parallax depth.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  x: number;   // base x (0..W)
-  y: number;   // base y (0..H)
+  // Position stored as angle + distance from center (polar)
+  // so rotation is just angle += speed
+  cx: number;   // center offset x from canvas center
+  cy: number;   // center offset y from canvas center
   r: number;
   opacity: number;
-  layer: number; // 0=far, 4=near
+  layer: number;
   twinkleFreq: number;
   twinklePhase: number;
 }
 
-// Layer drift multipliers: far barely moves, near moves more
-const LAYER_DRIFT = [0.08, 0.18, 0.32, 0.52, 0.80];
-
-const LAYER_CONFIGS = [
-  { count: 350, rMin: 0.10, rMax: 0.28, oMin: 0.04, oMax: 0.18 },
-  { count: 280, rMin: 0.18, rMax: 0.40, oMin: 0.10, oMax: 0.28 },
-  { count: 200, rMin: 0.26, rMax: 0.55, oMin: 0.18, oMax: 0.42 },
-  { count: 130, rMin: 0.36, rMax: 0.72, oMin: 0.28, oMax: 0.55 },
-  { count:  80, rMin: 0.50, rMax: 0.95, oMin: 0.40, oMax: 0.68 },
+// Layer configs: more dots, each layer rotates at different speed
+const LAYERS = [
+  { count: 600, rotSpeed: 0.00005, rMin: 0.10, rMax: 0.26, oMin: 0.04, oMax: 0.17 },
+  { count: 480, rotSpeed: 0.00009, rMin: 0.16, rMax: 0.38, oMin: 0.09, oMax: 0.27 },
+  { count: 340, rotSpeed: 0.00015, rMin: 0.24, rMax: 0.52, oMin: 0.17, oMax: 0.40 },
+  { count: 220, rotSpeed: 0.00023, rMin: 0.34, rMax: 0.70, oMin: 0.27, oMax: 0.54 },
+  { count: 130, rotSpeed: 0.00034, rMin: 0.48, rMax: 0.92, oMin: 0.38, oMax: 0.66 },
 ];
 
 function buildStars(W: number, H: number): Star[] {
   const stars: Star[] = [];
-  LAYER_CONFIGS.forEach((cfg, li) => {
+  // Spread radius: use diagonal so corners are filled
+  const maxR = Math.sqrt(W * W + H * H) * 0.52;
+
+  LAYERS.forEach((cfg, li) => {
     for (let i = 0; i < cfg.count; i++) {
+      // Uniform random distribution across full screen area
+      const dist = Math.sqrt(Math.random()) * maxR;
+      const angle = Math.random() * Math.PI * 2;
       stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
+        cx: Math.cos(angle) * dist,
+        cy: Math.sin(angle) * dist,
         r: cfg.rMin + Math.random() * (cfg.rMax - cfg.rMin),
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
         layer: li,
@@ -54,15 +59,15 @@ interface ShootingStar {
 
 function spawnShoot(W: number, H: number): ShootingStar {
   const angle = (10 + Math.random() * 32) * (Math.PI / 180);
-  const speed = 3 + Math.random() * 4.5; // slow and graceful
+  const speed = 1.5 + Math.random() * 2.5;
   return {
     x: Math.random() * W * 0.8,
     y: Math.random() * H * 0.5,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     life: 0,
-    maxLife: 60 + Math.random() * 80,
-    len: 100 + Math.random() * 200,
+    maxLife: 90 + Math.random() * 120,
+    len: 120 + Math.random() * 220,
     glowR: 1.8 + Math.random() * 2.5,
   };
 }
@@ -87,11 +92,12 @@ export default function SpaceBackground() {
     let t = 0;
     let frame = 0;
 
-    // Global drift: moves in a slow elliptical path
-    // driftX and driftY are the current global offset
-    const DRIFT_RADIUS_X = 35; // pixels the whole field drifts horizontally
-    const DRIFT_RADIUS_Y = 22; // pixels the whole field drifts vertically
-    const DRIFT_SPEED = 0.0004; // how fast the drift cycles
+    // Per-layer rotation offsets
+    const layerAngles = LAYERS.map(() => Math.random() * Math.PI * 2);
+
+    // 3D tilt: the rotation axis is tilted so it looks 3D not flat
+    // We apply a slight Y-axis tilt when projecting
+    const TILT = 0.28; // radians (~16 degrees) — makes it look 3D
 
     const shoots: ShootingStar[] = [];
     shoots.push(spawnShoot(W, H));
@@ -105,23 +111,34 @@ export default function SpaceBackground() {
       ctx.fillStyle = isDark ? "#000000" : "#eeeeee";
       ctx.fillRect(0, 0, W, H);
 
-      // Global drift offset (slow elliptical path = 3D circular feel)
-      const globalDX = Math.sin(t * DRIFT_SPEED) * DRIFT_RADIUS_X;
-      const globalDY = Math.cos(t * DRIFT_SPEED * 0.7) * DRIFT_RADIUS_Y;
+      const cx = W / 2;
+      const cy = H / 2;
+
+      // Advance each layer's rotation
+      LAYERS.forEach((cfg, li) => {
+        layerAngles[li] += cfg.rotSpeed;
+      });
 
       // Draw stars
       for (const s of stars) {
-        const mult = LAYER_DRIFT[s.layer];
-        // Each layer moves a fraction of the global drift
-        const ox = globalDX * mult;
-        const oy = globalDY * mult;
+        const cfg = LAYERS[s.layer];
+        const rot = layerAngles[s.layer];
 
-        // Wrap around edges so no empty corners
-        let px = ((s.x + ox) % (W + 4) + W + 4) % (W + 4) - 2;
-        let py = ((s.y + oy) % (H + 4) + H + 4) % (H + 4) - 2;
+        // Rotate the star's position by the layer angle
+        const cosR = Math.cos(rot);
+        const sinR = Math.sin(rot);
+        const rx = s.cx * cosR - s.cy * sinR;
+        const ry = s.cx * sinR + s.cy * cosR;
+
+        // Apply 3D tilt: compress Y axis slightly to simulate perspective tilt
+        const px = cx + rx;
+        const py = cy + ry * Math.cos(TILT);
+
+        // Depth cue from Y position after tilt
+        const depthFactor = 0.7 + (py / H) * 0.3;
 
         const twinkle = 0.78 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.22;
-        const alpha = s.opacity * twinkle;
+        const alpha = s.opacity * twinkle * depthFactor;
 
         ctx.beginPath();
         ctx.arc(px, py, s.r, 0, Math.PI * 2);
