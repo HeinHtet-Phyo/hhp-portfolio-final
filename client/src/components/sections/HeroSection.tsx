@@ -223,7 +223,8 @@ export default function HeroSection() {
       }}
     >
       <div style={{
-        width: "100%", maxWidth: "100%",
+        width: "100%", maxWidth: "1280px",
+        marginLeft: "auto", marginRight: "auto",
         display: "grid",
         gridTemplateColumns: "1.1fr 1.2fr",
         gap: "clamp(1.5rem, 3vw, 4rem)",
