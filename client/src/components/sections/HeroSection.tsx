@@ -110,7 +110,11 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
       { text: '"focus"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
       { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
-      { text: '"Machine Learning, Software Development, and building AI systems I\'m genuinely passionate about"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: '"Machine Learning, Software Development,"', color: isDark ? "#4ade80" : "#22c55e" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"and building AI systems I\'m passionate about"', color: isDark ? "#4ade80" : "#22c55e" },
       { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
