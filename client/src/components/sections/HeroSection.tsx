@@ -108,6 +108,20 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
     ]},
     { spans: [
       { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"focus"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Machine Learning, Deep Learning & AI Systems"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"passion"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Building intelligent systems that solve real problems"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
       { text: '"status"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
       { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
       { text: '"Open to work 🚀"', color: isDark ? "#4ade80" : "#22c55e" },
