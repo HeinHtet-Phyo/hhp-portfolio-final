@@ -1,7 +1,7 @@
 // Hero Section — Split layout: left text + right terminal code window
 // Inspired by reference: left has name/title/bio/buttons/socials
 // Right has a macOS-style terminal window showing developer info as JS object
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -207,54 +207,9 @@ export default function HeroSection() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [revealed, setRevealed] = useState(false);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const tiltRef = useRef({ rx: 0, ry: 0, targetRx: 0, targetRy: 0, raf: 0 });
-
   useEffect(() => {
     const t = setTimeout(() => setRevealed(true), 200);
     return () => clearTimeout(t);
-  }, []);
-
-  // Cursor-driven tilt effect
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-    const state = tiltRef.current;
-
-    const onMove = (e: MouseEvent) => {
-      const rect = grid.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const nx = (e.clientX - cx) / (rect.width / 2);  // -1 to 1
-      const ny = (e.clientY - cy) / (rect.height / 2); // -1 to 1
-      state.targetRx = -ny * 4;  // max 4deg vertical
-      state.targetRy = nx * 5;   // max 5deg horizontal
-    };
-
-    const onLeave = () => {
-      state.targetRx = 0;
-      state.targetRy = 0;
-    };
-
-    const animate = () => {
-      state.rx += (state.targetRx - state.rx) * 0.08;
-      state.ry += (state.targetRy - state.ry) * 0.08;
-      if (grid) {
-        grid.style.transform = `perspective(1200px) rotateX(${state.rx}deg) rotateY(${state.ry}deg)`;
-      }
-      state.raf = requestAnimationFrame(animate);
-    };
-
-    window.addEventListener("mousemove", onMove, { passive: true });
-    window.addEventListener("mouseleave", onLeave, { passive: true });
-    state.raf = requestAnimationFrame(animate);
-
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseleave", onLeave);
-      cancelAnimationFrame(state.raf);
-      if (grid) grid.style.transform = "";
-    };
   }, []);
 
   const fadeUp = (delay: number) => ({
@@ -274,15 +229,12 @@ export default function HeroSection() {
       }}
     >
       <div
-        ref={gridRef}
         style={{
           width: "100%",
           display: "grid",
           gridTemplateColumns: "1fr 1fr",
           gap: "clamp(2rem, 5vw, 6rem)",
           alignItems: "center",
-          willChange: "transform",
-          transformStyle: "preserve-3d",
         }}
         className="hero-grid"
       >

@@ -78,6 +78,16 @@ function spawnShoot(W: number, H: number): ShootingStar {
 export default function SpaceBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { theme } = useTheme();
+  const mouseRef = useRef({ x: 0.5, y: 0.5, tx: 0.5, ty: 0.5 });
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      mouseRef.current.tx = e.clientX / window.innerWidth;
+      mouseRef.current.ty = e.clientY / window.innerHeight;
+    };
+    window.addEventListener("mousemove", onMove, { passive: true });
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -105,9 +115,21 @@ export default function SpaceBackground() {
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
 
+    // Parallax strengths per layer (index 0 = smallest/farthest, 4 = largest/closest)
+    const PARALLAX = [4, 8, 14, 20, 28]; // max pixel offset per layer
+    let layerIdx = 0;
+
     const draw = () => {
       t++;
       frame++;
+
+      // Smooth mouse lerp
+      const m = mouseRef.current;
+      m.x += (m.tx - m.x) * 0.05;
+      m.y += (m.ty - m.y) * 0.05;
+      // offset from center: -0.5 to 0.5
+      const mx = m.x - 0.5;
+      const my = m.y - 0.5;
 
       const isDark = theme === "dark";
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
@@ -123,9 +145,15 @@ export default function SpaceBackground() {
         if (s.y < -2) s.y += H + 4;
       }
 
+      layerIdx = 0;
+      let layerCount = 0;
       for (const s of stars) {
-        const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
-        const py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
+        // Determine which layer this star belongs to (layers are added in order)
+        if (layerCount >= LAYERS[layerIdx].count) { layerIdx++; layerCount = 0; }
+        layerCount++;
+        const pStrength = PARALLAX[Math.min(layerIdx, PARALLAX.length - 1)];
+        const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX + mx * pStrength;
+        const py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY + my * pStrength;
 
         const twinkle = 0.82 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.18;
         const alpha = Math.min(1, s.opacity * twinkle);
