@@ -39,7 +39,7 @@ export default function AboutSection() {
       ref={sectionRef}
       style={{
         minHeight: "100vh",
-        padding: "8rem 8vw",
+        padding: "6rem 8vw",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
@@ -74,8 +74,8 @@ export default function AboutSection() {
         className="about-main-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1.2fr",
-          gap: "5vw",
+          gridTemplateColumns: "42% 1fr",
+          gap: "4vw",
           alignItems: "start",
         }}
       >
@@ -101,7 +101,8 @@ export default function AboutSection() {
               style={{
                 overflow: "hidden",
                 borderRadius: "6px",
-                aspectRatio: "3/4",
+                aspectRatio: "4/5",
+                maxHeight: "480px",
                 width: "100%",
                 position: "relative",
               }}
