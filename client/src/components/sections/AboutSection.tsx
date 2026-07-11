@@ -96,27 +96,7 @@ export default function AboutSection() {
             onMouseEnter={() => setPhotoHovered(true)}
             onMouseLeave={() => setPhotoHovered(false)}
           >
-            {/* Corner brackets */}
-            {[
-              { top: "10px", left: "10px", borderTop: "2px solid currentColor", borderLeft: "2px solid currentColor" },
-              { top: "10px", right: "10px", borderTop: "2px solid currentColor", borderRight: "2px solid currentColor" },
-              { bottom: "10px", left: "10px", borderBottom: "2px solid currentColor", borderLeft: "2px solid currentColor" },
-              { bottom: "10px", right: "10px", borderBottom: "2px solid currentColor", borderRight: "2px solid currentColor" },
-            ].map((style, i) => (
-              <div
-                key={i}
-                style={{
-                  position: "absolute",
-                  width: "22px",
-                  height: "22px",
-                  zIndex: 3,
-                  opacity: 0.6,
-                  ...style,
-                }}
-              />
-            ))}
-
-            {/* Photo */}
+            {/* Photo — corner brackets are inside this container so they align to image edges */}
             <div
               style={{
                 overflow: "hidden",
@@ -127,6 +107,24 @@ export default function AboutSection() {
                 position: "relative",
               }}
             >
+            {/* Corner brackets — inside image container, aligned to image edges */}
+            {[
+              { top: "12px", left: "12px", borderTop: "2px solid rgba(255,255,255,0.7)", borderLeft: "2px solid rgba(255,255,255,0.7)" },
+              { top: "12px", right: "12px", borderTop: "2px solid rgba(255,255,255,0.7)", borderRight: "2px solid rgba(255,255,255,0.7)" },
+              { bottom: "12px", left: "12px", borderBottom: "2px solid rgba(255,255,255,0.7)", borderLeft: "2px solid rgba(255,255,255,0.7)" },
+              { bottom: "12px", right: "12px", borderBottom: "2px solid rgba(255,255,255,0.7)", borderRight: "2px solid rgba(255,255,255,0.7)" },
+            ].map((style, i) => (
+              <div
+                key={i}
+                style={{
+                  position: "absolute",
+                  width: "24px",
+                  height: "24px",
+                  zIndex: 4,
+                  ...style,
+                }}
+              />
+            ))}
               <img
                 src="/manus-storage/hein-photo_e7519650.jpg"
                 alt="Hein Htet Phyo"
@@ -136,7 +134,7 @@ export default function AboutSection() {
                   objectFit: "cover",
                   objectPosition: "center 15%",
                   display: "block",
-                  filter: photoHovered ? "grayscale(0%) brightness(1.0) saturate(1.0)" : "grayscale(60%) brightness(0.75) saturate(0.4)",
+                  filter: photoHovered ? "saturate(1.0) brightness(1.0)" : "saturate(0.2) brightness(0.8)",
                   transition: "filter 0.6s ease",
                 }}
               />
