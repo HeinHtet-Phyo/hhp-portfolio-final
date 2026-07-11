@@ -223,8 +223,7 @@ export default function HeroSection() {
       }}
     >
       <div style={{
-        width: "100%", maxWidth: "1280px",
-        marginLeft: "auto", marginRight: "auto",
+        width: "100%",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: "clamp(2rem, 5vw, 6rem)",
@@ -285,8 +284,9 @@ export default function HeroSection() {
             fontWeight: 600,
             color: isDark ? "rgba(255,255,255,0.85)" : "#1e293b",
             overflow: "visible",
-            whiteSpace: "pre",
+            whiteSpace: "nowrap",
             display: "block",
+            minWidth: 0,
           }}>
             <TypingRole isDark={isDark} />
           </motion.p>
@@ -375,7 +375,7 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", paddingRight: "2vw" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>
