@@ -92,7 +92,7 @@ export default function AboutSection() {
         >
           {/* Photo with corner brackets */}
           <div
-            style={{ position: "relative", cursor: "pointer" }}
+            style={{ position: "relative", cursor: "pointer", width: "100%" }}
             onMouseEnter={() => setPhotoHovered(true)}
             onMouseLeave={() => setPhotoHovered(false)}
           >
@@ -122,7 +122,8 @@ export default function AboutSection() {
                 overflow: "hidden",
                 borderRadius: "6px",
                 aspectRatio: "4/5",
-                maxHeight: "560px",
+                maxHeight: "520px",
+                width: "100%",
                 position: "relative",
               }}
             >
@@ -135,7 +136,7 @@ export default function AboutSection() {
                   objectFit: "cover",
                   objectPosition: "center 15%",
                   display: "block",
-                  filter: photoHovered ? "grayscale(0%) brightness(1.05) saturate(1.15)" : "grayscale(100%) brightness(0.85)",
+                  filter: photoHovered ? "grayscale(0%) brightness(1.0) saturate(1.0)" : "grayscale(60%) brightness(0.75) saturate(0.4)",
                   transition: "filter 0.6s ease",
                 }}
               />
