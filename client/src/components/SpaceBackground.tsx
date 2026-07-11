@@ -1,38 +1,45 @@
-// SpaceBackground — Static star field, no rotation
-// 6000+ bright dots fill the entire screen.
-// Each dot slowly drifts with its own organic motion (sine waves).
-// Slow graceful shooting stars with glowing tails.
+// SpaceBackground — Subtle animated starfield (global, site-wide)
+// Effects:
+//   1. Ambient drift: dots gently float/oscillate on their own (slow, calm)
+//   2. Cursor repel: nearby dots subtly push away from cursor + soft glow near cursor
+//   3. Scroll parallax: each layer scrolls at a slightly different speed for depth
+//   4. Shooting stars with glowing tails
+//   5. Mobile-safe: cursor effects skipped on touch devices
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  x: number;
-  y: number;
+  x: number; y: number;        // base position
   r: number;
   opacity: number;
-  // Drift params
-  driftX: number;   // drift amplitude X
-  driftY: number;   // drift amplitude Y
-  freqX: number;    // drift frequency X
-  freqY: number;    // drift frequency Y
-  phaseX: number;
-  phaseY: number;
-  // Twinkle
-  twinkleFreq: number;
-  twinklePhase: number;
+  driftX: number; driftY: number;
+  freqX: number; freqY: number;
+  phaseX: number; phaseY: number;
+  twinkleFreq: number; twinklePhase: number;
+  layer: number;               // 0 = farthest, 4 = closest
 }
 
 const LAYERS = [
-  { count: 1100, rMin: 0.15, rMax: 0.30, oMin: 0.75, oMax: 0.95, drift: 2.5 },
-  { count:  700, rMin: 0.20, rMax: 0.42, oMin: 0.80, oMax: 0.98, drift: 4.0 },
-  { count:  450, rMin: 0.28, rMax: 0.55, oMin: 0.85, oMax: 1.00, drift: 6.0 },
-  { count:  250, rMin: 0.36, rMax: 0.70, oMin: 0.88, oMax: 1.00, drift: 8.5 },
-  { count:  150, rMin: 0.48, rMax: 0.92, oMin: 0.92, oMax: 1.00, drift: 12.0 },
+  { count: 1100, rMin: 0.15, rMax: 0.30, oMin: 0.75, oMax: 0.95, drift: 1.8 },
+  { count:  700, rMin: 0.20, rMax: 0.42, oMin: 0.80, oMax: 0.98, drift: 2.8 },
+  { count:  450, rMin: 0.28, rMax: 0.55, oMin: 0.85, oMax: 1.00, drift: 4.0 },
+  { count:  250, rMin: 0.36, rMax: 0.70, oMin: 0.88, oMax: 1.00, drift: 5.5 },
+  { count:  150, rMin: 0.48, rMax: 0.92, oMin: 0.92, oMax: 1.00, drift: 7.5 },
 ];
+
+// Scroll parallax multiplier per layer (0 = no scroll shift, higher = more shift)
+const SCROLL_PARALLAX = [0.02, 0.04, 0.07, 0.10, 0.14];
+
+// Cursor repel radius and strength
+const REPEL_RADIUS = 120;
+const REPEL_STRENGTH = 18;
+
+// Cursor glow radius
+const GLOW_RADIUS = 180;
 
 function buildStars(W: number, H: number): Star[] {
   const stars: Star[] = [];
-  LAYERS.forEach((cfg) => {
+  LAYERS.forEach((cfg, layerIdx) => {
     for (let i = 0; i < cfg.count; i++) {
       stars.push({
         x: Math.random() * W,
@@ -41,12 +48,13 @@ function buildStars(W: number, H: number): Star[] {
         opacity: cfg.oMin + Math.random() * (cfg.oMax - cfg.oMin),
         driftX: (Math.random() * 0.6 + 0.4) * cfg.drift,
         driftY: (Math.random() * 0.6 + 0.4) * cfg.drift,
-        freqX: 0.0003 + Math.random() * 0.0006,
-        freqY: 0.0002 + Math.random() * 0.0005,
+        freqX: 0.0002 + Math.random() * 0.0004,
+        freqY: 0.00015 + Math.random() * 0.0003,
         phaseX: Math.random() * Math.PI * 2,
         phaseY: Math.random() * Math.PI * 2,
-        twinkleFreq: 0.004 + Math.random() * 0.010,
+        twinkleFreq: 0.003 + Math.random() * 0.008,
         twinklePhase: Math.random() * Math.PI * 2,
+        layer: layerIdx,
       });
     }
   });
@@ -78,6 +86,38 @@ function spawnShoot(W: number, H: number): ShootingStar {
 export default function SpaceBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { theme } = useTheme();
+  // Smooth mouse position (0–1 normalised), raw pixel position for repel
+  const mouseRef = useRef({ nx: -999, ny: -999, px: -999, py: -999, active: false });
+  const scrollRef = useRef(0);
+  const isTouchRef = useRef(false);
+
+  // Track mouse (skip on touch devices)
+  useEffect(() => {
+    const onTouch = () => { isTouchRef.current = true; };
+    const onMove = (e: MouseEvent) => {
+      if (isTouchRef.current) return;
+      mouseRef.current.nx = e.clientX / window.innerWidth;
+      mouseRef.current.ny = e.clientY / window.innerHeight;
+      mouseRef.current.px = e.clientX;
+      mouseRef.current.py = e.clientY;
+      mouseRef.current.active = true;
+    };
+    const onLeave = () => { mouseRef.current.active = false; };
+    window.addEventListener("touchstart", onTouch, { passive: true, once: true });
+    window.addEventListener("mousemove", onMove, { passive: true });
+    window.addEventListener("mouseleave", onLeave, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseleave", onLeave);
+    };
+  }, []);
+
+  // Track scroll
+  useEffect(() => {
+    const onScroll = () => { scrollRef.current = window.scrollY; };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -104,12 +144,51 @@ export default function SpaceBackground() {
       frame++;
 
       const isDark = theme === "dark";
+      const scrollY = scrollRef.current;
+      const m = mouseRef.current;
+
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
+      // Soft cursor glow on background (desktop only)
+      if (m.active && !isTouchRef.current) {
+        const gx = m.nx * W;
+        const gy = m.ny * H;
+        const glow = ctx.createRadialGradient(gx, gy, 0, gx, gy, GLOW_RADIUS);
+        if (isDark) {
+          glow.addColorStop(0, "rgba(160,200,255,0.07)");
+          glow.addColorStop(0.5, "rgba(120,170,255,0.03)");
+          glow.addColorStop(1, "rgba(80,140,255,0)");
+        } else {
+          glow.addColorStop(0, "rgba(80,100,200,0.05)");
+          glow.addColorStop(1, "rgba(80,100,200,0)");
+        }
+        ctx.beginPath();
+        ctx.arc(gx, gy, GLOW_RADIUS, 0, Math.PI * 2);
+        ctx.fillStyle = glow;
+        ctx.fill();
+      }
+
+      // Draw stars
       for (const s of stars) {
-        const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
-        const py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
+        // Ambient drift (slow sine oscillation)
+        let px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
+        let py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
+
+        // Scroll parallax — closer layers shift more
+        py -= scrollY * SCROLL_PARALLAX[s.layer];
+
+        // Cursor repel (desktop only)
+        if (m.active && !isTouchRef.current) {
+          const dx = px - m.px;
+          const dy = py - m.py;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < REPEL_RADIUS && dist > 0) {
+            const force = (1 - dist / REPEL_RADIUS) * REPEL_STRENGTH;
+            px += (dx / dist) * force;
+            py += (dy / dist) * force;
+          }
+        }
 
         const twinkle = 0.82 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.18;
         const alpha = Math.min(1, s.opacity * twinkle);
