@@ -219,7 +219,7 @@ export default function HeroSection() {
         position: "relative", zIndex: 2,
         minHeight: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "80px 5vw 0",
+        padding: "80px 8vw 0",
       }}
     >
       <div style={{
