@@ -139,7 +139,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
         overflow: "hidden",
         width: "100%",
-        maxWidth: 540,
+        maxWidth: 660,
         position: "relative" as const,
       }}
     >
@@ -165,9 +165,9 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
 
       {/* Code content */}
       <div style={{
-        padding: "24px 32px 28px",
+        padding: "26px 36px 30px",
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "clamp(0.68rem, 1.2vw, 0.79rem)",
+        fontSize: "clamp(0.72rem, 1.35vw, 0.88rem)",
         lineHeight: 1.7,
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
@@ -217,14 +217,14 @@ export default function HeroSection() {
         position: "relative", zIndex: 2,
         minHeight: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "80px clamp(1.5rem, 6vw, 5rem) 0",
+        padding: "80px clamp(1.5rem, 5.5vw, 6rem) 0",
       }}
     >
       <div style={{
-        width: "100%", maxWidth: 1200, margin: "0 auto",
+        width: "100%", maxWidth: "100%",
         display: "grid",
-        gridTemplateColumns: "1fr 1.2fr",
-        gap: "clamp(2rem, 5vw, 4rem)",
+        gridTemplateColumns: "1fr 1.3fr",
+        gap: "clamp(2rem, 4vw, 5rem)",
         alignItems: "center",
       }}
       className="hero-grid"
@@ -252,22 +252,24 @@ export default function HeroSection() {
           <div>
             <motion.div {...fadeUp(0.2)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(2.8rem, 7vw, 5.5rem)",
-              fontWeight: 900, lineHeight: 0.95,
+              fontSize: "clamp(2.8rem, 7.5vw, 6.5rem)",
+              fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               color: isDark ? "white" : "#0a0a0a",
               textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}>
               Hein Htet
             </motion.div>
             <motion.div {...fadeUp(0.28)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(2.8rem, 7vw, 5.5rem)",
-              fontWeight: 900, lineHeight: 0.95,
+              fontSize: "clamp(2.8rem, 7.5vw, 6.5rem)",
+              fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
               color: "transparent",
               textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}>
               Phyo
             </motion.div>
