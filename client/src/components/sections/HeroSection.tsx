@@ -167,8 +167,8 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       <div style={{
         padding: "24px 32px 28px",
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "clamp(0.65rem, 1.15vw, 0.75rem)",
-        lineHeight: 1.65,
+        fontSize: "clamp(0.72rem, 1.3vw, 0.84rem)",
+        lineHeight: 1.7,
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
           <div key={i} style={{ whiteSpace: "pre" }}>
