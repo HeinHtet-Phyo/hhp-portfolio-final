@@ -219,14 +219,14 @@ export default function HeroSection() {
         position: "relative", zIndex: 2,
         minHeight: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "80px clamp(1.5rem, 5.5vw, 6rem) 0",
+        padding: "80px clamp(1rem, 3.5vw, 4rem) 0",
       }}
     >
       <div style={{
         width: "100%", maxWidth: "100%",
         display: "grid",
-        gridTemplateColumns: "1fr 1.3fr",
-        gap: "clamp(2rem, 4vw, 5rem)",
+        gridTemplateColumns: "1.1fr 1.2fr",
+        gap: "clamp(1.5rem, 3vw, 4rem)",
         alignItems: "center",
       }}
       className="hero-grid"
@@ -254,7 +254,7 @@ export default function HeroSection() {
           <div>
             <motion.div {...fadeUp(0.2)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(2.8rem, 7.5vw, 6.5rem)",
+              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
               fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               color: isDark ? "white" : "#0a0a0a",
@@ -265,7 +265,7 @@ export default function HeroSection() {
             </motion.div>
             <motion.div {...fadeUp(0.28)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(2.8rem, 7.5vw, 6.5rem)",
+              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
               fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
@@ -280,7 +280,7 @@ export default function HeroSection() {
           {/* Typing role */}
           <motion.p {...fadeUp(0.36)} style={{
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
+            fontSize: "clamp(1rem, 2.2vw, 1.25rem)",
             fontWeight: 600,
             color: isDark ? "rgba(255,255,255,0.85)" : "#1e293b",
             overflow: "visible",
@@ -293,10 +293,10 @@ export default function HeroSection() {
           {/* Bio */}
           <motion.p {...fadeUp(0.44)} style={{
             fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: "clamp(0.875rem, 1.6vw, 1rem)",
+            fontSize: "clamp(0.95rem, 1.75vw, 1.1rem)",
             lineHeight: 1.8, fontWeight: 300,
             color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.55)",
-            maxWidth: 440,
+            maxWidth: 520,
           }}>
             BSc Data Science & AI — UWE Bristol. Specialising in machine learning,
             deep learning, and building intelligent systems that solve real problems.
@@ -314,7 +314,7 @@ export default function HeroSection() {
                 background: isDark ? "white" : "#0a0a0a",
                 color: isDark ? "black" : "white", border: "none",
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "0.85rem", fontWeight: 700,
+                fontSize: "0.95rem", fontWeight: 700,
                 letterSpacing: "0.04em", cursor: "pointer",
                 borderRadius: "6px",
               }}
@@ -333,7 +333,7 @@ export default function HeroSection() {
                 color: isDark ? "rgba(255,255,255,0.8)" : "#1e293b",
                 border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"}`,
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "0.85rem", fontWeight: 600,
+                fontSize: "0.95rem", fontWeight: 600,
                 letterSpacing: "0.04em", cursor: "pointer",
                 borderRadius: "6px", textDecoration: "none",
               }}
