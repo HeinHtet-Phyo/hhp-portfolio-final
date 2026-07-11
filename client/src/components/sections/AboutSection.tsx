@@ -135,7 +135,7 @@ export default function AboutSection() {
                   objectFit: "cover",
                   objectPosition: "center 15%",
                   display: "block",
-                  filter: photoHovered ? "grayscale(0%)" : "grayscale(100%)",
+                  filter: photoHovered ? "grayscale(0%) brightness(1.05) saturate(1.15)" : "grayscale(100%) brightness(0.85)",
                   transition: "filter 0.6s ease",
                 }}
               />
