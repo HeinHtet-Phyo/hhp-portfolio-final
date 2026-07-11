@@ -47,26 +47,51 @@ export default function AboutSection() {
         zIndex: 1,
       }}
     >
-      {/* Section label */}
+      {/* Section label — Motionfolio style: dot + text + full-width line */}
       <div
         style={{
           opacity: inView ? 1 : 0,
           transform: inView ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
           marginBottom: "3rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "0.6rem",
         }}
       >
+        {/* Green dot */}
+        <span
+          style={{
+            width: "7px",
+            height: "7px",
+            borderRadius: "50%",
+            background: "#84cc16",
+            flexShrink: 0,
+            display: "inline-block",
+          }}
+        />
+        {/* Label text */}
         <span
           style={{
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "0.70rem",
+            fontSize: "0.68rem",
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            opacity: 0.4,
+            opacity: 0.55,
+            flexShrink: 0,
           }}
         >
-          01 / About
+          01 — About
         </span>
+        {/* Full-width horizontal rule */}
+        <span
+          style={{
+            flex: 1,
+            height: "1px",
+            background: "rgba(255,255,255,0.12)",
+            display: "block",
+          }}
+        />
       </div>
 
       {/* Main layout — left photo col, right bio col */}
