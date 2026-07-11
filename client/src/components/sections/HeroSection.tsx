@@ -44,77 +44,77 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
   // Each line: array of {text, color} spans for syntax highlighting
   const lines: { spans: { text: string; color: string }[] }[] = [
     { spans: [
-      { text: "developer", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: " = {", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: "developer", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: " = {", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"name"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"Hein Htet Phyo"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"name"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Hein Htet Phyo"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"location"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"London, UK"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"location"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"London, UK"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"degree"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"BSc Data Science & AI"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"degree"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"BSc Data Science & AI"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"university"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"UWE Bristol"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"university"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"UWE Bristol"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"open_to"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": [", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"open_to"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": [", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
     ]},
     { spans: [
-      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"AI Engineer"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"AI Engineer"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"Data Scientist"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"Data Scientist"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"ML Engineer"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"ML Engineer"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: "],", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: "],", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"seeking"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"Full-time roles in AI & Data"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"seeking"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Full-time roles in AI & Data"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: '"status"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
-      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
-      { text: '"Open to work 🚀"', color: isDark ? "#4ade80" : "#2d7a4f" },
-      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"status"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Open to work 🚀"', color: isDark ? "#4ade80" : "#15803d" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
-      { text: "}", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: "}", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
     ]},
   ];
 
@@ -131,7 +131,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
       transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
       style={{
-        background: isDark ? "rgba(5,5,10,0.88)" : "rgba(248,248,250,0.96)",
+        background: isDark ? "rgba(5,5,10,0.88)" : "rgba(232,234,238,0.98)",
         border: isDark ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(0,0,0,0.10)",
         borderRadius: "12px",
         backdropFilter: "blur(24px)",
@@ -174,7 +174,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
           <div key={i} style={{ whiteSpace: "pre" }}>
-            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.20)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(i + 1).padStart(2, "0")}
             </span>
             {line.spans.map((span, j) => (
@@ -184,7 +184,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         ))}
         {linesDone < lines.length && (
           <div style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)", whiteSpace: "pre" }}>
-            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.20)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(linesDone + 1).padStart(2, "0")}
             </span>
             <span className="typing-cursor" style={{ color: "#60a5fa" }} />
