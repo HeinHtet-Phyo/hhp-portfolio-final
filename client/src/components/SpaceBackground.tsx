@@ -1,22 +1,25 @@
-// SpaceBackground — Animated starfield
-// Features:
-//   1. Stars slowly rotate around the centre of the canvas (self-rotating galaxy)
-//   2. Cursor creates a glowing ripple/aura on the background
-//   3. Scroll accelerates the star flow temporarily
-//   4. Cursor parallax: closer layers shift more than distant ones
-//   5. Twinkle + shooting stars
+// SpaceBackground — Static star field, no rotation
+// 6000+ bright dots fill the entire screen.
+// Each dot slowly drifts with its own organic motion (sine waves).
+// Slow graceful shooting stars with glowing tails.
 import { useEffect, useRef } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 
 interface Star {
-  x: number; y: number;        // base position (relative to canvas centre)
+  x: number;
+  y: number;
   r: number;
   opacity: number;
-  driftX: number; driftY: number;
-  freqX: number; freqY: number;
-  phaseX: number; phaseY: number;
-  twinkleFreq: number; twinklePhase: number;
-  layer: number;               // 0 = farthest, 4 = closest
+  // Drift params
+  driftX: number;   // drift amplitude X
+  driftY: number;   // drift amplitude Y
+  freqX: number;    // drift frequency X
+  freqY: number;    // drift frequency Y
+  phaseX: number;
+  phaseY: number;
+  // Twinkle
+  twinkleFreq: number;
+  twinklePhase: number;
 }
 
 const LAYERS = [
@@ -27,12 +30,9 @@ const LAYERS = [
   { count:  150, rMin: 0.48, rMax: 0.92, oMin: 0.92, oMax: 1.00, drift: 12.0 },
 ];
 
-// Parallax shift per layer (px) when cursor is at edge
-const PARALLAX = [4, 8, 14, 20, 28];
-
 function buildStars(W: number, H: number): Star[] {
   const stars: Star[] = [];
-  LAYERS.forEach((cfg, layerIdx) => {
+  LAYERS.forEach((cfg) => {
     for (let i = 0; i < cfg.count; i++) {
       stars.push({
         x: Math.random() * W,
@@ -47,7 +47,6 @@ function buildStars(W: number, H: number): Star[] {
         phaseY: Math.random() * Math.PI * 2,
         twinkleFreq: 0.004 + Math.random() * 0.010,
         twinklePhase: Math.random() * Math.PI * 2,
-        layer: layerIdx,
       });
     }
   });
@@ -76,41 +75,9 @@ function spawnShoot(W: number, H: number): ShootingStar {
   };
 }
 
-interface Ripple {
-  x: number; y: number;
-  r: number; maxR: number;
-  alpha: number; life: number;
-}
-
 export default function SpaceBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { theme } = useTheme();
-  const mouseRef = useRef({ x: 0.5, y: 0.5, tx: 0.5, ty: 0.5, px: 0, py: 0 });
-  const scrollRef = useRef({ boost: 0 }); // extra flow speed from scroll
-
-  // Track mouse
-  useEffect(() => {
-    const onMove = (e: MouseEvent) => {
-      mouseRef.current.tx = e.clientX / window.innerWidth;
-      mouseRef.current.ty = e.clientY / window.innerHeight;
-      mouseRef.current.px = e.clientX;
-      mouseRef.current.py = e.clientY;
-    };
-    window.addEventListener("mousemove", onMove, { passive: true });
-    return () => window.removeEventListener("mousemove", onMove);
-  }, []);
-
-  // Track scroll
-  useEffect(() => {
-    let lastY = window.scrollY;
-    const onScroll = () => {
-      const delta = Math.abs(window.scrollY - lastY);
-      lastY = window.scrollY;
-      scrollRef.current.boost = Math.min(scrollRef.current.boost + delta * 0.15, 8);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -128,106 +95,21 @@ export default function SpaceBackground() {
     let t = 0;
     let frame = 0;
 
-    // Rotation angle (radians) — very slow self-rotation
-    let rotAngle = 0;
-    const ROT_SPEED = 0.00008; // radians per frame
-
-    // Global flow direction
-    const flowSpeed = 0.06;
-    const flowVX = Math.cos(Math.PI * 0.15) * flowSpeed;
-    const flowVY = Math.sin(Math.PI * 0.15) * flowSpeed;
-
     const shoots: ShootingStar[] = [];
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
-
-    // Ripple pool — cursor click/move creates ripples on background
-    const ripples: Ripple[] = [];
-    let lastRippleFrame = 0;
 
     const draw = () => {
       t++;
       frame++;
 
-      // Smooth mouse lerp
-      const m = mouseRef.current;
-      m.x += (m.tx - m.x) * 0.05;
-      m.y += (m.ty - m.y) * 0.05;
-      const mx = m.x - 0.5; // -0.5 to 0.5
-      const my = m.y - 0.5;
-
-      // Scroll boost decay
-      const sc = scrollRef.current;
-      sc.boost *= 0.92;
-      const totalFlowVX = flowVX * (1 + sc.boost);
-      const totalFlowVY = flowVY * (1 + sc.boost);
-
-      // Advance rotation
-      rotAngle += ROT_SPEED;
-      const cosR = Math.cos(rotAngle);
-      const sinR = Math.sin(rotAngle);
-      const cx = W / 2;
-      const cy = H / 2;
-
-      // Spawn cursor ripple every ~40 frames
-      if (frame - lastRippleFrame > 40) {
-        ripples.push({ x: m.px, y: m.py, r: 0, maxR: 80 + Math.random() * 60, alpha: 0.35, life: 0 });
-        lastRippleFrame = frame;
-      }
-
       const isDark = theme === "dark";
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
 
-      // Draw cursor ripples (behind stars)
-      for (let i = ripples.length - 1; i >= 0; i--) {
-        const rp = ripples[i];
-        rp.r += (rp.maxR - rp.r) * 0.04;
-        rp.life++;
-        rp.alpha *= 0.96;
-        if (rp.alpha < 0.005) { ripples.splice(i, 1); continue; }
-
-        const grad = ctx.createRadialGradient(rp.x, rp.y, 0, rp.x, rp.y, rp.r);
-        if (isDark) {
-          grad.addColorStop(0, `rgba(180,220,255,${rp.alpha * 0.6})`);
-          grad.addColorStop(0.4, `rgba(120,180,255,${rp.alpha * 0.25})`);
-          grad.addColorStop(1, `rgba(80,140,255,0)`);
-        } else {
-          grad.addColorStop(0, `rgba(80,100,200,${rp.alpha * 0.3})`);
-          grad.addColorStop(1, `rgba(80,100,200,0)`);
-        }
-        ctx.beginPath();
-        ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
-        ctx.fillStyle = grad;
-        ctx.fill();
-      }
-
-      // Apply global flow + rotation to star base positions
       for (const s of stars) {
-        s.x += totalFlowVX;
-        s.y += totalFlowVY;
-        if (s.x > W + 2) s.x -= W + 4;
-        if (s.x < -2) s.x += W + 4;
-        if (s.y > H + 2) s.y -= H + 4;
-        if (s.y < -2) s.y += H + 4;
-      }
-
-      // Draw stars with rotation + parallax
-      for (const s of stars) {
-        const pStrength = PARALLAX[s.layer];
-        // Drift oscillation
-        const driftedX = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
-        const driftedY = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
-
-        // Rotate around canvas centre
-        const dx = driftedX - cx;
-        const dy = driftedY - cy;
-        const rx = dx * cosR - dy * sinR + cx;
-        const ry = dx * sinR + dy * cosR + cy;
-
-        // Cursor parallax offset
-        const px = rx + mx * pStrength;
-        const py = ry + my * pStrength;
+        const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
+        const py = s.y + Math.sin(t * s.freqY + s.phaseY) * s.driftY;
 
         const twinkle = 0.82 + Math.sin(t * s.twinkleFreq + s.twinklePhase) * 0.18;
         const alpha = Math.min(1, s.opacity * twinkle);

@@ -1,7 +1,7 @@
 // Hero Section — Split layout: left text + right terminal code window
 // Inspired by reference: left has name/title/bio/buttons/socials
 // Right has a macOS-style terminal window showing developer info as JS object
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -207,6 +207,7 @@ export default function HeroSection() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [revealed, setRevealed] = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setRevealed(true), 200);
     return () => clearTimeout(t);
@@ -228,15 +229,14 @@ export default function HeroSection() {
         padding: "80px 8vw 0",
       }}
     >
-      <div
-        style={{
-          width: "100%",
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "clamp(2rem, 5vw, 6rem)",
-          alignItems: "center",
-        }}
-        className="hero-grid"
+      <div style={{
+        width: "100%",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "clamp(2rem, 5vw, 6rem)",
+        alignItems: "center",
+      }}
+      className="hero-grid"
       >
         {/* ── LEFT: Text ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", overflow: "visible", minWidth: 0 }}>
