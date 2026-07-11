@@ -216,8 +216,8 @@ export default function HeroSection() {
       style={{
         position: "relative", zIndex: 2,
         minHeight: "100vh",
-        display: "flex", alignItems: "center",
-        padding: "0 clamp(1.5rem, 6vw, 5rem)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "80px clamp(1.5rem, 6vw, 5rem) 0",
       }}
     >
       <div style={{
