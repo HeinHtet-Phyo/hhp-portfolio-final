@@ -141,7 +141,6 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
           : "0 0 0 1px rgba(0,0,0,0.06), 0 20px 60px rgba(0,0,0,0.12)",
         overflow: "hidden",
         width: "100%",
-        maxWidth: 560,
         position: "relative" as const,
       }}
     >
@@ -219,7 +218,7 @@ export default function HeroSection() {
         position: "relative", zIndex: 2,
         minHeight: "100vh",
         display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "80px clamp(1rem, 3.5vw, 4rem) 0",
+        padding: "80px 5vw 0",
       }}
     >
       <div style={{
@@ -375,7 +374,7 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "stretch", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>
