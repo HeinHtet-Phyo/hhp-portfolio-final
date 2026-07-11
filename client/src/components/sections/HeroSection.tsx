@@ -44,77 +44,77 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
   // Each line: array of {text, color} spans for syntax highlighting
   const lines: { spans: { text: string; color: string }[] }[] = [
     { spans: [
-      { text: "developer", color: "rgba(255,255,255,0.90)" },
-      { text: " = {", color: "rgba(255,255,255,0.60)" },
+      { text: "developer", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: " = {", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"name"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"Hein Htet Phyo"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"name"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"Hein Htet Phyo"', color: isDark ? "#4ade80" : "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"location"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"London, UK"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"location"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"London, UK"', color: isDark ? "#4ade80" : "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"degree"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"BSc Data Science & AI"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"degree"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"BSc Data Science & AI"', color: isDark ? "#4ade80" : "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"university"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"UWE Bristol"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"university"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"UWE Bristol"', color: isDark ? "#4ade80" : "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"open_to"', color: "rgba(255,255,255,0.90)" },
-      { text: ": [", color: "rgba(255,255,255,0.60)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"open_to"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": [", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
     ]},
     { spans: [
-      { text: "        ", color: "rgba(255,255,255,0.90)" },
-      { text: '"AI Engineer"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"AI Engineer"', color: "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "        ", color: "rgba(255,255,255,0.90)" },
-      { text: '"Data Scientist"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"Data Scientist"', color: "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "        ", color: "rgba(255,255,255,0.90)" },
-      { text: '"ML Engineer"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"ML Engineer"', color: "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: "],", color: "rgba(255,255,255,0.60)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: "],", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"seeking"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"Full-time roles in AI & Data"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"seeking"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"Full-time roles in AI & Data"', color: "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"status"', color: "rgba(255,255,255,0.90)" },
-      { text: ": ", color: "rgba(255,255,255,0.60)" },
-      { text: '"Open to work 🚀"', color: "#4ade80" },
-      { text: ",", color: "rgba(255,255,255,0.40)" },
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: '"status"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(0,0,0,0.85)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
+      { text: '"Open to work 🚀"', color: "#16a34a" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(0,0,0,0.35)" },
     ]},
     { spans: [
-      { text: "}", color: "rgba(255,255,255,0.60)" },
+      { text: "}", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(0,0,0,0.50)" },
     ]},
   ];
 
@@ -131,12 +131,14 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
       transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
       style={{
-        background: "rgba(5,5,10,0.88)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        background: isDark ? "rgba(5,5,10,0.88)" : "rgba(248,248,250,0.96)",
+        border: isDark ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(0,0,0,0.10)",
         borderRadius: "12px",
         backdropFilter: "blur(24px)",
         WebkitBackdropFilter: "blur(24px)",
-        boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
+        boxShadow: isDark
+          ? "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset"
+          : "0 0 0 1px rgba(0,0,0,0.06), 0 20px 60px rgba(0,0,0,0.12)",
         overflow: "hidden",
         width: "100%",
         maxWidth: 560,
@@ -147,8 +149,8 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "12px 16px",
-        borderBottom: "1px solid rgba(255,255,255,0.07)",
-        background: "rgba(255,255,255,0.025)",
+        borderBottom: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid rgba(0,0,0,0.07)",
+        background: isDark ? "rgba(255,255,255,0.025)" : "rgba(0,0,0,0.03)",
       }}>
         <div style={{ display: "flex", gap: 7 }}>
           <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
@@ -157,7 +159,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         </div>
         <span style={{
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.7rem", color: "rgba(255,255,255,0.35)",
+          fontSize: "0.7rem", color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)",
           letterSpacing: "0.05em",
         }}>portfolio.py</span>
         <div style={{ width: 52 }} />
@@ -172,7 +174,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
           <div key={i} style={{ whiteSpace: "pre" }}>
-            <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.20)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(i + 1).padStart(2, "0")}
             </span>
             {line.spans.map((span, j) => (
@@ -181,8 +183,8 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
           </div>
         ))}
         {linesDone < lines.length && (
-          <div style={{ color: "rgba(255,255,255,0.5)", whiteSpace: "pre" }}>
-            <span style={{ color: "rgba(255,255,255,0.18)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+          <div style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)", whiteSpace: "pre" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.20)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(linesDone + 1).padStart(2, "0")}
             </span>
             <span className="typing-cursor" style={{ color: "#60a5fa" }} />
@@ -372,7 +374,7 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "stretch", alignItems: "center" }}>
           <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>

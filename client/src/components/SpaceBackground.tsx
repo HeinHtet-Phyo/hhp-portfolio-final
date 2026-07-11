@@ -118,7 +118,7 @@ export default function SpaceBackground() {
         ctx.arc(px, py, s.r, 0, Math.PI * 2);
         ctx.fillStyle = isDark
           ? `rgba(255,255,255,${alpha})`
-          : `rgba(10,10,10,${alpha * 0.7})`;
+          : `rgba(15,15,20,${alpha})`;
         ctx.fill();
       }
 
