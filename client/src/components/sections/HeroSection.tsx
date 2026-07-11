@@ -141,6 +141,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
           : "0 0 0 1px rgba(0,0,0,0.06), 0 20px 60px rgba(0,0,0,0.12)",
         overflow: "hidden",
         width: "100%",
+        maxWidth: 560,
         position: "relative" as const,
       }}
     >
@@ -225,8 +226,8 @@ export default function HeroSection() {
         width: "100%", maxWidth: "1280px",
         marginLeft: "auto", marginRight: "auto",
         display: "grid",
-        gridTemplateColumns: "1.1fr 1.2fr",
-        gap: "clamp(1.5rem, 3vw, 4rem)",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "clamp(2rem, 5vw, 6rem)",
         alignItems: "center",
       }}
       className="hero-grid"
@@ -374,7 +375,7 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", paddingRight: "2vw" }}>
           <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>
