@@ -101,8 +101,8 @@ export default function AboutSection() {
               style={{
                 overflow: "hidden",
                 borderRadius: "6px",
-                aspectRatio: "4/5",
-                maxHeight: "480px",
+                aspectRatio: "3/4",
+                maxHeight: "420px",
                 width: "100%",
                 position: "relative",
               }}
@@ -132,7 +132,7 @@ export default function AboutSection() {
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  objectPosition: "center top",
+                  objectPosition: "center 30%",
                   display: "block",
                 }}
               />
