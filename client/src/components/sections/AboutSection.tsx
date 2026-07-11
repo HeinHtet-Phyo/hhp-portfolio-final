@@ -134,8 +134,9 @@ export default function AboutSection() {
                   objectFit: "cover",
                   objectPosition: "center 15%",
                   display: "block",
-                  filter: photoHovered ? "saturate(1.0) brightness(1.0)" : "saturate(0.2) brightness(0.8)",
-                  transition: "filter 0.6s ease",
+                  transform: photoHovered ? "scale(1.06)" : "scale(1.0)",
+                  transition: "transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)",
+                  transformOrigin: "center center",
                 }}
               />
               {/* Bottom gradient */}
