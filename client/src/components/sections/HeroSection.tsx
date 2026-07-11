@@ -139,7 +139,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
         overflow: "hidden",
         width: "100%",
-        maxWidth: 580,
+        maxWidth: 520,
         position: "relative" as const,
       }}
     >
@@ -167,8 +167,8 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       <div style={{
         padding: "24px 32px 28px",
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "clamp(0.72rem, 1.4vw, 0.82rem)",
-        lineHeight: 1.75,
+        fontSize: "clamp(0.62rem, 1.1vw, 0.70rem)",
+        lineHeight: 1.65,
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
           <div key={i} style={{ whiteSpace: "pre" }}>
