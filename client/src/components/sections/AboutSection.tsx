@@ -101,8 +101,7 @@ export default function AboutSection() {
               style={{
                 overflow: "hidden",
                 borderRadius: "6px",
-                aspectRatio: "4/5",
-                maxHeight: "520px",
+                aspectRatio: "3/4",
                 width: "100%",
                 position: "relative",
               }}
@@ -132,11 +131,8 @@ export default function AboutSection() {
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                  objectPosition: "center 15%",
+                  objectPosition: "center top",
                   display: "block",
-                  transform: photoHovered ? "scale(1.06)" : "scale(1.0)",
-                  transition: "transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)",
-                  transformOrigin: "center center",
                 }}
               />
               {/* Bottom gradient */}
