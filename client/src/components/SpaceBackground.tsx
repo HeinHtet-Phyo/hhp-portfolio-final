@@ -23,11 +23,11 @@ interface Star {
 }
 
 const LAYERS = [
-  { count:  650, rMin: 0.25, rMax: 0.48, oMin: 0.92, oMax: 1.00, drift: 2.5 },
-  { count:  400, rMin: 0.32, rMax: 0.60, oMin: 0.94, oMax: 1.00, drift: 4.0 },
-  { count:  220, rMin: 0.42, rMax: 0.78, oMin: 0.95, oMax: 1.00, drift: 6.0 },
-  { count:  110, rMin: 0.55, rMax: 0.95, oMin: 0.97, oMax: 1.00, drift: 8.5 },
-  { count:   55, rMin: 0.70, rMax: 1.25, oMin: 0.98, oMax: 1.00, drift: 12.0 },
+  { count:  480, rMin: 0.25, rMax: 0.48, oMin: 0.92, oMax: 1.00, drift: 2.5 },
+  { count:  300, rMin: 0.32, rMax: 0.60, oMin: 0.94, oMax: 1.00, drift: 4.0 },
+  { count:  165, rMin: 0.42, rMax: 0.78, oMin: 0.95, oMax: 1.00, drift: 6.0 },
+  { count:   85, rMin: 0.55, rMax: 0.95, oMin: 0.97, oMax: 1.00, drift: 8.5 },
+  { count:   42, rMin: 0.70, rMax: 1.25, oMin: 0.98, oMax: 1.00, drift: 12.0 },
 ];
 
 function buildStars(W: number, H: number): Star[] {
