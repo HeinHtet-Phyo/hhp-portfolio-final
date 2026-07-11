@@ -83,15 +83,7 @@ export default function AboutSection() {
         >
           01 — About
         </span>
-        {/* Full-width horizontal rule */}
-        <span
-          style={{
-            flex: 1,
-            height: "1px",
-            background: "rgba(255,255,255,0.12)",
-            display: "block",
-          }}
-        />
+
       </div>
 
       {/* Main layout — left photo col, right bio col */}
