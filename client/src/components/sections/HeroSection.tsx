@@ -139,7 +139,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
         overflow: "hidden",
         width: "100%",
-        maxWidth: 660,
+        maxWidth: 560,
         position: "relative" as const,
       }}
     >
@@ -165,9 +165,9 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
 
       {/* Code content */}
       <div style={{
-        padding: "26px 36px 30px",
+        padding: "22px 28px 26px",
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "clamp(0.72rem, 1.35vw, 0.88rem)",
+        fontSize: "clamp(0.65rem, 1.15vw, 0.77rem)",
         lineHeight: 1.7,
       }}>
         {lines.slice(0, linesDone).map((line, i) => (
@@ -230,7 +230,7 @@ export default function HeroSection() {
       className="hero-grid"
       >
         {/* ── LEFT: Text ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", overflow: "visible", minWidth: 0 }}>
 
           {/* Available badge */}
           <motion.div {...fadeUp(0.1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
@@ -281,6 +281,9 @@ export default function HeroSection() {
             fontSize: "clamp(0.9rem, 2vw, 1.1rem)",
             fontWeight: 600,
             color: isDark ? "rgba(255,255,255,0.85)" : "#1e293b",
+            overflow: "visible",
+            whiteSpace: "pre",
+            display: "block",
           }}>
             <TypingRole isDark={isDark} />
           </motion.p>
