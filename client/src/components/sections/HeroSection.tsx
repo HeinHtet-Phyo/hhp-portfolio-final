@@ -49,53 +49,66 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"name"', color: "#4ade80" },
+      { text: '"name"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"Hein Htet Phyo"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"location"', color: "#4ade80" },
+      { text: '"location"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"London, UK"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"degree"', color: "#4ade80" },
+      { text: '"degree"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"BSc Data Science & AI"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"university"', color: "#4ade80" },
+      { text: '"university"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"UWE Bristol"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"open_to"', color: "#4ade80" },
+      { text: '"open_to"', color: "rgba(255,255,255,0.90)" },
       { text: ": [", color: "rgba(255,255,255,0.60)" },
+    ]},
+    { spans: [
+      { text: "        ", color: "rgba(255,255,255,0.90)" },
       { text: '"AI Engineer"', color: "#4ade80" },
-      { text: ", ", color: "rgba(255,255,255,0.40)" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "        ", color: "rgba(255,255,255,0.90)" },
       { text: '"Data Scientist"', color: "#4ade80" },
-      { text: ", ", color: "rgba(255,255,255,0.40)" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
+    ]},
+    { spans: [
+      { text: "        ", color: "rgba(255,255,255,0.90)" },
       { text: '"ML Engineer"', color: "#4ade80" },
-      { text: "],", color: "rgba(255,255,255,0.40)" },
+      { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"seeking"', color: "#4ade80" },
+      { text: "],", color: "rgba(255,255,255,0.60)" },
+    ]},
+    { spans: [
+      { text: "    ", color: "rgba(255,255,255,0.90)" },
+      { text: '"seeking"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"Full-time roles in AI & Data"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
     ]},
     { spans: [
       { text: "    ", color: "rgba(255,255,255,0.90)" },
-      { text: '"status"', color: "#4ade80" },
+      { text: '"status"', color: "rgba(255,255,255,0.90)" },
       { text: ": ", color: "rgba(255,255,255,0.60)" },
       { text: '"Open to work 🚀"', color: "#4ade80" },
       { text: ",", color: "rgba(255,255,255,0.40)" },
@@ -126,7 +139,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
         boxShadow: "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset",
         overflow: "hidden",
         width: "100%",
-        maxWidth: 480,
+        maxWidth: 580,
         position: "relative" as const,
       }}
     >
@@ -152,7 +165,7 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
 
       {/* Code content */}
       <div style={{
-        padding: "20px 24px 24px",
+        padding: "24px 32px 28px",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: "clamp(0.72rem, 1.4vw, 0.82rem)",
         lineHeight: 1.75,
@@ -210,7 +223,7 @@ export default function HeroSection() {
       <div style={{
         width: "100%", maxWidth: 1200, margin: "0 auto",
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
+        gridTemplateColumns: "1fr 1.2fr",
         gap: "clamp(2rem, 5vw, 4rem)",
         alignItems: "center",
       }}
@@ -354,7 +367,7 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+        <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
           <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>
