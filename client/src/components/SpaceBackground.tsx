@@ -95,6 +95,12 @@ export default function SpaceBackground() {
     let t = 0;
     let frame = 0;
 
+    // Global drift: slow flow direction
+    const flowAngle = Math.PI * 0.15; // gentle diagonal
+    const flowSpeed = 0.08; // pixels per frame
+    const flowVX = Math.cos(flowAngle) * flowSpeed;
+    const flowVY = Math.sin(flowAngle) * flowSpeed;
+
     const shoots: ShootingStar[] = [];
     shoots.push(spawnShoot(W, H));
     let nextShoot = 140;
@@ -106,6 +112,16 @@ export default function SpaceBackground() {
       const isDark = theme === "dark";
       ctx.fillStyle = isDark ? "#000000" : "#f0f0f0";
       ctx.fillRect(0, 0, W, H);
+
+      // Apply global flow — wrap stars around edges
+      for (const s of stars) {
+        s.x += flowVX;
+        s.y += flowVY;
+        if (s.x > W + 2) s.x -= W + 4;
+        if (s.x < -2) s.x += W + 4;
+        if (s.y > H + 2) s.y -= H + 4;
+        if (s.y < -2) s.y += H + 4;
+      }
 
       for (const s of stars) {
         const px = s.x + Math.sin(t * s.freqX + s.phaseX) * s.driftX;
