@@ -74,8 +74,8 @@ export default function AboutSection() {
         className="about-main-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "42% 1fr",
-          gap: "4vw",
+          gridTemplateColumns: "32% 1fr",
+          gap: "5vw",
           alignItems: "start",
         }}
       >
@@ -101,8 +101,6 @@ export default function AboutSection() {
               style={{
                 overflow: "hidden",
                 borderRadius: "6px",
-                aspectRatio: "3/4",
-                maxHeight: "420px",
                 width: "100%",
                 position: "relative",
               }}
@@ -130,10 +128,10 @@ export default function AboutSection() {
                 alt="Hein Htet Phyo"
                 style={{
                   width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  objectPosition: "center 30%",
+                  height: "auto",
                   display: "block",
+                  transform: photoHovered ? "scale(1.06)" : "scale(1)",
+                  transition: "transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)",
                 }}
               />
               {/* Bottom gradient */}
