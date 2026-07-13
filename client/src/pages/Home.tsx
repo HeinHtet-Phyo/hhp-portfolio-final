@@ -52,8 +52,8 @@ export default function Home() {
         <HeroSection />
         <AboutSection />
         <PlaceholderSection id="projects" label="Projects" />
-        <ExperienceSection />
         <SkillsSection />
+        <ExperienceSection />
         <PlaceholderSection id="contact" label="Contact" />
       </main>
     </div>

@@ -34,6 +34,8 @@ const SKILLS: Record<string, { name: string; icon: string }[]> = {
     { name: "Flask", icon: `${DEVICON}/flask/flask-original.svg` },
     { name: "Java", icon: `${DEVICON}/java/java-original.svg` },
     { name: "Spring Boot", icon: `${DEVICON}/spring/spring-original.svg` },
+    { name: "Express.js", icon: `${DEVICON}/express/express-original.svg` },
+    { name: "GraphQL", icon: `${DEVICON}/graphql/graphql-plain.svg` },
   ],
   "Databases & Tools": [
     { name: "PostgreSQL", icon: `${DEVICON}/postgresql/postgresql-original.svg` },
@@ -45,19 +47,22 @@ const SKILLS: Record<string, { name: string; icon: string }[]> = {
     { name: "GitHub", icon: `${DEVICON}/github/github-original.svg` },
     { name: "AWS", icon: `${DEVICON}/amazonwebservices/amazonwebservices-plain-wordmark.svg` },
     { name: "Linux", icon: `${DEVICON}/linux/linux-original.svg` },
+    { name: "Supabase", icon: `${DEVICON}/supabase/supabase-original.svg` },
+    { name: "Maven", icon: `${DEVICON}/maven/maven-original.svg` },
+    { name: "Vercel", icon: `${DEVICON}/vercel/vercel-original.svg` },
   ],
 };
 
 const ALL_SKILLS = Object.values(SKILLS).flat();
 
-// Split into 3 rows for marquee
+// Split into N rows for marquee
 function chunkIntoRows<T>(items: T[], rows: number): T[][] {
   const result: T[][] = Array.from({ length: rows }, () => []);
   items.forEach((item, i) => result[i % rows].push(item));
   return result;
 }
 
-const MARQUEE_ROWS = chunkIntoRows(ALL_SKILLS, 3);
+const MARQUEE_ROWS = chunkIntoRows(ALL_SKILLS, 4);
 
 // ── Pill ──────────────────────────────────────────────────────────────────────
 function Pill({ name, icon }: { name: string; icon: string }) {
@@ -282,6 +287,7 @@ export default function SkillsSection() {
             <MarqueeRow items={MARQUEE_ROWS[0]} direction="left" speed={50} />
             <MarqueeRow items={MARQUEE_ROWS[1]} direction="right" speed={62} />
             <MarqueeRow items={MARQUEE_ROWS[2]} direction="left" speed={42} />
+            <MarqueeRow items={MARQUEE_ROWS[3]} direction="right" speed={55} />
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
