@@ -6,6 +6,8 @@ import HeroSection from "../components/sections/HeroSection";
 import AboutSection from "../components/sections/AboutSection";
 import ExperienceSection from "../components/sections/ExperienceSection";
 import SkillsSection from "../components/sections/SkillsSection";
+import ContactSection from "../components/sections/ContactSection";
+import FooterSection from "../components/sections/FooterSection";
 
 // Placeholder sections — will be built section by section
 function PlaceholderSection({ id, label }: { id: string; label: string }) {
@@ -54,8 +56,11 @@ export default function Home() {
         <PlaceholderSection id="projects" label="Projects" />
         <SkillsSection />
         <ExperienceSection />
-        <PlaceholderSection id="contact" label="Contact" />
+        <ContactSection />
       </main>
+
+      {/* Footer */}
+      <FooterSection />
     </div>
   );
 }
