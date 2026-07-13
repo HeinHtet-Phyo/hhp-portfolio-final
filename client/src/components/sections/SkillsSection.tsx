@@ -186,8 +186,7 @@ export default function SkillsSection() {
       id="skills"
       ref={sectionRef}
       style={{
-        minHeight: "70vh",
-        padding: "6rem 8vw",
+        padding: "6rem 8vw 4rem",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
