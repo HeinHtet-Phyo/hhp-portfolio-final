@@ -462,12 +462,12 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
 
-  // Wireframe material — thin gray lines over the brain surface
+  // Wireframe material — barely-there hint of mesh texture, not dominant
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#cccccc",
+    color: "#ffffff",
     wireframe: true,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.05,
     depthWrite: false,
   }), []);
 
@@ -570,14 +570,10 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
 
   return (
     <>
-      {/* Bright inner core glow — contained within brain silhouette */}
+      {/* Bright inner core glow — tight sphere only, no large outer shadow */}
       <mesh position={[0, 0.08, 0]}>
-        <sphereGeometry args={[0.22, 32, 32]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      <mesh position={[0, 0.08, 0]}>
-        <sphereGeometry args={[0.14, 24, 24]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <sphereGeometry args={[0.13, 24, 24]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* Spinning brain group */}
       <group ref={groupRef}>
