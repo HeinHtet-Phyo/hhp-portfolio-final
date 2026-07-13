@@ -1,407 +1,400 @@
-// Dark Space Theme — Hero Section
-// Split-char name animation, typing roles, count-up stats, magnetic buttons, 3D neural network
+// Hero Section — Split layout: left text + right terminal code window
+// Inspired by reference: left has name/title/bio/buttons/socials
+// Right has a macOS-style terminal window showing developer info as JS object
 import { useEffect, useRef, useState } from "react";
-import { FiGithub, FiLinkedin, FiMail, FiArrowRight, FiDownload } from "react-icons/fi";
-import RobotPlayground from "../RobotPlayground";
+import { motion } from "framer-motion";
+import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
+import { useTheme } from "../../contexts/ThemeContext";
 
+// ── Typing Role ──
+const ROLES = ["Data Scientist", "AI Engineer", "ML Engineer", "Software Engineer"];
 
-const ROLES = ["Data Scientist", "AI Engineer", "ML Developer", "Data Analyst"];
-const NAME = "Hein Htet Phyo";
-
-const STATS = [
-  { value: 114, suffix: "K+", label: "Spotify Tracks" },
-  { value: 80, suffix: "%", label: "API Optimised" },
-  { value: 40, suffix: "%", label: "Report Time Cut" },
-  { value: 99.75, suffix: "%", label: "ML Accuracy" },
-];
-
-// Random fly-in directions for each character
-const getCharStyle = (i: number) => {
-  const directions = [
-    { "--tx": "-80px", "--ty": "-60px", "--tr": "-20deg" },
-    { "--tx": "60px", "--ty": "-80px", "--tr": "15deg" },
-    { "--tx": "-50px", "--ty": "70px", "--tr": "-10deg" },
-    { "--tx": "90px", "--ty": "40px", "--tr": "25deg" },
-    { "--tx": "-70px", "--ty": "-30px", "--tr": "-15deg" },
-    { "--tx": "50px", "--ty": "-70px", "--tr": "20deg" },
-    { "--tx": "-90px", "--ty": "50px", "--tr": "-25deg" },
-    { "--tx": "70px", "--ty": "80px", "--tr": "10deg" },
-    { "--tx": "-40px", "--ty": "-90px", "--tr": "-20deg" },
-    { "--tx": "80px", "--ty": "-40px", "--tr": "30deg" },
-    { "--tx": "-60px", "--ty": "60px", "--tr": "-12deg" },
-    { "--tx": "40px", "--ty": "90px", "--tr": "18deg" },
-    { "--tx": "-80px", "--ty": "30px", "--tr": "-22deg" },
-    { "--tx": "60px", "--ty": "-60px", "--tr": "14deg" },
-  ];
-  return directions[i % directions.length];
-};
-
-function SplitCharName({ name }: { name: string }) {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 600);
-    return () => clearTimeout(t);
-  }, []);
-
-  return (
-    <h1 style={{
-      fontFamily: "'Space Grotesk', sans-serif",
-      fontSize: "clamp(2.5rem, 6vw, 4.5rem)",
-      fontWeight: 700,
-      lineHeight: 1.1,
-      color: "white",
-      marginBottom: "0.5rem",
-      letterSpacing: "-0.02em",
-      whiteSpace: "nowrap",
-    }}>
-      {name.split(" ").map((word, wi) => (
-        <span key={wi} style={{ display: "inline-block", marginRight: "0.3em" }}>
-          {word.split("").map((char, ci) => {
-            const idx = wi * 10 + ci;
-            return (
-              <span
-                key={ci}
-                className="split-char"
-                style={{
-                  ...(getCharStyle(idx) as React.CSSProperties),
-                  animationDelay: visible ? `${idx * 0.04}s` : "999s",
-                  animationPlayState: visible ? "running" : "paused",
-                }}
-              >
-                {char}
-              </span>
-            );
-          })}
-        </span>
-      ))}
-    </h1>
-  );
-}
-
-function TypingRole() {
+function TypingRole({ isDark }: { isDark: boolean }) {
   const [roleIdx, setRoleIdx] = useState(0);
   const [text, setText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const role = ROLES[roleIdx];
-    let timeout: ReturnType<typeof setTimeout>;
-
+    let t: ReturnType<typeof setTimeout>;
     if (!deleting && text.length < role.length) {
-      timeout = setTimeout(() => setText(role.slice(0, text.length + 1)), 80);
+      t = setTimeout(() => setText(role.slice(0, text.length + 1)), 80);
     } else if (!deleting && text.length === role.length) {
-      timeout = setTimeout(() => setDeleting(true), 2000);
+      t = setTimeout(() => setDeleting(true), 2200);
     } else if (deleting && text.length > 0) {
-      timeout = setTimeout(() => setText(text.slice(0, -1)), 40);
-    } else if (deleting && text.length === 0) {
+      t = setTimeout(() => setText(text.slice(0, -1)), 40);
+    } else {
       setDeleting(false);
       setRoleIdx((i) => (i + 1) % ROLES.length);
     }
-
-    return () => clearTimeout(timeout);
+    return () => clearTimeout(t);
   }, [text, deleting, roleIdx]);
 
   return (
-    <div style={{
-      fontFamily: "'JetBrains Mono', monospace",
-      fontSize: "clamp(1rem, 2.5vw, 1.4rem)",
-      color: "var(--electric-blue)",
-      marginBottom: "1rem",
-      minHeight: "2rem",
-    }}>
-      <span>{text}</span>
-      <span style={{
-        display: "inline-block",
-        width: "2px",
-        height: "1.2em",
-        background: "var(--electric-blue)",
-        marginLeft: "2px",
-        verticalAlign: "middle",
-        animation: "blink 1s step-end infinite",
-      }} />
-      <style>{`@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }`}</style>
-    </div>
+    <span style={{ color: isDark ? "rgba(255,255,255,0.9)" : "#0a0a0a" }}>
+      {text}<span className="typing-cursor" style={{ color: isDark ? "rgba(255,255,255,0.9)" : "#0a0a0a" }} />
+    </span>
   );
 }
 
-function CountUpStat({ value, suffix, label }: { value: number; suffix: string; label: string }) {
-  const [count, setCount] = useState(0);
-  const started = useRef(false);
+// ── Terminal Code Window ──
+function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boolean }) {
+  const [linesDone, setLinesDone] = useState(0);
+
+  // Each line: array of {text, color} spans for syntax highlighting
+  const lines: { spans: { text: string; color: string }[] }[] = [
+    { spans: [
+      { text: "developer", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: " = {", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"name"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Hein Htet Phyo"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"location"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"London, UK"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"degree"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"BSc Data Science & AI"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"university"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"UWE Bristol"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"open_to"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": [", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+    ]},
+    { spans: [
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"AI Engineer"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"Data Scientist"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"ML Engineer"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: "],", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"seeking"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Full-time roles in AI & Data"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"focus"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Machine Learning & AI, Software Development"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "    ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: '"status"', color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
+      { text: ": ", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+      { text: '"Open to work 🚀"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
+    ]},
+    { spans: [
+      { text: "}", color: isDark ? "rgba(255,255,255,0.60)" : "rgba(10,10,10,0.65)" },
+    ]},
+  ];
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const duration = 2000;
-    const steps = 60;
-    const increment = value / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= value) {
-        setCount(value);
-        clearInterval(timer);
-      } else {
-        setCount(Math.floor(current));
-      }
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [value]);
+    if (!revealed) return;
+    if (linesDone >= lines.length) return;
+    const t = setTimeout(() => setLinesDone((n) => n + 1), 90);
+    return () => clearTimeout(t);
+  }, [revealed, linesDone, lines.length]);
 
   return (
-    <div className="stat-item">
-      <div className="stat-number glow-blue">
-        {count}{suffix}
+    <motion.div
+      initial={{ opacity: 0, x: 40, y: 20 }}
+      animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
+      transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      style={{
+        background: isDark ? "rgba(5,5,10,0.88)" : "rgba(232,234,238,0.98)",
+        border: isDark ? "1px solid rgba(255,255,255,0.10)" : "1px solid rgba(0,0,0,0.10)",
+        borderRadius: "12px",
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        boxShadow: isDark
+          ? "0 0 0 1px rgba(255,255,255,0.05), 0 30px 80px rgba(0,0,0,0.7), 0 0 60px rgba(255,255,255,0.02) inset"
+          : "0 0 0 1px rgba(0,0,0,0.06), 0 20px 60px rgba(0,0,0,0.12)",
+        overflow: "hidden",
+        width: "100%",
+        maxWidth: 560,
+        position: "relative" as const,
+      }}
+    >
+      {/* Title bar */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "12px 16px",
+        borderBottom: isDark ? "1px solid rgba(255,255,255,0.07)" : "1px solid rgba(0,0,0,0.07)",
+        background: isDark ? "rgba(255,255,255,0.025)" : "rgba(0,0,0,0.03)",
+      }}>
+        <div style={{ display: "flex", gap: 7 }}>
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#ff5f57" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#febc2e" }} />
+          <div style={{ width: 12, height: 12, borderRadius: "50%", background: "#28c840" }} />
+        </div>
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "0.7rem", color: isDark ? "rgba(255,255,255,0.35)" : "rgba(0,0,0,0.35)",
+          letterSpacing: "0.05em",
+        }}>portfolio.py</span>
+        <div style={{ width: 52 }} />
       </div>
-      <div className="stat-label">{label}</div>
-    </div>
+
+      {/* Code content */}
+      <div style={{
+        padding: "22px 28px 26px",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: "clamp(0.65rem, 1.15vw, 0.77rem)",
+        lineHeight: 1.7,
+      }}>
+        {lines.slice(0, linesDone).map((line, i) => (
+          <div key={i} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            {line.spans.map((span, j) => (
+              <span key={j} style={{ color: span.color }}>{span.text}</span>
+            ))}
+          </div>
+        ))}
+        {linesDone < lines.length && (
+          <div style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)", whiteSpace: "pre" }}>
+            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
+              {String(linesDone + 1).padStart(2, "0")}
+            </span>
+            <span className="typing-cursor" style={{ color: "#60a5fa" }} />
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }
 
+// ── Main Hero ──
 export default function HeroSection() {
-  const btnRef1 = useRef<HTMLButtonElement>(null);
-  const btnRef2 = useRef<HTMLButtonElement>(null);
-
-  // Magnetic button effect
-  const makeMagnetic = (ref: React.RefObject<HTMLButtonElement | null>) => {
-    const el = ref.current;
-    if (!el) return;
-
-    const onMove = (e: MouseEvent) => {
-      const rect = el.getBoundingClientRect();
-      const x = e.clientX - rect.left - rect.width / 2;
-      const y = e.clientY - rect.top - rect.height / 2;
-      const dist = Math.sqrt(x * x + y * y);
-      const maxDist = 80;
-      if (dist < maxDist) {
-        const factor = (1 - dist / maxDist) * 0.4;
-        el.style.transform = `translate(${x * factor}px, ${y * factor}px)`;
-      }
-    };
-
-    const onLeave = () => {
-      el.style.transform = "translate(0, 0)";
-      el.style.transition = "transform 0.4s cubic-bezier(0.23, 1, 0.32, 1)";
-    };
-
-    window.addEventListener("mousemove", onMove);
-    el.addEventListener("mouseleave", onLeave);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      el.removeEventListener("mouseleave", onLeave);
-    };
-  };
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
-    const c1 = makeMagnetic(btnRef1);
-    const c2 = makeMagnetic(btnRef2);
-    return () => { c1?.(); c2?.(); };
+    const t = setTimeout(() => setRevealed(true), 200);
+    return () => clearTimeout(t);
   }, []);
+
+  const fadeUp = (delay: number) => ({
+    initial: { opacity: 0, y: 24 },
+    animate: revealed ? { opacity: 1, y: 0 } : {},
+    transition: { duration: 0.75, delay, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  });
 
   return (
     <section
       id="hero"
       style={{
+        position: "relative", zIndex: 2,
         minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        background: "#000000",
-        backgroundImage: "url('/manus-storage/hero-bg_46db4527.png')",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-        backgroundRepeat: "no-repeat",
-        position: "relative",
-        zIndex: 1,
-        paddingTop: "80px",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "80px 8vw 0",
       }}
     >
-      <div className="container" style={{ width: "100%" }}>
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "4rem",
-          alignItems: "center",
-        }}
-          className="hero-grid"
-        >
-          {/* Left Column */}
-          <div>
-            {/* Status Pill */}
-            <div style={{ marginBottom: "1.5rem" }}>
-              <div className="status-pill">
-                <div className="status-dot" />
-                Available for Work · London, UK
-              </div>
-            </div>
+      <div style={{
+        width: "100%",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "clamp(2rem, 5vw, 6rem)",
+        alignItems: "center",
+      }}
+      className="hero-grid"
+      >
+        {/* ── LEFT: Text ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", overflow: "visible", minWidth: 0 }}>
 
-            {/* Name */}
-            <SplitCharName name={NAME} />
-
-            {/* Typing Role */}
-            <TypingRole />
-
-            {/* Credential */}
+          {/* Available badge */}
+          <motion.div {...fadeUp(0.1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
             <div style={{
+              display: "inline-flex", alignItems: "center", gap: "0.5rem",
+              padding: "0.35rem 0.9rem",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`,
+              borderRadius: 999,
               fontFamily: "'JetBrains Mono', monospace",
-              fontSize: "0.78rem",
-              color: "rgba(255,255,255,0.5)",
-              marginBottom: "1.25rem",
-              letterSpacing: "0.03em",
+              fontSize: "0.7rem", letterSpacing: "0.08em",
+              color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)",
             }}>
-              <span style={{ color: "var(--electric-blue)" }}>✦</span> First Class Honours · BSc Data Science &amp; AI · UWE Bristol
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e", display: "inline-block" }} />
+              Available for opportunities
             </div>
+          </motion.div>
 
-            {/* Description */}
-            <p style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: "1rem",
-              color: "rgba(255,255,255,0.6)",
-              lineHeight: 1.7,
-              marginBottom: "2rem",
-              maxWidth: "480px",
+          {/* Name */}
+          <div>
+            <motion.div {...fadeUp(0.2)} style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
+              fontWeight: 900, lineHeight: 0.92,
+              letterSpacing: "-0.03em",
+              color: isDark ? "white" : "#0a0a0a",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}>
-              99.75% ML accuracy. 114K+ Spotify tracks processed. 5M+ payment users served.
-              I build data systems that deliver measurable impact at scale.
-            </p>
-
-            {/* Stats */}
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "1rem",
-              marginBottom: "2rem",
-              padding: "1.25rem",
-              background: "rgba(255,255,255,0.02)",
-              border: "1px solid rgba(255,255,255,0.05)",
-              borderRadius: "8px",
+              Hein Htet
+            </motion.div>
+            <motion.div {...fadeUp(0.28)} style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
+              fontWeight: 900, lineHeight: 0.92,
+              letterSpacing: "-0.03em",
+              WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
+              color: "transparent",
+              textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}>
-              {STATS.map((s) => (
-                <CountUpStat key={s.label} {...s} />
-              ))}
-            </div>
+              Phyo
+            </motion.div>
+          </div>
 
-            {/* Social Icons */}
-            <div style={{ display: "flex", gap: "0.75rem", marginBottom: "2rem" }}>
-              <a href="https://github.com/HeinHtet-Phyo" target="_blank" rel="noopener noreferrer" className="social-icon">
-                <FiGithub size={18} />
-              </a>
-              <a href="https://linkedin.com/in/hein-htet-phyo" target="_blank" rel="noopener noreferrer" className="social-icon">
-                <FiLinkedin size={18} />
-              </a>
-              <a href="mailto:heinhtetphyo56@gmail.com" className="social-icon">
-                <FiMail size={18} />
-              </a>
-            </div>
+          {/* Typing role */}
+          <motion.p {...fadeUp(0.36)} style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: "clamp(1rem, 2.2vw, 1.25rem)",
+            fontWeight: 600,
+            color: isDark ? "rgba(255,255,255,0.85)" : "#1e293b",
+            overflow: "visible",
+            whiteSpace: "nowrap",
+            display: "block",
+            minWidth: 0,
+          }}>
+            <TypingRole isDark={isDark} />
+          </motion.p>
 
-            {/* CTA Buttons */}
-            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-              <button
-                ref={btnRef1}
-                className="btn-magnetic btn-primary"
-                onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
-              >
-                View Projects <FiArrowRight size={16} />
-              </button>
-              <button
-                ref={btnRef2}
-                className="btn-magnetic btn-outline"
-                onClick={() => {
-                  // Download CV placeholder
-                  const link = document.createElement("a");
-                  link.href = "#";
-                  link.download = "HeinHtetPhyo_CV.pdf";
-                  link.click();
+          {/* Bio */}
+          <motion.p {...fadeUp(0.44)} style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "clamp(0.95rem, 1.75vw, 1.1rem)",
+            lineHeight: 1.8, fontWeight: 300,
+            color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.55)",
+            maxWidth: 520,
+          }}>
+            BSc Data Science & AI — UWE Bristol. Specialising in machine learning,
+            deep learning, and building intelligent systems that solve real problems.
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div {...fadeUp(0.52)} style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+            <motion.button
+              onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.75rem 1.5rem",
+                background: isDark ? "white" : "#0a0a0a",
+                color: isDark ? "black" : "white", border: "none",
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "0.95rem", fontWeight: 700,
+                letterSpacing: "0.04em", cursor: "pointer",
+                borderRadius: "6px",
+              }}
+            >
+              View Projects <ArrowUpRight size={15} />
+            </motion.button>
+
+            <motion.a
+              href="mailto:heinhtetphyo@email.com"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: "flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.75rem 1.5rem",
+                background: "transparent",
+                color: isDark ? "rgba(255,255,255,0.8)" : "#1e293b",
+                border: `1px solid ${isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.2)"}`,
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "0.95rem", fontWeight: 600,
+                letterSpacing: "0.04em", cursor: "pointer",
+                borderRadius: "6px", textDecoration: "none",
+              }}
+            >
+              Let's Talk <Mail size={15} />
+            </motion.a>
+          </motion.div>
+
+          {/* Social Links */}
+          <motion.div {...fadeUp(0.60)} style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
+            {[
+              { icon: Github, href: "https://github.com/heinhtetphyo", label: "GitHub" },
+              { icon: Linkedin, href: "https://linkedin.com/in/heinhtetphyo", label: "LinkedIn" },
+              { icon: Twitter, href: "https://twitter.com/heinhtetphyo", label: "Twitter" },
+              { icon: Mail, href: "mailto:heinhtetphyo@email.com", label: "Email" },
+            ].map(({ icon: Icon, href, label }) => (
+              <motion.a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                whileHover={{ scale: 1.1, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                title={label}
+                style={{
+                  width: 40, height: 40, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`,
+                  background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+                  color: isDark ? "rgba(255,255,255,0.6)" : "rgba(0,0,0,0.55)",
+                  textDecoration: "none", transition: "all 0.2s",
                 }}
               >
-                <FiDownload size={16} /> Download CV
-              </button>
-            </div>
-          </div>
+                <Icon size={16} />
+              </motion.a>
+            ))}
+          </motion.div>
+        </div>
 
-          {/* Right Column */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
-            {/* 3D Robot — GLB Viewer */}
-            <RobotPlayground />
-
-            {/* Profile Photo Placeholder */}
-            <div style={{ position: "relative", width: "180px", height: "180px" }}>
-              {/* Spinning gradient ring */}
-              <svg
-                className="photo-ring"
-                style={{ position: "absolute", inset: "-8px", width: "calc(100% + 16px)", height: "calc(100% + 16px)" }}
-                viewBox="0 0 196 196"
-              >
-                <defs>
-                  <linearGradient id="ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#00d4ff" />
-                    <stop offset="50%" stopColor="#7c3aed" />
-                    <stop offset="100%" stopColor="#00d4ff" />
-                  </linearGradient>
-                </defs>
-                <circle cx="98" cy="98" r="94" fill="none" stroke="url(#ring-grad)" strokeWidth="2" strokeDasharray="60 20" />
-              </svg>
-              {/* Photo */}
-              <div style={{
-                width: "180px",
-                height: "180px",
-                borderRadius: "50%",
-                overflow: "hidden",
-                border: "3px solid rgba(0,212,255,0.3)",
-              }}>
-                <img
-                  src="/manus-storage/profile-placeholder_ecf77c3b.png"
-                  alt="Hein Htet Phyo"
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                    (e.target as HTMLImageElement).parentElement!.innerHTML = '<div class="profile-placeholder" style="border-radius:50%;font-size:3rem;width:100%;height:100%;display:flex;align-items:center;justify-content:center;">HHP</div>';
-                  }}
-                />
-              </div>
-            </div>
-          </div>
+        {/* ── RIGHT: Terminal Window ── */}
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+          <TerminalWindow isDark={isDark} revealed={revealed} />
         </div>
       </div>
 
-      {/* Scroll indicator */}
-      <div style={{
-        position: "absolute",
-        bottom: "2rem",
-        left: "50%",
-        transform: "translateX(-50%)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "0.5rem",
-        opacity: 0.4,
-      }}>
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.65rem",
-          color: "white",
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-        }}>scroll</div>
-        <div style={{
-          width: "1px",
-          height: "40px",
-          background: "linear-gradient(to bottom, rgba(0,212,255,0.8), transparent)",
-          animation: "scroll-line 2s ease-in-out infinite",
-        }} />
-        <style>{`
-          @keyframes scroll-line {
-            0% { transform: scaleY(0); transform-origin: top; }
-            50% { transform: scaleY(1); transform-origin: top; }
-            51% { transform: scaleY(1); transform-origin: bottom; }
-            100% { transform: scaleY(0); transform-origin: bottom; }
+      {/* Responsive styles */}
+      <style>{`
+        @media (max-width: 768px) {
+          .hero-grid {
+            grid-template-columns: 1fr !important;
           }
-          @media (max-width: 768px) {
-            .hero-grid {
-              grid-template-columns: 1fr !important;
-            }
-          }
-        `}</style>
-      </div>
+        }
+      `}</style>
     </section>
   );
 }

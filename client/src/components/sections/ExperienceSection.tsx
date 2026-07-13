@@ -1,250 +1,311 @@
-// Dark Space Theme — Experience Section
-// Terminal CLI design with traffic light dots, skill progress bars
-import { useEffect, useRef } from "react";
+// Experience Section — vertical center timeline, alternating left/right cards
+// Scroll-triggered reveal per card, cyan/purple accent, JetBrains Mono
+// Real work experience data preserved
 
+import { useState, useEffect, useRef } from "react";
+
+// ── Data ──────────────────────────────────────────────────────────────────────
 const EXPERIENCES = [
   {
     company: "KBZ Pay",
     role: "Software Engineer Intern",
     period: "Sep 2024 – Feb 2025",
-    file: "kbzpay.sh",
+    type: "work",
     color: "#00d4ff",
-    lines: [
-      { type: "prompt", text: "cat role.txt" },
-      { type: "output", text: "Software Engineer Intern @ KBZ Pay" },
-      { type: "prompt", text: "cat achievements.txt" },
-      { type: "highlight", text: "✓ Built QR payment system for 5M+ users" },
-      { type: "highlight", text: "✓ Optimised API response time by 80%" },
-      { type: "highlight", text: "✓ Integrated MPT Ooredoo payment gateway" },
-      { type: "highlight", text: "✓ Delivered features in Agile sprints" },
-      { type: "prompt", text: "cat stack.txt" },
-      { type: "output", text: "Java · Spring Boot · REST API · MySQL · Git · Agile" },
+    bullets: [
+      "Built QR payment system serving 5M+ users.",
+      "Optimised API response time by 80% through query refactoring.",
+      "Integrated MPT Ooredoo payment gateway end-to-end.",
+      "Delivered features in Agile sprints with cross-functional teams.",
     ],
-    skills: [
-      { name: "Java", level: 80 },
-      { name: "API Development", level: 85 },
-      { name: "MySQL", level: 80 },
-    ],
+    stack: "Java · Spring Boot · REST API · MySQL · Git · Agile",
   },
   {
     company: "City Mart Holding (CMHL)",
     role: "Data Analyst Intern",
     period: "Apr 2025 – Jun 2025",
-    file: "citymart.sh",
+    type: "work",
     color: "#7c3aed",
-    lines: [
-      { type: "prompt", text: "cat role.txt" },
-      { type: "output", text: "Data Analyst Intern @ City Mart Holding CMHL" },
-      { type: "prompt", text: "cat achievements.txt" },
-      { type: "highlight", text: "✓ Built Power BI dashboards, cut reporting time 40%" },
-      { type: "highlight", text: "✓ SAP HANA data extraction across 200+ branches" },
-      { type: "highlight", text: "✓ SQL analysis for business intelligence" },
-      { type: "prompt", text: "cat stack.txt" },
-      { type: "output", text: "Power BI · SAP HANA · SQL · Excel · Python · pandas" },
+    bullets: [
+      "Built Power BI dashboards, cutting reporting time by 40%.",
+      "Extracted and transformed data from SAP HANA across 200+ branches.",
+      "Wrote SQL queries for business intelligence and trend analysis.",
     ],
-    skills: [
-      { name: "Power BI", level: 85 },
-      { name: "SQL", level: 85 },
-      { name: "Data Analysis", level: 90 },
-    ],
+    stack: "Power BI · SAP HANA · SQL · Excel · Python · pandas",
   },
   {
     company: "McDonald's Bristol",
     role: "Customer Service Representative",
     period: "Oct 2025 – May 2026",
-    file: "mcdonalds.sh",
+    type: "work",
     color: "#febc2e",
-    lines: [
-      { type: "prompt", text: "cat role.txt" },
-      { type: "output", text: "Customer Service Representative @ McDonald's Bristol" },
-      { type: "prompt", text: "cat achievements.txt" },
-      { type: "highlight", text: "✓ High-volume customer service in fast-paced environment" },
-      { type: "highlight", text: "✓ Team collaboration and communication skills" },
-      { type: "highlight", text: "✓ Maintained quality standards under pressure" },
+    bullets: [
+      "High-volume customer service in a fast-paced environment.",
+      "Collaborated with team to maintain quality and speed standards.",
+      "Developed strong communication and time-management skills.",
     ],
-    skills: [
-      { name: "Communication", level: 90 },
-      { name: "Teamwork", level: 85 },
-    ],
+    stack: "Communication · Teamwork · Customer Service",
   },
   {
-    company: "GUSTO College",
+    company: "GUSTO College Myanmar",
     role: "IT Support",
     period: "Apr 2024 – Jun 2024",
-    file: "gusto-it.sh",
+    type: "work",
     color: "#28c840",
-    lines: [
-      { type: "prompt", text: "cat role.txt" },
-      { type: "output", text: "IT Support @ GUSTO College Myanmar" },
-      { type: "prompt", text: "cat achievements.txt" },
-      { type: "highlight", text: "✓ Supported 500+ students and staff" },
-      { type: "highlight", text: "✓ 100% issue resolution rate" },
-      { type: "highlight", text: "✓ Network and hardware troubleshooting" },
+    bullets: [
+      "Supported 500+ students and staff with technical issues.",
+      "Achieved 100% issue resolution rate across all tickets.",
+      "Handled network and hardware troubleshooting independently.",
     ],
-    skills: [
-      { name: "IT Support", level: 90 },
-      { name: "Networking", level: 70 },
-    ],
+    stack: "IT Support · Networking · Hardware · Troubleshooting",
   },
 ];
 
-function TerminalWindow({ exp }: { exp: typeof EXPERIENCES[0] }) {
+// ── useInView ─────────────────────────────────────────────────────────────────
+function useInView(threshold = 0.1) {
   const ref = useRef<HTMLDivElement>(null);
-
+  const [inView, setInView] = useState(false);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.querySelectorAll<HTMLElement>(".skill-bar-fill").forEach((bar) => {
-            bar.style.width = (bar.dataset.width || "0") + "%";
-          });
-        }
-      },
-      { threshold: 0.3 }
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { threshold }
     );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, inView };
+}
+
+// ── Node icon ─────────────────────────────────────────────────────────────────
+function NodeIcon({ color }: { color: string }) {
+  return (
+    <div
+      style={{
+        width: "44px",
+        height: "44px",
+        borderRadius: "50%",
+        background: "rgba(8,8,18,0.98)",
+        border: "2px solid rgba(255,255,255,0.22)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxShadow: "0 0 16px rgba(255,255,255,0.06)",
+        zIndex: 3,
+        position: "relative",
+      }}
+      className="exp-node"
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
+        <rect x="2" y="7" width="20" height="14" rx="2"/>
+        <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+      </svg>
+    </div>
+  );
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+function TimelineCard({
+  exp,
+  side,
+  delay,
+}: {
+  exp: typeof EXPERIENCES[0];
+  side: "left" | "right";
+  delay: number;
+}) {
+  const { ref, inView } = useInView(0.15);
+  const [hovered, setHovered] = useState(false);
 
   return (
-    <div ref={ref} className="terminal-window reveal" style={{ height: "100%" }}>
-      <div className="terminal-header">
-        <div className="terminal-dot dot-red" />
-        <div className="terminal-dot dot-yellow" />
-        <div className="terminal-dot dot-green" />
-        <span className="terminal-title">{exp.file}</span>
-        <span style={{
-          marginLeft: "auto",
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.65rem",
-          color: exp.color,
-          opacity: 0.8,
-        }}>{exp.period}</span>
+    <div
+      ref={ref}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView
+          ? "translateX(0)"
+          : side === "left"
+          ? "translateX(-48px)"
+          : "translateX(48px)",
+        transition: `opacity 0.75s ease ${delay}s, transform 0.75s cubic-bezier(0.23,1,0.32,1) ${delay}s`,
+        background: hovered ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.025)",
+        border: hovered ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.08)",
+        borderRadius: "10px",
+        padding: "1.6rem 1.8rem",
+        maxWidth: "520px",
+        width: "100%",
+        cursor: "default",
+      } as React.CSSProperties}
+      className="exp-card"
+    >
+      {/* Role */}
+      <div className="exp-role" style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>
+        {exp.role}
       </div>
-      <div className="terminal-body">
-        <div style={{ marginBottom: "0.75rem" }}>
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 600,
-            fontSize: "0.95rem",
-            color: exp.color,
-          }}>{exp.company}</span>
-          <span style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "0.75rem",
-            color: "rgba(255,255,255,0.4)",
-            marginLeft: "0.75rem",
-          }}>{exp.role}</span>
-        </div>
-
-        {exp.lines.map((line, i) => (
-          <div key={i} style={{ marginBottom: "0.15rem" }}>
-            {line.type === "prompt" && (
-              <div>
-                <span className="terminal-prompt">$ </span>
-                <span className="terminal-cmd">{line.text}</span>
-              </div>
-            )}
-            {line.type === "output" && (
-              <div className="terminal-output">{line.text}</div>
-            )}
-            {line.type === "highlight" && (
-              <div className="terminal-highlight" style={{ paddingLeft: "1rem" }}>{line.text}</div>
-            )}
-          </div>
+      {/* Company */}
+      <div className="exp-company" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)", marginBottom: "0.25rem", letterSpacing: "0.03em" }}>
+        {exp.company}
+      </div>
+      {/* Period */}
+      <div className="exp-period" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.66rem", opacity: 0.38, letterSpacing: "0.08em", marginBottom: "1.1rem" }}>
+        {exp.period}
+      </div>
+      {/* Bullets */}
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "1rem" }}>
+        {exp.bullets.map((b, i) => (
+          <li key={i} className="exp-bullet" style={{ display: "flex", gap: "0.6rem", fontSize: "0.92rem", lineHeight: 1.65, opacity: 0.72 }}>
+            <span className="exp-bullet-dot" style={{ marginTop: "0.5em", width: "5px", height: "5px", borderRadius: "50%", background: "rgba(255,255,255,0.3)", flexShrink: 0 }} />
+            {b}
+          </li>
         ))}
-
-        {/* Skill bars */}
-        <div style={{ marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: "1rem" }}>
-          {exp.skills.map((skill) => (
-            <div key={skill.name} style={{ marginBottom: "0.6rem" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "0.65rem",
-                  color: "rgba(255,255,255,0.5)",
-                }}>{skill.name}</span>
-                <span style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "0.65rem",
-                  color: exp.color,
-                }}>{skill.level}%</span>
-              </div>
-              <div className="skill-bar-track">
-                <div
-                  className="skill-bar-fill"
-                  data-width={skill.level}
-                  style={{
-                    background: `linear-gradient(90deg, ${exp.color}, ${exp.color}88)`,
-                    boxShadow: `0 0 8px ${exp.color}44`,
-                  }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+      </ul>
+      {/* Stack */}
+      <div className="exp-stack" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", opacity: 0.35, letterSpacing: "0.06em", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
+        {exp.stack}
       </div>
     </div>
   );
 }
 
+// ── Main ──────────────────────────────────────────────────────────────────────
 export default function ExperienceSection() {
-  const sectionRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.querySelectorAll<HTMLElement>(".reveal").forEach((r, i) => {
-            setTimeout(() => r.classList.add("visible"), i * 150);
-          });
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const { ref: sectionRef, inView } = useInView(0.04);
 
   return (
     <section
+      id="work"
       ref={sectionRef}
-      id="experience"
-      style={{
-        padding: "6rem 0",
-        background: "#000000",
-        position: "relative",
-        zIndex: 1,
-      }}
+      style={{ padding: "6rem 8vw", position: "relative", zIndex: 1 }}
     >
-      <div className="container">
-        <div style={{ marginBottom: "4rem" }}>
-          <div className="section-label">02. experience</div>
-          <h2 className="section-title">
-            Work <span>Experience</span>
-          </h2>
-        </div>
-
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "1.5rem",
-        }}
-          className="exp-grid"
-        >
-          {EXPERIENCES.map((exp) => (
-            <TerminalWindow key={exp.company} exp={exp} />
-          ))}
-        </div>
+      {/* Section label */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "3.5rem",
+        opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(16px)",
+        transition: "opacity 0.6s ease, transform 0.6s ease",
+      }}>
+        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+        <span className="exp-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          03 — Experience
+        </span>
       </div>
 
+
+
+      {/* Timeline */}
+      <div style={{ position: "relative" }} className="exp-timeline">
+        {/* Center line */}
+        <div style={{
+          position: "absolute",
+          left: "50%",
+          top: 0,
+          bottom: 0,
+          width: "2px",
+          transform: "translateX(-50%)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.08) 100%)",
+          zIndex: 1,
+        }}
+        className="exp-timeline-line" />
+
+        {EXPERIENCES.map((exp, i) => {
+          const side = i % 2 === 0 ? "left" : "right";
+          return (
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 72px 1fr",
+                alignItems: "center",
+                gap: "0 2rem",
+                marginBottom: i < EXPERIENCES.length - 1 ? "4rem" : 0,
+                position: "relative",
+                zIndex: 2,
+              }}
+            >
+              {/* Left slot */}
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                {side === "left" ? (
+                  <TimelineCard exp={exp} side="left" delay={i * 0.08} />
+                ) : <div />}
+              </div>
+
+              {/* Center node */}
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center" }}>
+                <NodeIcon color={exp.color} />
+              </div>
+
+              {/* Right slot */}
+              <div style={{ display: "flex", justifyContent: "flex-start" }}>
+                {side === "right" ? (
+                  <TimelineCard exp={exp} side="right" delay={i * 0.08} />
+                ) : <div />}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Theme-aware styles */}
       <style>{`
+        /* Light mode overrides */
+        .light .exp-card {
+          background: rgba(0,0,0,0.04) !important;
+          border-color: rgba(0,0,0,0.12) !important;
+        }
+        .light .exp-card:hover {
+          background: rgba(0,0,0,0.07) !important;
+          border-color: rgba(0,0,0,0.22) !important;
+        }
+        .light .exp-role {
+          color: rgba(0,0,0,0.9) !important;
+        }
+        .light .exp-company {
+          color: rgba(0,0,0,0.6) !important;
+        }
+        .light .exp-period {
+          color: rgba(0,0,0,0.4) !important;
+        }
+        .light .exp-bullet {
+          color: rgba(0,0,0,0.75) !important;
+        }
+        .light .exp-bullet-dot {
+          background: rgba(0,0,0,0.3) !important;
+        }
+        .light .exp-stack {
+          color: rgba(0,0,0,0.4) !important;
+          border-top-color: rgba(0,0,0,0.08) !important;
+        }
+        .light .exp-node {
+          border-color: rgba(0,0,0,0.25) !important;
+          background: rgba(255,255,255,0.9) !important;
+        }
+        .light .exp-node svg {
+          stroke: rgba(0,0,0,0.6) !important;
+        }
+        .light .exp-timeline-line {
+          background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 100%) !important;
+        }
+        .light .exp-label {
+          color: rgba(0,0,0,0.55) !important;
+        }
         @media (max-width: 768px) {
-          .exp-grid { grid-template-columns: 1fr !important; }
+          .exp-timeline > div {
+            grid-template-columns: 40px 1fr !important;
+            gap: 0 1rem !important;
+          }
+          .exp-timeline > div > div:first-child {
+            display: none !important;
+          }
+          .exp-timeline > div > div:last-child {
+            display: flex !important;
+            justify-content: flex-start !important;
+          }
+          .exp-timeline > div > div:nth-child(2) {
+            justify-content: flex-start !important;
+          }
         }
       `}</style>
     </section>
