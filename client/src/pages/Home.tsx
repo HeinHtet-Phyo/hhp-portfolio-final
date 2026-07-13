@@ -9,6 +9,7 @@ import CertificateGallery from "../components/sections/CertificateGallery";
 import ExperienceSection from "../components/sections/ExperienceSection";
 import SkillsSection from "../components/sections/SkillsSection";
 import ContactSection from "../components/sections/ContactSection";
+import BrainProjectsSection from "../components/sections/BrainProjectsSection";
 import FooterSection from "../components/sections/FooterSection";
 
 // Placeholder sections — will be built section by section
@@ -57,7 +58,7 @@ export default function Home() {
         <AboutSection />
         <EducationSection />
         <CertificateGallery />
-        <PlaceholderSection id="projects" label="Projects" />
+        <BrainProjectsSection />
         <SkillsSection />
         <ExperienceSection />
         <ContactSection />
