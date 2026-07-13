@@ -785,7 +785,6 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
-      <Platform />
       <AmbientParticles />
     </>
   );
@@ -1067,23 +1066,30 @@ export default function ProjectsSection() {
     <section id="projects" style={{
       height: "100vh", background: BG, position: "relative", overflow: "hidden",
     }}>
-      {/* Animated tech background: neural network nodes + dot grid + radial glow */}
-      <TechBackground />
+      {/* Background: inherits unified dark space starfield from the page */}
 
-      {/* Header */}
+      {/* Header — portfolio-standard section label */}
       <div style={{
-        position: "absolute", top: 22, left: 0, right: 0,
-        textAlign: "center", zIndex: 10, pointerEvents: "none",
+        position: "absolute", top: 28, left: "8vw",
+        zIndex: 10, pointerEvents: "none",
+        display: "flex", alignItems: "center", gap: "0.6rem",
       }}>
-        <p style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}70`, letterSpacing: "0.25em", marginBottom: 5 }}>
-          SYS.05 · PROJECT MATRIX
-        </p>
-        <h2 style={{ fontSize: 30, fontWeight: 700, color: "#ffffff", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>
-          Projects
-        </h2>
-        <p style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}40`, marginTop: 5, letterSpacing: "0.15em" }}>
-          SELECT A PROJECT TO INSPECT
-        </p>
+        {/* Lime dot */}
+        <span style={{
+          width: "7px", height: "7px", borderRadius: "50%",
+          background: "#84cc16", flexShrink: 0, display: "inline-block",
+        }} />
+        {/* Label */}
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "0.68rem",
+          letterSpacing: "0.22em",
+          textTransform: "uppercase",
+          opacity: 0.55,
+          color: "#ffffff",
+        }}>
+          03 — Projects
+        </span>
       </div>
 
       {/* 3D Canvas — transparent bg so TechBackground shows through */}
@@ -1095,11 +1101,7 @@ export default function ProjectsSection() {
         <BrainScene selected={selected} onHotspotSelect={setSelected} />
       </Canvas>
 
-      {/* HUD Corners */}
-      <HudCorner pos="tl" />
-      <HudCorner pos="tr" />
-      <HudCorner pos="bl" />
-      <HudCorner pos="br" />
+      {/* HUD Corners removed — not part of site theme */}
 
       {/* Left code panel */}
       <CodePanel />
