@@ -117,15 +117,20 @@ function HotspotDot({ position, index, active, onSelect }: {
 
   return (
     <group position={position}>
-      {/* Clean white sphere node — no ring, no halo */}
-      <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.016, 20, 20]} />
-        <meshBasicMaterial color="#ffffff" />
+      {/* Outer pulsing ring */}
+      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.022, 0.004, 8, 32]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={0.5} />
       </mesh>
-      {/* Soft glow bloom — additive white, subtle */}
+      {/* Core dot — clickable */}
+      <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <sphereGeometry args={[0.014, 16, 16]} />
+        <meshBasicMaterial color={active ? "#ffffff" : TEAL} />
+      </mesh>
+      {/* Glow halo — very small, additive */}
       <mesh>
-        <sphereGeometry args={[0.032, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.22 : 0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <circleGeometry args={[0.018, 16]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={active ? 0.55 : 0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* HTML label */}
       <Html
@@ -404,7 +409,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
 
-  // Smooth frosted glass brain shader — no wireframe, clean transparent surface with inner glow
+  // Realistic flesh-tone brain shader
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -434,37 +439,51 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
         vec3 V = normalize(vViewDir);
         float NdotV = max(dot(N, V), 0.0);
 
-        // Fresnel — edges more opaque, center more transparent (glass look)
-        float fresnel = pow(1.0 - NdotV, 2.2);
-
-        // Key light
+        // Key light — warm upper-left
         vec3 L1 = normalize(vec3(-1.5, 3.0, 2.5));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Fill light
+        // Cool fill from right
         vec3 L2 = normalize(vec3(2.5, 1.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.3;
+        float diff2 = max(dot(N, L2), 0.0) * 0.35;
 
-        // Sharp glass specular
+        // Subtle under-bounce
+        vec3 L3 = normalize(vec3(0.0, -1.0, 0.5));
+        float diff3 = max(dot(N, L3), 0.0) * 0.15;
+
+        // Soft specular (skin-like, not metallic)
         vec3 H1 = normalize(L1 + V);
-        float spec = pow(max(dot(N, H1), 0.0), 80.0) * 0.7;
+        float spec = pow(max(dot(N, H1), 0.0), 22.0) * 0.5;
 
-        // Base glass color — very pale cool white, nearly transparent at center
-        float lit = clamp(diff1 * 0.8 + diff2, 0.0, 1.0);
-        vec3 glassBase = mix(vec3(0.85, 0.90, 0.95), vec3(0.96, 0.97, 1.0), lit);
+        // Subsurface scattering hint — warm glow at edges
+        float sss = pow(1.0 - NdotV, 2.5) * 0.4;
 
-        // Combine: glass surface + specular highlight + fresnel rim
-        vec3 color = glassBase * 0.25 + vec3(spec) + vec3(fresnel * 0.55);
+        // Flesh tone palette
+        vec3 shadowCol = vec3(0.28, 0.14, 0.12);  // dark reddish-brown grooves
+        vec3 baseCol   = vec3(0.72, 0.48, 0.40);  // warm pinkish-grey flesh
+        vec3 litCol    = vec3(0.85, 0.65, 0.55);  // lit ridge tops
+        vec3 specCol   = vec3(0.92, 0.80, 0.72);  // soft specular
+        vec3 sssCol    = vec3(0.90, 0.40, 0.30);  // warm SSS rim
 
-        // Opacity: low at center (see-through), higher at edges (glass rim)
-        float alpha = uOpacity * (0.12 + fresnel * 0.55 + spec * 0.4);
+        float lit = clamp(diff1 * 1.1 + diff2 + diff3, 0.0, 1.2);
+        vec3 base = mix(shadowCol, baseCol, smoothstep(0.0, 0.7, lit));
+        base = mix(base, litCol, smoothstep(0.5, 1.1, lit));
+        base = mix(base, specCol, smoothstep(0.4, 0.9, spec));
 
-        gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.92));
+        // Cyan circuit glow tint — subtle overlay to blend with circuit texture
+        float circuitGlow = 0.06 + 0.04 * sin(uTime * 1.2 + vWorldPos.x * 8.0 + vWorldPos.y * 6.0);
+        vec3 circuitTint = vec3(0.0, 0.8, 1.0) * circuitGlow;
+
+        // SSS warm rim
+        vec3 sssRim = sssCol * sss;
+
+        vec3 color = base + sssRim + circuitTint;
+        gl_FragColor = vec4(color, uOpacity);
       }
     `,
     transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
+    depthWrite: true,
+    side: THREE.FrontSide,
   }), []);
 
   useEffect(() => {
@@ -484,18 +503,13 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
-      selected ? 0.7 : 1.0,
+      selected ? 0.75 : 1.0,
       0.05
     );
   });
 
   return (
     <>
-      {/* Inner glow sphere — bright white core visible through glass surface */}
-      <mesh position={[0, 0.08, 0]}>
-        <sphereGeometry args={[0.28, 32, 32]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
       {/* Spinning brain group */}
       <group ref={groupRef}>
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
@@ -760,12 +774,10 @@ function AmbientParticles() {
 function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   return (
     <>
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[-2, 4, 3]} intensity={1.8} color="#ffffff" />
-      <directionalLight position={[3, 1, 1]}  intensity={0.8} color="#e8f0ff" />
-      {/* Central point light for inner glow effect */}
-      <pointLight position={[0, 0.08, 0]} intensity={3.5} color="#ffffff" distance={0.9} />
-      <pointLight position={[0, 0.4, 0.2]} intensity={1.5} color="#d0e8ff" distance={0.7} />
+      <ambientLight intensity={0.25} />
+      <directionalLight position={[-2, 4, 3]} intensity={1.4} color="#fff5ee" />
+      <directionalLight position={[3, 1, 1]}  intensity={0.5} color="#ffffff" />
+      <pointLight position={[0, -0.4, 0]} intensity={2.0} color={TEAL_GLOW} distance={1.5} />
 
       <CameraController selected={selected} />
       <Suspense fallback={null}>
