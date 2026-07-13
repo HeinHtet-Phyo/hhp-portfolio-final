@@ -73,6 +73,7 @@ function Pill({ name, icon }: { name: string; icon: string }) {
     <span
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="skills-pill"
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -195,6 +196,27 @@ export default function SkillsSection() {
       }}
     >
       <style>{`
+        /* Light mode overrides */
+        .light .skills-pill {
+          border-color: rgba(0,0,0,0.13) !important;
+          background: rgba(0,0,0,0.04) !important;
+          color: rgba(0,0,0,0.8) !important;
+        }
+        .light .skills-pill:hover {
+          border-color: rgba(0,0,0,0.3) !important;
+          background: rgba(0,0,0,0.07) !important;
+        }
+        .light .skills-label {
+          color: rgba(0,0,0,0.55) !important;
+        }
+        .light .skills-toggle {
+          border-color: rgba(0,0,0,0.15) !important;
+          background: rgba(0,0,0,0.05) !important;
+          color: rgba(0,0,0,0.6) !important;
+        }
+        .light .skills-category {
+          color: rgba(0,0,0,0.4) !important;
+        }
         @keyframes hhp-marquee-left {
           0% { transform: translateX(0); }
           100% { transform: translateX(-33.333%); }
@@ -220,7 +242,7 @@ export default function SkillsSection() {
         {/* Section label */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          <span className="skills-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
             04 — Skills
           </span>
         </div>
@@ -229,6 +251,7 @@ export default function SkillsSection() {
         <button
           onClick={toggleView}
           title={grouped ? "Marquee view" : "Grouped view"}
+          className="skills-toggle"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: "38px", height: "38px", borderRadius: "8px",

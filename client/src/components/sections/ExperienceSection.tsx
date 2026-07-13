@@ -96,6 +96,7 @@ function NodeIcon({ color }: { color: string }) {
         zIndex: 3,
         position: "relative",
       }}
+      className="exp-node"
     >
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
@@ -140,30 +141,31 @@ function TimelineCard({
         transition2: "border-color 0.2s ease, background 0.2s ease",
         cursor: "default",
       } as React.CSSProperties}
+      className="exp-card"
     >
       {/* Role */}
-      <div style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>
+      <div className="exp-role" style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>
         {exp.role}
       </div>
       {/* Company */}
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)", marginBottom: "0.25rem", letterSpacing: "0.03em" }}>
+      <div className="exp-company" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)", marginBottom: "0.25rem", letterSpacing: "0.03em" }}>
         {exp.company}
       </div>
       {/* Period */}
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.66rem", opacity: 0.38, letterSpacing: "0.08em", marginBottom: "1.1rem" }}>
+      <div className="exp-period" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.66rem", opacity: 0.38, letterSpacing: "0.08em", marginBottom: "1.1rem" }}>
         {exp.period}
       </div>
       {/* Bullets */}
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "1rem" }}>
         {exp.bullets.map((b, i) => (
-          <li key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.92rem", lineHeight: 1.65, opacity: 0.72 }}>
-            <span style={{ marginTop: "0.5em", width: "5px", height: "5px", borderRadius: "50%", background: "rgba(255,255,255,0.3)", flexShrink: 0 }} />
+          <li key={i} className="exp-bullet" style={{ display: "flex", gap: "0.6rem", fontSize: "0.92rem", lineHeight: 1.65, opacity: 0.72 }}>
+            <span className="exp-bullet-dot" style={{ marginTop: "0.5em", width: "5px", height: "5px", borderRadius: "50%", background: "rgba(255,255,255,0.3)", flexShrink: 0 }} />
             {b}
           </li>
         ))}
       </ul>
       {/* Stack */}
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", opacity: 0.35, letterSpacing: "0.06em", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
+      <div className="exp-stack" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.65rem", opacity: 0.35, letterSpacing: "0.06em", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "0.75rem" }}>
         {exp.stack}
       </div>
     </div>
@@ -187,7 +189,7 @@ export default function ExperienceSection() {
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+        <span className="exp-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
           03 — Experience
         </span>
       </div>
@@ -206,7 +208,8 @@ export default function ExperienceSection() {
           transform: "translateX(-50%)",
           background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.08) 100%)",
           zIndex: 1,
-        }} />
+        }}
+        className="exp-timeline-line" />
 
         {EXPERIENCES.map((exp, i) => {
           const side = i % 2 === 0 ? "left" : "right";
@@ -246,8 +249,49 @@ export default function ExperienceSection() {
         })}
       </div>
 
-      {/* Mobile: single column */}
+      {/* Theme-aware styles */}
       <style>{`
+        /* Light mode overrides */
+        .light .exp-card {
+          background: rgba(0,0,0,0.04) !important;
+          border-color: rgba(0,0,0,0.12) !important;
+        }
+        .light .exp-card:hover {
+          background: rgba(0,0,0,0.07) !important;
+          border-color: rgba(0,0,0,0.22) !important;
+        }
+        .light .exp-role {
+          color: rgba(0,0,0,0.9) !important;
+        }
+        .light .exp-company {
+          color: rgba(0,0,0,0.6) !important;
+        }
+        .light .exp-period {
+          color: rgba(0,0,0,0.4) !important;
+        }
+        .light .exp-bullet {
+          color: rgba(0,0,0,0.75) !important;
+        }
+        .light .exp-bullet-dot {
+          background: rgba(0,0,0,0.3) !important;
+        }
+        .light .exp-stack {
+          color: rgba(0,0,0,0.4) !important;
+          border-top-color: rgba(0,0,0,0.08) !important;
+        }
+        .light .exp-node {
+          border-color: rgba(0,0,0,0.25) !important;
+          background: rgba(255,255,255,0.9) !important;
+        }
+        .light .exp-node svg {
+          stroke: rgba(0,0,0,0.6) !important;
+        }
+        .light .exp-timeline-line {
+          background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.12) 50%, rgba(0,0,0,0.06) 100%) !important;
+        }
+        .light .exp-label {
+          color: rgba(0,0,0,0.55) !important;
+        }
         @media (max-width: 768px) {
           .exp-timeline > div {
             grid-template-columns: 40px 1fr !important;
