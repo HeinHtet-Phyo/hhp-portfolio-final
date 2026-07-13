@@ -103,6 +103,7 @@ function HoloBrain({
   useEffect(() => {
     if (groupRef.current) {
       groupRef.current.rotation.y = -Math.PI * 0.35; // show left side profile
+      groupRef.current.position.y = 0.12; // shift up so full brain (including stem) is visible
     }
   }, []);
 
@@ -228,10 +229,10 @@ function HoloBrain({
   useEffect(() => {
     if (selectedId) {
       autoRotateRef.current = false;
-      gsap.to(camera.position, { x: 0.1, y: 0.1, z: 2.0, duration: 0.9, ease: "power3.inOut" });
+      gsap.to(camera.position, { x: 0.1, y: -0.08, z: 2.6, duration: 0.9, ease: "power3.inOut" });
     } else {
       autoRotateRef.current = true;
-      gsap.to(camera.position, { x: 0, y: 0.05, z: 2.6, duration: 0.9, ease: "power3.inOut" });
+      gsap.to(camera.position, { x: 0, y: -0.08, z: 3.2, duration: 0.9, ease: "power3.inOut" });
     }
   }, [selectedId, camera]);
 
@@ -675,7 +676,7 @@ export default function BrainProjectsSection() {
 
       {/* Three.js Canvas */}
       <Canvas
-        camera={{ position: [0.4, 0.1, 2.4], fov: 42, near: 0.1, far: 100 }}
+        camera={{ position: [0, -0.08, 3.2], fov: 50, near: 0.1, far: 100 }}
         style={{ position: "absolute", inset: 0, zIndex: 2 }}
         gl={{ alpha: true, antialias: true }}
       >
