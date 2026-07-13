@@ -9,13 +9,12 @@ void main() {
   vec3 N = normalize(vNormal);
   vec3 V = normalize(vViewDir);
 
-  // Inner glow — visible from all angles
-  float fresnel = pow(1.0 - max(dot(-N, V), 0.0), 1.5);
+  // Inverted fresnel for inner glow (bright in center when seen from outside)
+  float fresnel = pow(1.0 - max(dot(-N, V), 0.0), 2.0);
   float innerGlow = 1.0 - fresnel;
 
-  // Strong base alpha so the full brain shape is always visible
-  float alpha = 0.18 + innerGlow * (0.28 + uGlowPulse * 0.12);
-  vec3 color = uColor * (0.85 + uGlowPulse * 0.15);
+  float alpha = innerGlow * (0.18 + uGlowPulse * 0.08);
+  vec3 color = uColor * (0.7 + uGlowPulse * 0.3);
 
   gl_FragColor = vec4(color, alpha);
 }

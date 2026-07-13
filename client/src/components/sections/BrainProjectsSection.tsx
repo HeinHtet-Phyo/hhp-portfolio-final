@@ -123,9 +123,9 @@ function HoloBrain({
     uniforms: {
       uColor:       { value: new THREE.Color(0.82, 0.88, 0.96) },
       uRimColor:    { value: new THREE.Color(0.92, 0.96, 1.0) },
-      uRimPower:    { value: 1.8 },
-      uRimStrength: { value: 3.2 },
-      uOpacity:     { value: 0.28 },
+      uRimPower:    { value: 2.2 },
+      uRimStrength: { value: 3.8 },
+      uOpacity:     { value: 0.18 },
       uGlowPulse:   { value: 0.0 },
       uLightDir:    { value: new THREE.Vector3(1.5, 2.5, 1.5).normalize() },
     },
@@ -236,20 +236,10 @@ function HoloBrain({
     }
   }, [selectedId, camera]);
 
-  // Solid dark fill material — defines the full brain silhouette
-  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0.04, 0.06, 0.10),
-    side: THREE.FrontSide,
-    transparent: false,
-    depthWrite: true,
-  }), []);
-
   if (!brainGeo) return null;
 
   return (
     <group ref={groupRef}>
-      {/* Solid dark fill — defines the full brain silhouette, blocks stars behind */}
-      <mesh geometry={brainGeo} material={fillMat} scale={0.999} />
       {/* Inner glow shell — back-side, slightly larger */}
       <mesh geometry={brainGeo} material={innerMat} scale={1.02} />
       {/* Outer holographic mesh — front-side with Fresnel */}
