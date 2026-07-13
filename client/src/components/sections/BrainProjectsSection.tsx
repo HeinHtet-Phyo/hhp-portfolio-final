@@ -462,7 +462,16 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
 
-  // Grayscale semi-transparent glass brain shader — no pink, no wireframe, smooth surface
+  // Wireframe material — thin gray lines over the brain surface
+  const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: "#cccccc",
+    wireframe: true,
+    transparent: true,
+    opacity: 0.18,
+    depthWrite: false,
+  }), []);
+
+  // Grayscale semi-transparent glass brain shader — base layer under wireframe
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -528,13 +537,22 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     side: THREE.DoubleSide,
   }), []);
 
-  useEffect(() => {
+  // Collect all brain meshes for wireframe cloning
+  const brainMeshes = useMemo(() => {
+    const meshes: THREE.Mesh[] = [];
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        (child as THREE.Mesh).material = mat;
+        meshes.push(child as THREE.Mesh);
       }
     });
-  }, [gltf, mat]);
+    return meshes;
+  }, [gltf]);
+
+  useEffect(() => {
+    brainMeshes.forEach((mesh) => {
+      mesh.material = mat;
+    });
+  }, [brainMeshes, mat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -552,13 +570,32 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
 
   return (
     <>
+      {/* Bright inner core glow — contained within brain silhouette */}
+      <mesh position={[0, 0.08, 0]}>
+        <sphereGeometry args={[0.22, 32, 32]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      <mesh position={[0, 0.08, 0]}>
+        <sphereGeometry args={[0.14, 24, 24]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
       {/* Spinning brain group */}
       <group ref={groupRef}>
+        {/* Glass base layer */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Neural network dots + lines rotating WITH the brain */}
-        <NeuralDots />
+        {/* Wireframe overlay — same geometry, same transform */}
+        {brainMeshes.map((mesh, i) => (
+          <mesh
+            key={i}
+            geometry={mesh.geometry}
+            material={wireMat}
+            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
+            position={new THREE.Vector3(0, 0.08, 0)}
+            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
+          />
+        ))}
       </group>
       {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
       {PROJECTS.map((proj, i) => (
