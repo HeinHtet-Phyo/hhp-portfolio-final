@@ -87,17 +87,17 @@ function NodeIcon({ color }: { color: string }) {
         height: "44px",
         borderRadius: "50%",
         background: "rgba(8,8,18,0.98)",
-        border: `2px solid ${color}66`,
+        border: "2px solid rgba(255,255,255,0.22)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         flexShrink: 0,
-        boxShadow: `0 0 20px ${color}22`,
+        boxShadow: "0 0 16px rgba(255,255,255,0.06)",
         zIndex: 3,
         position: "relative",
       }}
     >
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.85">
         <rect x="2" y="7" width="20" height="14" rx="2"/>
         <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
       </svg>
@@ -132,7 +132,7 @@ function TimelineCard({
           : "translateX(48px)",
         transition: `opacity 0.75s ease ${delay}s, transform 0.75s cubic-bezier(0.23,1,0.32,1) ${delay}s`,
         background: hovered ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.025)",
-        border: hovered ? `1px solid ${exp.color}44` : "1px solid rgba(255,255,255,0.08)",
+        border: hovered ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.08)",
         borderRadius: "10px",
         padding: "1.6rem 1.8rem",
         maxWidth: "420px",
@@ -146,7 +146,7 @@ function TimelineCard({
         {exp.role}
       </div>
       {/* Company */}
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: exp.color, marginBottom: "0.25rem", letterSpacing: "0.03em" }}>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", color: "rgba(255,255,255,0.65)", marginBottom: "0.25rem", letterSpacing: "0.03em" }}>
         {exp.company}
       </div>
       {/* Period */}
@@ -204,7 +204,7 @@ export default function ExperienceSection() {
           bottom: 0,
           width: "2px",
           transform: "translateX(-50%)",
-          background: "linear-gradient(180deg, rgba(0,212,255,0.5) 0%, rgba(124,58,237,0.5) 50%, rgba(254,188,46,0.4) 80%, rgba(40,200,64,0.4) 100%)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.08) 100%)",
           zIndex: 1,
         }} />
 
