@@ -1,10 +1,11 @@
 // Home — Main page wiring all sections together
-import { lazy, Suspense } from "react";
 import SpaceBackground from "../components/SpaceBackground";
 import CustomCursor from "../components/CustomCursor";
 import Navbar from "../components/Navbar";
 import HeroSection from "../components/sections/HeroSection";
 import AboutSection from "../components/sections/AboutSection";
+import ExperienceSection from "../components/sections/ExperienceSection";
+import SkillsSection from "../components/sections/SkillsSection";
 
 // Placeholder sections — will be built section by section
 function PlaceholderSection({ id, label }: { id: string; label: string }) {
@@ -51,8 +52,8 @@ export default function Home() {
         <HeroSection />
         <AboutSection />
         <PlaceholderSection id="projects" label="Projects" />
-        <PlaceholderSection id="experience" label="Work Experience" />
-        <PlaceholderSection id="skills" label="Skills" />
+        <ExperienceSection />
+        <SkillsSection />
         <PlaceholderSection id="contact" label="Contact" />
       </main>
     </div>
