@@ -135,14 +135,14 @@ function TimelineCard({
         border: hovered ? "1px solid rgba(255,255,255,0.22)" : "1px solid rgba(255,255,255,0.08)",
         borderRadius: "10px",
         padding: "1.6rem 1.8rem",
-        maxWidth: "420px",
+        maxWidth: "520px",
         width: "100%",
         transition2: "border-color 0.2s ease, background 0.2s ease",
         cursor: "default",
       } as React.CSSProperties}
     >
       {/* Role */}
-      <div style={{ fontSize: "1.05rem", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>
+      <div style={{ fontSize: "1.15rem", fontWeight: 700, letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>
         {exp.role}
       </div>
       {/* Company */}
@@ -156,7 +156,7 @@ function TimelineCard({
       {/* Bullets */}
       <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.45rem", marginBottom: "1rem" }}>
         {exp.bullets.map((b, i) => (
-          <li key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.87rem", lineHeight: 1.65, opacity: 0.72 }}>
+          <li key={i} style={{ display: "flex", gap: "0.6rem", fontSize: "0.92rem", lineHeight: 1.65, opacity: 0.72 }}>
             <span style={{ marginTop: "0.5em", width: "5px", height: "5px", borderRadius: "50%", background: "rgba(255,255,255,0.3)", flexShrink: 0 }} />
             {b}
           </li>
@@ -178,7 +178,7 @@ export default function ExperienceSection() {
     <section
       id="work"
       ref={sectionRef}
-      style={{ padding: "6rem 8vw", position: "relative", zIndex: 1 }}
+      style={{ padding: "6rem 5vw", position: "relative", zIndex: 1 }}
     >
       {/* Section label */}
       <div style={{
@@ -215,9 +215,9 @@ export default function ExperienceSection() {
               key={i}
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 60px 1fr",
+                gridTemplateColumns: "1fr 72px 1fr",
                 alignItems: "center",
-                gap: "0 1.5rem",
+                gap: "0 2rem",
                 marginBottom: i < EXPERIENCES.length - 1 ? "4rem" : 0,
                 position: "relative",
                 zIndex: 2,
