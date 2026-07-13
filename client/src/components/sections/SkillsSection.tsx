@@ -258,21 +258,7 @@ export default function SkillsSection() {
         </button>
       </div>
 
-      {/* Heading */}
-      <h2
-        style={{
-          fontSize: "clamp(2.4rem, 4.5vw, 4rem)",
-          fontWeight: 900,
-          lineHeight: 1.05,
-          letterSpacing: "-0.03em",
-          margin: "0 0 2.5rem",
-          opacity: inView ? 1 : 0,
-          transform: inView ? "translateY(0)" : "translateY(20px)",
-          transition: "opacity 0.7s ease 0.1s, transform 0.7s ease 0.1s",
-        }}
-      >
-        Technologies
-      </h2>
+
 
       {/* Content */}
       <div

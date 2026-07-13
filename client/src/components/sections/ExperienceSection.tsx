@@ -182,7 +182,7 @@ export default function ExperienceSection() {
     >
       {/* Section label */}
       <div style={{
-        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "3rem",
+        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "3.5rem",
         opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(16px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
@@ -192,15 +192,7 @@ export default function ExperienceSection() {
         </span>
       </div>
 
-      {/* Heading */}
-      <h2 style={{
-        fontSize: "clamp(2.4rem, 4.5vw, 4rem)", fontWeight: 900, lineHeight: 1.05,
-        letterSpacing: "-0.03em", margin: "0 0 4.5rem",
-        opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(20px)",
-        transition: "opacity 0.7s ease 0.1s, transform 0.7s ease 0.1s",
-      }}>
-        Work Experience
-      </h2>
+
 
       {/* Timeline */}
       <div style={{ position: "relative" }} className="exp-timeline">
