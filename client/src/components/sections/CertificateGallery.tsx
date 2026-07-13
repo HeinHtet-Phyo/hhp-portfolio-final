@@ -1,6 +1,5 @@
 // CertificateGallery — horizontal drag-scroll certificate cards
-// B&W deep space theme, JetBrains Mono, right-edge fade hint
-// 5 certificates with relevant icons
+// Colored gradient image areas, emoji icons, cyan glow on hover/focus
 
 import { useState, useEffect, useRef } from "react";
 
@@ -23,64 +22,49 @@ function useInView(threshold = 0.1) {
 // ── Certificate data ──────────────────────────────────────────────────────────
 const CERTS = [
   {
+    emoji: "🥇",
     title: "IOT Challenge Winner",
     org: "GUSTO College",
     date: "Jan 2024",
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="8" r="6"/>
-        <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
-      </svg>
-    ),
+    gradient: "linear-gradient(135deg, rgba(180,130,30,0.45) 0%, rgba(90,55,5,0.25) 100%)",
+    accentColor: "rgba(212,175,55,0.7)",
+    glowColor: "rgba(180,130,30,0.3)",
   },
   {
-    title: "Innovation Hackathon – FixIt App",
+    emoji: "🚀",
+    title: "Innovation Hackathon — FixIt App",
     org: "GUSTO College",
     date: "Mar 2025",
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
-        <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
-        <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
-        <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
-      </svg>
-    ),
+    gradient: "linear-gradient(135deg, rgba(34,120,80,0.45) 0%, rgba(10,55,30,0.25) 100%)",
+    accentColor: "rgba(52,211,153,0.7)",
+    glowColor: "rgba(34,180,80,0.25)",
   },
   {
+    emoji: "📊",
     title: "Data Analysis & Machine Learning",
     org: "Ace of Data",
     date: "Dec 2025",
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="20" x2="18" y2="10"/>
-        <line x1="12" y1="20" x2="12" y2="4"/>
-        <line x1="6" y1="20" x2="6" y2="14"/>
-        <path d="M3 20h18"/>
-      </svg>
-    ),
+    gradient: "linear-gradient(135deg, rgba(20,120,140,0.45) 0%, rgba(8,55,75,0.25) 100%)",
+    accentColor: "rgba(34,211,238,0.7)",
+    glowColor: "rgba(20,180,200,0.25)",
   },
   {
+    emoji: "🌍",
     title: "Regen Asia Summit",
     org: "NUS Singapore",
     date: "Jul 2025",
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <line x1="2" y1="12" x2="22" y2="12"/>
-        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-      </svg>
-    ),
+    gradient: "linear-gradient(135deg, rgba(100,50,160,0.45) 0%, rgba(45,15,95,0.25) 100%)",
+    accentColor: "rgba(167,139,250,0.7)",
+    glowColor: "rgba(140,80,220,0.25)",
   },
   {
+    emoji: "🐍",
     title: "Introduction to Python",
     org: "Technortal",
     date: "May 2025",
-    icon: (
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="16 18 22 12 16 6"/>
-        <polyline points="8 6 2 12 8 18"/>
-      </svg>
-    ),
+    gradient: "linear-gradient(135deg, rgba(50,60,160,0.45) 0%, rgba(18,25,95,0.25) 100%)",
+    accentColor: "rgba(129,140,248,0.7)",
+    glowColor: "rgba(80,100,220,0.25)",
   },
 ];
 
@@ -90,72 +74,96 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
 
   return (
     <div
+      tabIndex={0}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       style={{
         flexShrink: 0,
         width: "220px",
-        padding: "1.6rem 1.5rem",
-        borderRadius: "12px",
-        border: hovered ? "1px solid rgba(255,255,255,0.28)" : "1px solid rgba(255,255,255,0.1)",
-        background: hovered ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.025)",
-        boxShadow: hovered ? "0 0 22px rgba(255,255,255,0.06)" : "none",
-        transition: "border-color 0.25s, background 0.25s, box-shadow 0.25s, opacity 0.65s cubic-bezier(0.23,1,0.32,1), transform 0.65s cubic-bezier(0.23,1,0.32,1)",
-        transitionDelay: `0s, 0s, 0s, ${index * 0.08}s, ${index * 0.08}s`,
+        borderRadius: "14px",
+        overflow: "hidden",
+        border: hovered
+          ? "1px solid rgba(34,211,238,0.55)"
+          : "1px solid rgba(255,255,255,0.1)",
+        background: "rgba(255,255,255,0.025)",
+        boxShadow: hovered
+          ? "0 0 30px rgba(34,211,238,0.18), 0 0 10px rgba(34,211,238,0.1)"
+          : "none",
+        transform: hovered ? "scale(1.07)" : "scale(1)",
+        transition: "transform 0.3s cubic-bezier(0.23,1,0.32,1), border-color 0.3s, box-shadow 0.3s, opacity 0.65s cubic-bezier(0.23,1,0.32,1)",
+        transitionDelay: `0s, 0s, 0s, ${index * 0.08}s`,
         opacity: inView ? 1 : 0,
-        transform: inView ? "translateY(0)" : "translateY(24px)",
-        cursor: "default",
+        cursor: "pointer",
         userSelect: "none",
+        outline: "none",
       }}
       className="cert-card"
     >
-      {/* Icon */}
+      {/* Gradient image area with emoji */}
       <div style={{
-        width: "52px",
-        height: "52px",
-        borderRadius: "10px",
-        border: "1px solid rgba(255,255,255,0.12)",
-        background: "rgba(255,255,255,0.04)",
+        height: "130px",
+        background: cert.gradient,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        marginBottom: "1.1rem",
-        color: "rgba(255,255,255,0.65)",
+        fontSize: "3.2rem",
+        position: "relative",
+        borderBottom: `1px solid ${hovered ? "rgba(34,211,238,0.2)" : "rgba(255,255,255,0.06)"}`,
+        transition: "border-color 0.3s",
       }}>
-        {cert.icon}
+        {/* Radial glow behind emoji */}
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          background: `radial-gradient(circle at 50% 60%, ${cert.glowColor} 0%, transparent 65%)`,
+          pointerEvents: "none",
+        }} />
+        <span style={{ position: "relative", zIndex: 1, filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.5))" }}>
+          {cert.emoji}
+        </span>
       </div>
 
-      {/* Title */}
-      <div style={{
-        fontWeight: 700,
-        fontSize: "0.9rem",
-        lineHeight: 1.35,
-        marginBottom: "0.45rem",
-        letterSpacing: "-0.01em",
-      }}>
-        {cert.title}
-      </div>
+      {/* Text area */}
+      <div style={{ padding: "1rem 1.1rem 1.1rem" }}>
+        {/* Title */}
+        <div style={{
+          fontWeight: 700,
+          fontSize: "0.85rem",
+          lineHeight: 1.35,
+          marginBottom: "0.45rem",
+          letterSpacing: "-0.01em",
+        }}>
+          {cert.title}
+        </div>
 
-      {/* Org */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.72rem",
-        opacity: 0.5,
-        marginBottom: "0.5rem",
-        lineHeight: 1.4,
-      }}>
-        {cert.org}
-      </div>
+        {/* Org */}
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "0.68rem",
+          opacity: 0.45,
+          marginBottom: "0.6rem",
+          lineHeight: 1.4,
+        }}>
+          {cert.org}
+        </div>
 
-      {/* Date */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.62rem",
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        opacity: 0.3,
-      }}>
-        {cert.date}
+        {/* Date badge */}
+        <div style={{
+          display: "inline-block",
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "0.55rem",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          padding: "0.2rem 0.55rem",
+          border: `1px solid ${cert.accentColor}`,
+          borderRadius: "999px",
+          color: cert.accentColor,
+          background: "rgba(255,255,255,0.03)",
+        }}>
+          {cert.date}
+        </div>
       </div>
     </div>
   );
@@ -192,7 +200,7 @@ export default function CertificateGallery() {
   // Wheel → horizontal scroll
   const onWheel = (e: React.WheelEvent) => {
     if (!scrollRef.current) return;
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // native horizontal scroll
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
     e.preventDefault();
     scrollRef.current.scrollLeft += e.deltaY * 0.8;
   };
@@ -211,16 +219,28 @@ export default function CertificateGallery() {
         transform: inView ? "translateY(0)" : "translateY(16px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          <div style={{ width: "32px", height: "1px", background: "rgba(255,255,255,0.25)" }} />
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: "0.68rem",
+              letterSpacing: "0.22em",
+              textTransform: "uppercase",
+              opacity: 0.55,
+            }}>
+              Certificate Gallery
+            </span>
+          </div>
           <span style={{
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "0.65rem",
-            letterSpacing: "0.22em",
+            fontSize: "0.6rem",
+            letterSpacing: "0.15em",
             textTransform: "uppercase",
-            opacity: 0.45,
+            opacity: 0.3,
+            paddingRight: "8vw",
           }}>
-            Certificate Gallery · Scroll →
+            Scroll →
           </span>
         </div>
       </div>
@@ -274,12 +294,7 @@ export default function CertificateGallery() {
           background: rgba(0,0,0,0.03) !important;
         }
         .light .cert-card:hover {
-          border-color: rgba(0,0,0,0.22) !important;
-          background: rgba(0,0,0,0.06) !important;
-          box-shadow: 0 0 22px rgba(0,0,0,0.05) !important;
-        }
-        .light .cert-card [style*="rgba(255,255,255,0.65)"] {
-          color: rgba(0,0,0,0.55) !important;
+          border-color: rgba(34,211,238,0.45) !important;
         }
         .light .cert-fade-hint {
           background: linear-gradient(to left, var(--background, #f8f8f8) 0%, transparent 100%) !important;
