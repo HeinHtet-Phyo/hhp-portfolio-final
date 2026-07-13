@@ -296,23 +296,20 @@ function BrainMesh({ activeIndex, onHotspotSelect }: {
   const [brainRotY, setBrainRotY] = useState(0);
 
   const { outerMat, innerMat } = useMemo(() => {
-    const outer = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0.92, 0.92, 0.92),
-      emissive: new THREE.Color(0.25, 0.25, 0.25),
-      emissiveIntensity: 0.6,
-      metalness: 0.4,
-      roughness: 0.45,
-      transparent: true,
-      opacity: 0.92,
+    // Use MeshPhongMaterial — works better with alpha canvas on dark bg
+    const outer = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(1, 1, 1),
+      emissive: new THREE.Color(0.55, 0.55, 0.55),
+      specular: new THREE.Color(1, 1, 1),
+      shininess: 80,
+      transparent: false,
+      opacity: 1.0,
     });
-    const inner = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0.4, 0.4, 0.4),
+    const inner = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(0.1, 0.1, 0.1),
       emissive: new THREE.Color(0.08, 0.08, 0.08),
-      emissiveIntensity: 0.3,
-      metalness: 0.1,
-      roughness: 0.8,
-      transparent: true,
-      opacity: 0.55,
+      transparent: false,
+      opacity: 1.0,
       side: THREE.BackSide,
     });
     return { outerMat: outer, innerMat: inner };
@@ -334,7 +331,7 @@ function BrainMesh({ activeIndex, onHotspotSelect }: {
     setBrainRotY(groupRef.current.rotation.y);
     const t = clock.elapsedTime;
     // Subtle emissive pulse
-      outerMat.emissiveIntensity = 0.5 + 0.2 * Math.sin(t * 0.9);
+      (outerMat as THREE.MeshPhongMaterial).emissive.setScalar(0.45 + 0.15 * Math.sin(t * 0.9));
   });
 
   return (
