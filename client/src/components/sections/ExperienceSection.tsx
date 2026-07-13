@@ -178,7 +178,7 @@ export default function ExperienceSection() {
     <section
       id="work"
       ref={sectionRef}
-      style={{ padding: "6rem 5vw", position: "relative", zIndex: 1 }}
+      style={{ padding: "6rem 8vw", position: "relative", zIndex: 1 }}
     >
       {/* Section label */}
       <div style={{

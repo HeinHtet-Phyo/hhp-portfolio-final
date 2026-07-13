@@ -186,7 +186,7 @@ export default function SkillsSection() {
       id="skills"
       ref={sectionRef}
       style={{
-        padding: "6rem 5vw 4rem",
+        padding: "6rem 8vw 4rem",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
