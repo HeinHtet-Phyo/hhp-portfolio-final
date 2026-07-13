@@ -619,7 +619,7 @@ function TechBackground() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < LINK_DIST) {
             const alpha = (1 - dist / LINK_DIST) * 0.18;
-            ctx.strokeStyle = `rgba(0,200,240,${alpha})`;
+            ctx.strokeStyle = `rgba(200,200,200,${alpha})`;
             ctx.lineWidth = 0.6;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
@@ -716,7 +716,7 @@ function Platform() {
       {/* Solid disc (platform surface) */}
       <mesh rotation={[Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.38, 64]} />
-        <meshBasicMaterial color="#001a2e" transparent opacity={0.85} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.85} side={THREE.DoubleSide} />
       </mesh>
 
       {/* Light beam removed — was intersecting brain and causing visible split */}
@@ -785,7 +785,6 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
-      <Platform />
       <AmbientParticles />
     </>
   );
@@ -1063,53 +1062,34 @@ export default function ProjectsSection() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleClose]);
 
-  return (
-    <section id="projects" style={{
-      height: "100vh", background: BG, position: "relative", overflow: "hidden",
-    }}>
-      {/* Animated tech background: neural network nodes + dot grid + radial glow */}
-      <TechBackground />
-
-      {/* Header */}
-      <div style={{
-        position: "absolute", top: 22, left: 0, right: 0,
-        textAlign: "center", zIndex: 10, pointerEvents: "none",
-      }}>
-        <p style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}70`, letterSpacing: "0.25em", marginBottom: 5 }}>
-          SYS.05 · PROJECT MATRIX
-        </p>
-        <h2 style={{ fontSize: 30, fontWeight: 700, color: "#ffffff", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>
-          Projects
-        </h2>
-        <p style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}40`, marginTop: 5, letterSpacing: "0.15em" }}>
-          SELECT A PROJECT TO INSPECT
-        </p>
+    return (
+    <section
+      id="projects"
+      style={{
+        minHeight: "100vh",
+        padding: "6rem 8vw",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        background: "transparent",
+        overflow: "hidden",
+      }}
+    >
+      {/* Section label — matches portfolio style: dot + text */}
+      <div style={{ marginBottom: "2rem", display: "flex", alignItems: "center", gap: "0.6rem" }}>
+        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          03 — Projects
+        </span>
       </div>
-
-      {/* 3D Canvas — transparent bg so TechBackground shows through */}
+      {/* 3D Canvas — transparent, floats on portfolio space background */}
       <Canvas
         camera={{ position: [0, 0, 1.25], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: true }}
-        style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
+        style={{ background: "transparent", flex: 1, minHeight: "80vh" }}
       >
         <BrainScene selected={selected} onHotspotSelect={setSelected} />
       </Canvas>
-
-      {/* HUD Corners */}
-      <HudCorner pos="tl" />
-      <HudCorner pos="tr" />
-      <HudCorner pos="bl" />
-      <HudCorner pos="br" />
-
-      {/* Left code panel */}
-      <CodePanel />
-
-      {/* Right projects panel */}
-      <ProjectsPanel selected={selected} onSelect={setSelected} />
-
-      {/* Bottom data bar */}
-      <HudBottomBar selected={selected} />
-
       {/* Detail panel on project select */}
       <AnimatePresence>
         {selected && (
