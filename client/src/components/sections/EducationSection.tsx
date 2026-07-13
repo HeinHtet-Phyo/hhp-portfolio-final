@@ -175,10 +175,10 @@ export default function EducationSection() {
         </span>
       </div>
 
-      {/* Triangle layout wrapper */}
+      {/* Triangle layout wrapper — equilateral proportions: bottom gap ≈ vertical height */}
       <div
         ref={wrapRef}
-        style={{ position: "relative", maxWidth: "820px", margin: "0 auto", paddingBottom: "1rem" }}
+        style={{ position: "relative", maxWidth: "760px", margin: "0 auto", paddingBottom: "1rem" }}
         className="edu-triangle-wrap"
       >
         {/* SVG overlay — z-index 1, behind cards (z-index 2) */}
@@ -249,7 +249,7 @@ export default function EducationSection() {
         )}
 
         {/* Apex row — UWE Bristol */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: "3rem", position: "relative", zIndex: 2 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "5rem", position: "relative", zIndex: 2 }}>
           <EduCard
             badge="First Class Honours"
             institution="UWE Bristol"
@@ -264,9 +264,9 @@ export default function EducationSection() {
           />
         </div>
 
-        {/* Bottom row */}
+        {/* Bottom row — cards centered with fixed gap to form equilateral triangle */}
         <div
-          style={{ display: "flex", justifyContent: "space-between", gap: "2rem", position: "relative", zIndex: 2 }}
+          style={{ display: "flex", justifyContent: "center", gap: "3.5rem", position: "relative", zIndex: 2 }}
           className="edu-bottom-row"
         >
           <EduCard
