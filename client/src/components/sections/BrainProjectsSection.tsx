@@ -117,25 +117,20 @@ function HotspotDot({ position, index, active, onSelect }: {
 
   return (
     <group position={position}>
-      {/* Outer pulsing ring — pure white */}
+      {/* Outer pulsing ring */}
       <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[0.022, 0.003, 8, 32]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.5} />
+        <torusGeometry args={[0.022, 0.004, 8, 32]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={0.5} />
       </mesh>
-      {/* Core dot — clickable, bright white */}
+      {/* Core dot — clickable */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.013, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" />
+        <sphereGeometry args={[0.014, 16, 16]} />
+        <meshBasicMaterial color={active ? "#ffffff" : TEAL} />
       </mesh>
-      {/* Glow halo — additive white glow */}
+      {/* Glow halo — very small, additive */}
       <mesh>
-        <circleGeometry args={[0.028, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.45 : 0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* Larger soft outer glow */}
-      <mesh>
-        <circleGeometry args={[0.048, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.12 : 0.04} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <circleGeometry args={[0.018, 16]} />
+        <meshBasicMaterial color={TEAL} transparent opacity={active ? 0.55 : 0.18} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* HTML label */}
       <Html
@@ -144,15 +139,15 @@ function HotspotDot({ position, index, active, onSelect }: {
         distanceFactor={1.2}
       >
         <div style={{
-          background: active ? "rgba(255,255,255,0.10)" : "rgba(0,0,0,0.55)",
-          border: `1px solid ${active ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.25)"}`,
-          borderRadius: 3, padding: "3px 7px",
+          background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
+          border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
+          borderRadius: 4, padding: "3px 7px",
           fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: active ? "#ffffff" : "rgba(255,255,255,0.65)",
+          color: active ? "#ffffff" : "#aaaaaa",
           whiteSpace: "nowrap",
           backdropFilter: "blur(4px)",
-          boxShadow: active ? "0 0 12px rgba(255,255,255,0.3)" : "none",
-          transition: "all 0.25s ease",
+          boxShadow: active ? "0 0 10px rgba(0,229,255,0.5)" : "none",
+          transition: "all 0.2s ease",
         }}>
           {PROJECTS[index].title}
         </div>
@@ -414,7 +409,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
 
-  // Dark smoky glass brain shader — monochrome, moody, semi-transparent
+  // Realistic flesh-tone brain shader
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -444,44 +439,51 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
         vec3 V = normalize(vViewDir);
         float NdotV = max(dot(N, V), 0.0);
 
-        // Key light from upper-left
+        // Key light — warm upper-left
         vec3 L1 = normalize(vec3(-1.5, 3.0, 2.5));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Soft fill from right
+        // Cool fill from right
         vec3 L2 = normalize(vec3(2.5, 1.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.25;
+        float diff2 = max(dot(N, L2), 0.0) * 0.35;
 
-        // Subtle specular highlight
+        // Subtle under-bounce
+        vec3 L3 = normalize(vec3(0.0, -1.0, 0.5));
+        float diff3 = max(dot(N, L3), 0.0) * 0.15;
+
+        // Soft specular (skin-like, not metallic)
         vec3 H1 = normalize(L1 + V);
-        float spec = pow(max(dot(N, H1), 0.0), 40.0) * 0.35;
+        float spec = pow(max(dot(N, H1), 0.0), 22.0) * 0.5;
 
-        // Fresnel rim — faint white glow at silhouette edges
-        float fresnel = pow(1.0 - NdotV, 3.0) * 0.45;
+        // Subsurface scattering hint — warm glow at edges
+        float sss = pow(1.0 - NdotV, 2.5) * 0.4;
 
-        // Dark grayscale palette — almost black core, gray ridges
-        float lit = clamp(diff1 * 0.9 + diff2, 0.0, 1.0);
-        vec3 darkCore  = vec3(0.04, 0.04, 0.05);  // near-black
-        vec3 midGray   = vec3(0.18, 0.18, 0.20);  // groove highlights
-        vec3 lightGray = vec3(0.38, 0.38, 0.40);  // ridge tops
+        // Flesh tone palette
+        vec3 shadowCol = vec3(0.28, 0.14, 0.12);  // dark reddish-brown grooves
+        vec3 baseCol   = vec3(0.72, 0.48, 0.40);  // warm pinkish-grey flesh
+        vec3 litCol    = vec3(0.85, 0.65, 0.55);  // lit ridge tops
+        vec3 specCol   = vec3(0.92, 0.80, 0.72);  // soft specular
+        vec3 sssCol    = vec3(0.90, 0.40, 0.30);  // warm SSS rim
 
-        vec3 base = mix(darkCore, midGray, smoothstep(0.0, 0.5, lit));
-        base = mix(base, lightGray, smoothstep(0.4, 0.9, lit));
-        // Add specular
-        base += vec3(spec);
-        // Fresnel rim glow
-        base += vec3(fresnel * 0.5);
+        float lit = clamp(diff1 * 1.1 + diff2 + diff3, 0.0, 1.2);
+        vec3 base = mix(shadowCol, baseCol, smoothstep(0.0, 0.7, lit));
+        base = mix(base, litCol, smoothstep(0.5, 1.1, lit));
+        base = mix(base, specCol, smoothstep(0.4, 0.9, spec));
 
-        // Subtle slow pulse on ridges
-        float pulse = 0.03 * sin(uTime * 0.6 + vWorldPos.y * 5.0 + vWorldPos.x * 3.0);
-        base += vec3(pulse);
+        // Cyan circuit glow tint — subtle overlay to blend with circuit texture
+        float circuitGlow = 0.06 + 0.04 * sin(uTime * 1.2 + vWorldPos.x * 8.0 + vWorldPos.y * 6.0);
+        vec3 circuitTint = vec3(0.0, 0.8, 1.0) * circuitGlow;
 
-        gl_FragColor = vec4(clamp(base, 0.0, 1.0), uOpacity * 0.82);
+        // SSS warm rim
+        vec3 sssRim = sssCol * sss;
+
+        vec3 color = base + sssRim + circuitTint;
+        gl_FragColor = vec4(color, uOpacity);
       }
     `,
     transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
+    depthWrite: true,
+    side: THREE.FrontSide,
   }), []);
 
   useEffect(() => {
@@ -501,7 +503,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     mat.uniforms.uTime.value = state.clock.elapsedTime;
     mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
       mat.uniforms.uOpacity.value,
-      selected ? 0.65 : 0.82,
+      selected ? 0.75 : 1.0,
       0.05
     );
   });
@@ -778,81 +780,11 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       <pointLight position={[0, -0.4, 0]} intensity={2.0} color={TEAL_GLOW} distance={1.5} />
 
       <CameraController selected={selected} />
-      <BrainDustCloud />
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
     </>
   );
-}
-
-// ─── Brain Dust Cloud — dense particle field clustered around brain ─────────────
-function BrainDustCloud() {
-  const COUNT = 2200;
-  const ref   = useRef<THREE.Points>(null);
-
-  const { geo, speeds, phases, radii } = useMemo(() => {
-    const pos    = new Float32Array(COUNT * 3);
-    const spd    = new Float32Array(COUNT);
-    const ph     = new Float32Array(COUNT);
-    const rad    = new Float32Array(COUNT);
-    const sizes  = new Float32Array(COUNT);
-
-    for (let i = 0; i < COUNT; i++) {
-      // Bias particles closer to brain surface (r ~0.28-0.55) with long tail outward
-      const u = Math.random();
-      const r = 0.22 + Math.pow(u, 0.55) * 0.85;  // dense near surface, sparse far
-      const theta = Math.random() * Math.PI * 2;
-      const phi   = Math.acos(2 * Math.random() - 1);
-      pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta) * 0.75 + 0.06;
-      pos[i * 3 + 2] = r * Math.cos(phi);
-      spd[i] = 0.00015 + Math.random() * 0.00025;
-      ph[i]  = Math.random() * Math.PI * 2;
-      rad[i] = r;
-    }
-
-    const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    return { geo: g, speeds: spd, phases: ph, radii: rad };
-  }, []);
-
-  const mat = useMemo(() => new THREE.PointsMaterial({
-    color: "#ffffff",
-    size: 0.004,
-    transparent: true,
-    opacity: 0.55,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    sizeAttenuation: true,
-  }), []);
-
-  useFrame(({ clock }) => {
-    if (!ref.current) return;
-    const t   = clock.elapsedTime;
-    const pos = ref.current.geometry.attributes.position;
-    const arr = pos.array as Float32Array;
-    for (let i = 0; i < COUNT; i++) {
-      const ph = phases[i];
-      const sp = speeds[i];
-      // Gentle vertical drift with slight radial oscillation
-      arr[i * 3 + 1] += sp * Math.sin(t * 0.3 + ph);
-      arr[i * 3]     += sp * 0.4 * Math.cos(t * 0.25 + ph * 1.3);
-      arr[i * 3 + 2] += sp * 0.4 * Math.sin(t * 0.2 + ph * 0.8);
-      // Soft boundary reset — keep particles from drifting too far
-      const x = arr[i * 3], y = arr[i * 3 + 1], z = arr[i * 3 + 2];
-      const dist = Math.sqrt(x*x + y*y + z*z);
-      if (dist > 1.2) {
-        const scale = radii[i] / dist;
-        arr[i * 3]     *= scale;
-        arr[i * 3 + 1] *= scale;
-        arr[i * 3 + 2] *= scale;
-      }
-    }
-    pos.needsUpdate = true;
-  });
-
-  return <points ref={ref} geometry={geo} material={mat} />;
 }
 
 // ─── HUD Corner Brackets ──────────────────────────────────────────────────────
