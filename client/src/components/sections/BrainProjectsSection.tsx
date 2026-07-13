@@ -77,10 +77,10 @@ const PROJECTS = [
 type Project = (typeof PROJECTS)[0];
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
-const TEAL       = "#00e5ff";
-const TEAL_DIM   = "#00b4cc";
-const TEAL_GLOW  = "#00d4ff";
-const BG         = "#020d18";
+const TEAL       = "#ffffff";
+const TEAL_DIM   = "#aaaaaa";
+const TEAL_GLOW  = "#e0e0e0";
+const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
 // Project hotspot positions — placed ON the brain surface (brain radius ~0.28 at these angles)
@@ -139,11 +139,11 @@ function HotspotDot({ position, index, active, onSelect }: {
         distanceFactor={1.2}
       >
         <div style={{
-          background: active ? "rgba(0,229,255,0.18)" : "rgba(0,20,35,0.75)",
-          border: `1px solid ${active ? "#00e5ff" : "rgba(0,229,255,0.3)"}`,
+          background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
+          border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
           borderRadius: 4, padding: "3px 7px",
           fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: active ? "#ffffff" : "#00e5ff",
+          color: active ? "#ffffff" : "#aaaaaa",
           whiteSpace: "nowrap",
           backdropFilter: "blur(4px)",
           boxShadow: active ? "0 0 10px rgba(0,229,255,0.5)" : "none",
@@ -165,7 +165,7 @@ const PROJECT_GRAPHS: ProjectGraph[] = [
   // 0: MoodTunes AI — music neural net, star topology around central model
   {
     color: "rgba(0,229,255,",
-    accentColor: "#00e5ff",
+    accentColor: "#ffffff",
     nodes: [
       { id: "model",   x: 256, y: 256, size: 10, label: "LightGBM",     central: true },
       { id: "spotify", x: 140, y: 160, size: 6,  label: "Spotify API" },
@@ -577,13 +577,12 @@ function TechBackground() {
       const H = canvas.height;
       frame++;
 
-      // Clear with deep dark bg
-      ctx.fillStyle = "#020d18";
-      ctx.fillRect(0, 0, W, H);
+      // Clear canvas (transparent — inherits portfolio space background)
+      ctx.clearRect(0, 0, W, H);
 
       // ── Dot grid ──────────────────────────────────────────────
       const GRID = 36;
-      ctx.fillStyle = "rgba(0,212,255,0.035)";
+      ctx.fillStyle = "rgba(255,255,255,0.015)";
       for (let gx = GRID / 2; gx < W; gx += GRID) {
         for (let gy = GRID / 2; gy < H; gy += GRID) {
           ctx.beginPath();
@@ -779,7 +778,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
     <>
       <ambientLight intensity={0.25} />
       <directionalLight position={[-2, 4, 3]} intensity={1.4} color="#fff5ee" />
-      <directionalLight position={[3, 1, 1]}  intensity={0.5} color="#aaddff" />
+      <directionalLight position={[3, 1, 1]}  intensity={0.5} color="#ffffff" />
       <pointLight position={[0, -0.4, 0]} intensity={2.0} color={TEAL_GLOW} distance={1.5} />
 
       <CameraController selected={selected} />
@@ -870,7 +869,7 @@ function CodePanel() {
         </span>
       </div>
       {/* Border */}
-      <div style={{ border: `1px solid ${TEAL}30`, borderRadius: 4, padding: "10px 12px", background: "rgba(0,20,35,0.75)", backdropFilter: "blur(4px)" }}>
+      <div style={{ border: `1px solid rgba(255,255,255,0.15)`, borderRadius: 4, padding: "10px 12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
         {visible.map((line, i) => (
           <div key={i} style={{
             fontSize: 9, fontFamily: "JetBrains Mono, monospace",
@@ -907,7 +906,7 @@ function ProjectsPanel({ selected, onSelect }: { selected: Project | null; onSel
             key={proj.id}
             onClick={() => onSelect(active ? null : proj)}
             style={{
-              background: active ? `rgba(0,229,255,0.08)` : "rgba(0,20,35,0.75)",
+              background: active ? `rgba(255,255,255,0.08)` : "rgba(0,0,0,0.6)",
               border: `1px solid ${active ? TEAL + "80" : TEAL + "20"}`,
               borderRadius: 4, padding: "8px 10px", cursor: "pointer",
               textAlign: "left", backdropFilter: "blur(4px)",
@@ -922,7 +921,7 @@ function ProjectsPanel({ selected, onSelect }: { selected: Project | null; onSel
                 boxShadow: active ? `0 0 8px ${TEAL}` : "none",
                 flexShrink: 0,
               }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "#4dd9f0", fontFamily: "'Space Grotesk', sans-serif" }}>
+              <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "#aaaaaa", fontFamily: "'Space Grotesk', sans-serif" }}>
                 {proj.title}
               </span>
             </div>
@@ -953,7 +952,7 @@ function HudBottomBar({ selected }: { selected: Project | null }) {
       position: "absolute", bottom: 0, left: 0, right: 0, height: 36, zIndex: 10,
       display: "flex", alignItems: "center", justifyContent: "space-between",
       padding: "0 20px",
-      background: "linear-gradient(to top, rgba(0,10,20,0.95), transparent)",
+      background: "linear-gradient(to top, rgba(0,0,0,0.95), transparent)",
       borderTop: `1px solid ${TEAL}18`,
       pointerEvents: "none",
     }}>
@@ -981,7 +980,7 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
       style={{
         position: "absolute", bottom: 50, left: "50%", transform: "translateX(-50%)",
         width: 420, zIndex: 20,
-        background: "rgba(0,15,28,0.92)",
+        background: "rgba(0,0,0,0.88)",
         border: `1px solid ${TEAL}40`,
         borderRadius: 8, padding: "18px 22px",
         backdropFilter: "blur(12px)",
@@ -1002,8 +1001,8 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
           </div>
         </div>
         <button onClick={onClose} style={{
-          background: "transparent", border: `1px solid ${TEAL}30`,
-          color: `${TEAL_DIM}80`, borderRadius: 4, padding: "4px 8px",
+          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
+          color: `rgba(170,170,170,0.6)`, borderRadius: 4, padding: "4px 8px",
           fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
         }}>ESC</button>
       </div>
@@ -1012,7 +1011,7 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
       <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
         {project.stats.map(([val, key], i) => (
           <div key={i} style={{
-            flex: 1, background: `${TEAL}08`, border: `1px solid ${TEAL}20`,
+            flex: 1, background: `rgba(255,255,255,0.04)`, border: `1px solid rgba(255,255,255,0.12)`,
             borderRadius: 4, padding: "8px 10px", textAlign: "center",
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: TEAL, fontFamily: "'Space Grotesk', sans-serif" }}>{val}</div>
@@ -1031,8 +1030,8 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         {project.tech.map((t) => (
           <span key={t} style={{
             fontSize: 8, padding: "3px 7px", borderRadius: 3,
-            background: `${TEAL}10`, border: `1px solid ${TEAL}25`,
-            color: `${TEAL}cc`, fontFamily: "JetBrains Mono, monospace",
+            background: `rgba(255,255,255,0.06)`, border: `1px solid rgba(255,255,255,0.15)`,
+            color: `rgba(200,200,200,0.8)`, fontFamily: "JetBrains Mono, monospace",
           }}>{t}</span>
         ))}
       </div>
@@ -1042,8 +1041,8 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         display: "inline-flex", alignItems: "center", gap: 6,
         fontSize: 9, fontFamily: "JetBrains Mono, monospace",
         color: TEAL, textDecoration: "none",
-        border: `1px solid ${TEAL}40`, borderRadius: 4, padding: "6px 12px",
-        background: `${TEAL}08`,
+        border: `1px solid rgba(255,255,255,0.25)`, borderRadius: 4, padding: "6px 12px",
+        background: `rgba(255,255,255,0.05)`,
         transition: "all 0.2s ease",
       }}>
         ↗ VIEW ON GITHUB
