@@ -138,7 +138,6 @@ function TimelineCard({
         padding: "1.6rem 1.8rem",
         maxWidth: "520px",
         width: "100%",
-        transition2: "border-color 0.2s ease, background 0.2s ease",
         cursor: "default",
       } as React.CSSProperties}
       className="exp-card"

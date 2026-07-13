@@ -4,6 +4,8 @@ import CustomCursor from "../components/CustomCursor";
 import Navbar from "../components/Navbar";
 import HeroSection from "../components/sections/HeroSection";
 import AboutSection from "../components/sections/AboutSection";
+import EducationSection from "../components/sections/EducationSection";
+import CertificateGallery from "../components/sections/CertificateGallery";
 import ExperienceSection from "../components/sections/ExperienceSection";
 import SkillsSection from "../components/sections/SkillsSection";
 import ContactSection from "../components/sections/ContactSection";
@@ -53,6 +55,8 @@ export default function Home() {
       <main style={{ position: "relative", zIndex: 2 }}>
         <HeroSection />
         <AboutSection />
+        <EducationSection />
+        <CertificateGallery />
         <PlaceholderSection id="projects" label="Projects" />
         <SkillsSection />
         <ExperienceSection />

@@ -1,263 +1,186 @@
-// Dark Space Theme — Education Section
-// Holographic shimmer cards with 3D tilt, certificate carousel
-import { useEffect, useRef } from "react";
+// EducationSection — triangular connected layout
+// B&W deep space theme, JetBrains Mono, scroll-triggered animations
+// Foundation (bottom-left) → HND (bottom-right) → UWE Bristol (top/apex)
 
-const EDUCATION = [
-  {
-    degree: "BSc (Hons) Data Science and Artificial Intelligence",
-    institution: "UWE Bristol",
-    period: "Sep 2025 – Jun 2026",
-    grade: "First Class Honours",
-    icon: "◈",
-    color: "#00d4ff",
-    tags: ["Data Science", "AI", "Machine Learning", "Python"],
-  },
-  {
-    degree: "Higher National Diploma BTEC Level 4-5 in Computing",
-    institution: "GUSTO College Myanmar",
-    period: "Nov 2022 – Nov 2024",
-    grade: "HND Level 5",
-    icon: "⬡",
-    color: "#7c3aed",
-    tags: ["Computing", "Software Engineering", "Networking"],
-  },
-  {
-    degree: "International Foundation Diploma in Computing",
-    institution: "GUSTO College Myanmar",
-    period: "Jul 2022 – Oct 2022",
-    grade: "Distinctions in all modules",
-    icon: "◆",
-    color: "#00d4ff",
-    tags: ["Foundation", "Computing", "Distinctions"],
-  },
-];
+import { useState, useEffect, useRef } from "react";
 
-const CERTIFICATES = [
-  { title: "IOT Challenge Winner", org: "GUSTO College", date: "Jan 2024", icon: "◈" },
-  { title: "Innovation Hackathon FixIt App", org: "GUSTO College", date: "Mar 2025", icon: "△" },
-  { title: "Data Analysis & Machine Learning", org: "Ace of Data", date: "Dec 2025", icon: "□" },
-  { title: "Regen Asia Summit", org: "National University of Singapore", date: "Jul 2025", icon: "◎" },
-  { title: "Introduction to Python", org: "Technortal", date: "May 2025", icon: "◆" },
-  { title: "Introduction to Java", org: "Technortal", date: "Aug 2025", icon: "▷" },
-  { title: "IT Challenge Participant", org: "GUSTO College", date: "Jun 2023", icon: "▫" },
-];
-
-function HoloCard({ edu, index }: { edu: typeof EDUCATION[0]; index: number }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-
+function useInView(threshold = 0.1) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
   useEffect(() => {
-    const card = cardRef.current;
-    if (!card) return;
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return { ref, inView };
+}
 
-    const onMouseMove = (e: MouseEvent) => {
-      const rect = card.getBoundingClientRect();
-      const x = (e.clientX - rect.left) / rect.width - 0.5;
-      const y = (e.clientY - rect.top) / rect.height - 0.5;
-      card.style.transform = `perspective(800px) rotateY(${x * 15}deg) rotateX(${-y * 15}deg) translateZ(10px)`;
-    };
-
-    const onMouseLeave = () => {
-      card.style.transform = "perspective(800px) rotateY(0) rotateX(0) translateZ(0)";
-      card.style.transition = "transform 0.5s cubic-bezier(0.23, 1, 0.32, 1)";
-    };
-
-    card.addEventListener("mousemove", onMouseMove);
-    card.addEventListener("mouseleave", onMouseLeave);
-    return () => {
-      card.removeEventListener("mousemove", onMouseMove);
-      card.removeEventListener("mouseleave", onMouseLeave);
-    };
-  }, []);
-
+function EduCard({
+  badge, institution, degree, period, location, inView, delay, apex,
+}: {
+  badge: string; institution: string; degree: string; period: string;
+  location: string; inView: boolean; delay: number; apex?: boolean;
+}) {
+  const [hovered, setHovered] = useState(false);
   return (
     <div
-      ref={cardRef}
-      className="holo-card reveal"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        padding: "2rem",
-        animationDelay: `${index * 0.15}s`,
-        transition: "transform 0.1s ease",
+        background: hovered ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.025)",
+        border: hovered ? "1px solid rgba(255,255,255,0.28)" : "1px solid rgba(255,255,255,0.1)",
+        borderRadius: "12px",
+        padding: apex ? "1.8rem 2rem" : "1.5rem 1.7rem",
+        maxWidth: apex ? "340px" : "300px",
+        width: "100%",
+        boxShadow: hovered ? "0 0 24px rgba(255,255,255,0.06)" : "none",
+        transition: "border-color 0.25s, background 0.25s, box-shadow 0.25s, opacity 0.75s cubic-bezier(0.23,1,0.32,1), transform 0.75s cubic-bezier(0.23,1,0.32,1)",
+        transitionDelay: `0s, 0s, 0s, ${delay}s, ${delay}s`,
+        opacity: inView ? 1 : 0,
+        transform: inView ? "scale(1) translateY(0)" : "scale(0.92) translateY(20px)",
+        position: "relative",
+        zIndex: 2,
       }}
     >
-      {/* Icon + Grade */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.25rem" }}>
-        <span style={{ fontSize: "2.5rem" }}>{edu.icon}</span>
-        <span style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.65rem",
-          color: edu.color,
-          background: `${edu.color}15`,
-          border: `1px solid ${edu.color}30`,
-          padding: "0.25rem 0.6rem",
-          borderRadius: "4px",
-          letterSpacing: "0.05em",
-        }}>{edu.grade}</span>
-      </div>
-
-      {/* Degree */}
-      <h3 style={{
-        fontFamily: "'Space Grotesk', sans-serif",
-        fontSize: "1rem",
-        fontWeight: 600,
-        color: "white",
-        marginBottom: "0.5rem",
-        lineHeight: 1.4,
-      }}>{edu.degree}</h3>
-
-      {/* Institution */}
       <div style={{
-        fontFamily: "'Inter', sans-serif",
-        fontSize: "0.85rem",
-        color: edu.color,
-        marginBottom: "0.4rem",
-        fontWeight: 500,
-      }}>{edu.institution}</div>
-
-      {/* Period */}
-      <div style={{
+        display: "inline-block",
+        padding: "0.25rem 0.65rem",
+        border: "1px solid rgba(255,255,255,0.25)",
+        borderRadius: "999px",
         fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.7rem",
-        color: "rgba(255,255,255,0.4)",
-        marginBottom: "1.25rem",
-      }}>{edu.period}</div>
-
-      {/* Tags */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-        {edu.tags.map((tag) => (
-          <span key={tag} style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "0.62rem",
-            color: "rgba(255,255,255,0.5)",
-            background: "rgba(255,255,255,0.04)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            padding: "0.15rem 0.5rem",
-            borderRadius: "3px",
-          }}>{tag}</span>
-        ))}
+        fontSize: "0.58rem",
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        opacity: 0.7,
+        marginBottom: "0.9rem",
+      }}>{badge}</div>
+      <div style={{ fontWeight: 700, fontSize: apex ? "1.05rem" : "0.95rem", letterSpacing: "-0.01em", marginBottom: "0.3rem", lineHeight: 1.3 }}>
+        {institution}
       </div>
-
-      {/* Shimmer overlay */}
-      <div style={{
-        position: "absolute",
-        inset: 0,
-        background: `radial-gradient(circle at 50% 50%, ${edu.color}08, transparent 70%)`,
-        pointerEvents: "none",
-        borderRadius: "12px",
-      }} />
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.78rem", opacity: 0.55, marginBottom: "0.75rem", lineHeight: 1.5 }}>
+        {degree}
+      </div>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.62rem", letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.32, display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <span>{period}</span><span>·</span><span>{location}</span>
+      </div>
     </div>
   );
 }
 
 export default function EducationSection() {
-  const sectionRef = useRef<HTMLElement>(null);
-  const carouselRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.querySelectorAll<HTMLElement>(".reveal").forEach((r, i) => {
-            setTimeout(() => r.classList.add("visible"), i * 150);
-          });
-        }
-      },
-      { threshold: 0.1 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  const { ref, inView } = useInView(0.1);
 
   return (
-    <section
-      ref={sectionRef}
-      id="education"
-      style={{
-        padding: "6rem 0",
-        background: "rgba(8, 2, 20, 0.95)",
-        position: "relative",
-        zIndex: 1,
-      }}
-    >
-      <div className="container">
-        <div style={{ marginBottom: "4rem" }}>
-          <div className="section-label">03. education</div>
-          <h2 className="section-title">
-            Academic <span>Background</span>
-          </h2>
-        </div>
+    <section id="education" ref={ref} style={{ padding: "6rem 8vw", position: "relative", zIndex: 1 }}>
+      {/* Section label */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "4rem",
+        opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(16px)",
+        transition: "opacity 0.6s ease, transform 0.6s ease",
+      }}>
+        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          02 — Education
+        </span>
+      </div>
 
-        {/* Education Cards */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "1.5rem",
-          marginBottom: "5rem",
-        }}
-          className="edu-grid"
+      {/* Triangle layout */}
+      <div style={{ position: "relative", maxWidth: "820px", margin: "0 auto" }} className="edu-triangle-wrap">
+
+        {/* SVG connecting lines — drawn behind cards */}
+        <svg
+          viewBox="0 0 820 380"
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1, overflow: "visible" }}
+          preserveAspectRatio="none"
+          className="edu-svg-lines"
         >
-          {EDUCATION.map((edu, i) => (
-            <HoloCard key={edu.institution + edu.degree} edu={edu} index={i} />
+          <defs>
+            <filter id="edu-glow">
+              <feGaussianBlur stdDeviation="2.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          {/* Bottom line: BL → BR */}
+          <line x1="18%" y1="88%" x2="82%" y2="88%"
+            stroke="rgba(255,255,255,0.15)" strokeWidth="1.2" strokeDasharray="7 5"
+            style={{ opacity: inView ? 1 : 0, transition: "opacity 0.7s ease 0.35s" }}
+          />
+          {/* Left diagonal: BL → Apex */}
+          <line x1="18%" y1="88%" x2="50%" y2="6%"
+            stroke="rgba(255,255,255,0.15)" strokeWidth="1.2" strokeDasharray="7 5"
+            style={{ opacity: inView ? 1 : 0, transition: "opacity 0.7s ease 0.5s" }}
+          />
+          {/* Right diagonal: BR → Apex */}
+          <line x1="82%" y1="88%" x2="50%" y2="6%"
+            stroke="rgba(255,255,255,0.15)" strokeWidth="1.2" strokeDasharray="7 5"
+            style={{ opacity: inView ? 1 : 0, transition: "opacity 0.7s ease 0.65s" }}
+          />
+          {/* Vertex dots */}
+          {[
+            { cx: "18%", cy: "88%", d: "0.45s" },
+            { cx: "82%", cy: "88%", d: "0.6s" },
+            { cx: "50%", cy: "6%", d: "0.9s" },
+          ].map(({ cx, cy, d }) => (
+            <g key={cx + cy}>
+              <circle cx={cx} cy={cy} r="5" fill="rgba(255,255,255,0.75)" filter="url(#edu-glow)"
+                style={{ opacity: inView ? 1 : 0, transition: `opacity 0.5s ease ${d}` }}
+              />
+              <circle cx={cx} cy={cy} r="11" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1"
+                style={{ opacity: inView ? 1 : 0, transition: `opacity 0.5s ease ${d}` }}
+              />
+            </g>
           ))}
+        </svg>
+
+        {/* Apex — UWE Bristol */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "2.5rem", position: "relative", zIndex: 2 }}>
+          <EduCard
+            badge="First Class Honours"
+            institution="UWE Bristol"
+            degree="BSc Data Science & Artificial Intelligence"
+            period="Sep 2023 – Jun 2026"
+            location="Bristol, UK"
+            inView={inView}
+            delay={0.6}
+            apex
+          />
         </div>
 
-        {/* Certificates */}
-        <div>
-          <div style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: "0.7rem",
-            color: "rgba(255,255,255,0.4)",
-            letterSpacing: "0.2em",
-            textTransform: "uppercase",
-            marginBottom: "1.5rem",
-          }}>Certificates &amp; Achievements</div>
-
-          <div
-            ref={carouselRef}
-            style={{
-              display: "flex",
-              gap: "1rem",
-              overflowX: "auto",
-              paddingBottom: "1rem",
-              scrollbarWidth: "thin",
-              scrollbarColor: "rgba(0,212,255,0.3) transparent",
-            }}
-          >
-            {CERTIFICATES.map((cert) => (
-              <div key={cert.title} className="cert-card reveal">
-                <div style={{ fontSize: "2rem", marginBottom: "0.75rem" }}>{cert.icon}</div>
-                <div style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  color: "white",
-                  marginBottom: "0.4rem",
-                  lineHeight: 1.3,
-                }}>{cert.title}</div>
-                <div style={{
-                  fontFamily: "'Inter', sans-serif",
-                  fontSize: "0.75rem",
-                  color: "var(--electric-blue)",
-                  marginBottom: "0.3rem",
-                }}>{cert.org}</div>
-                <div style={{
-                  fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: "0.65rem",
-                  color: "rgba(255,255,255,0.35)",
-                }}>{cert.date}</div>
-              </div>
-            ))}
-          </div>
+        {/* Bottom row */}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "2rem", position: "relative", zIndex: 2 }} className="edu-bottom-row">
+          <EduCard
+            badge="All Distinctions"
+            institution="GUSTO College Myanmar"
+            degree="Foundation Diploma in IT"
+            period="Jul 2022 – Oct 2022"
+            location="Yangon, Myanmar"
+            inView={inView}
+            delay={0.1}
+          />
+          <EduCard
+            badge="HND Level 4–5"
+            institution="GUSTO College Myanmar"
+            degree="Higher National Diploma in Computing"
+            period="Nov 2022 – Nov 2024"
+            location="Yangon, Myanmar"
+            inView={inView}
+            delay={0.3}
+          />
         </div>
       </div>
 
       <style>{`
-        @media (max-width: 900px) {
-          .edu-grid { grid-template-columns: 1fr !important; }
+        @media (max-width: 640px) {
+          .edu-bottom-row { flex-direction: column !important; align-items: center !important; }
+          .edu-svg-lines { display: none !important; }
         }
-        @media (min-width: 640px) and (max-width: 900px) {
-          .edu-grid { grid-template-columns: 1fr 1fr !important; }
+        .light .edu-triangle-wrap [style*="rgba(255,255,255,0.025)"] {
+          background: rgba(0,0,0,0.03) !important;
         }
       `}</style>
     </section>
