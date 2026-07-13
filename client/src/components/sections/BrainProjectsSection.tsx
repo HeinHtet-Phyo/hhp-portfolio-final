@@ -515,8 +515,6 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Per-project neural network overlay rotates with brain */}
-        <NeuralNetworkOverlay selected={selected} />
       </group>
       {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
       {PROJECTS.map((proj, i) => (
@@ -785,7 +783,6 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
-      <AmbientParticles />
     </>
   );
 }
