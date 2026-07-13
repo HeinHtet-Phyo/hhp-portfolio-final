@@ -235,6 +235,34 @@ function HoloBrain({
     }
   }, [selectedId, camera]);
 
+  // Cerebellum geometry — procedural bumpy ellipsoid placed at the back-bottom of the brain
+  const cerebellumGeo = useMemo(() => {
+    // The cerebellum sits at back-bottom: x≈0, y≈-0.28, z≈-0.28 relative to brain center
+    // It's roughly 0.38 wide, 0.22 tall, 0.30 deep
+    const geo = new THREE.SphereGeometry(1, 64, 40);
+    const pos = geo.attributes.position;
+    // Squash into cerebellum ellipsoid shape — wider than tall, slightly flattened
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i) * 0.22;  // half-width (wider)
+      const y = pos.getY(i) * 0.13;  // half-height (flatter)
+      const z = pos.getZ(i) * 0.17;  // half-depth
+      // Add surface bumps to mimic cerebellar folia (horizontal ridges)
+      const bumpX = Math.sin(pos.getX(i) * 16 + pos.getZ(i) * 8) * 0.014;
+      const bumpZ = Math.sin(pos.getZ(i) * 14 + pos.getY(i) * 10) * 0.012;
+      const bumpY = Math.cos(pos.getY(i) * 18 + pos.getX(i) * 12) * 0.010;
+      pos.setXYZ(i, x + bumpX, y + bumpY, z + bumpZ);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
+
+  // Brainstem geometry — small cylinder connecting cerebellum to main brain
+  const brainstemGeo = useMemo(() => {
+    const geo = new THREE.CylinderGeometry(0.028, 0.022, 0.14, 12);
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
+
   if (!brainGeo) return null;
 
   return (
@@ -245,6 +273,14 @@ function HoloBrain({
       <mesh geometry={brainGeo} material={outerMat} />
       {/* Wireframe overlay */}
       <mesh geometry={brainGeo} material={wireMat} scale={1.001} />
+      {/* Cerebellum — back-bottom of brain: Z=-0.30 (back), Y=-0.32 (below center) */}
+      <mesh geometry={cerebellumGeo} material={innerMat} position={[0.0, -0.32, -0.30]} scale={1.05} />
+      <mesh geometry={cerebellumGeo} material={outerMat} position={[0.0, -0.32, -0.30]} />
+      <mesh geometry={cerebellumGeo} material={wireMat} position={[0.0, -0.32, -0.30]} scale={1.01} />
+      {/* Brainstem — connects cerebellum to main brain, angled slightly forward */}
+      <mesh geometry={brainstemGeo} material={innerMat} position={[0.03, -0.44, -0.12]} rotation={[0.3, 0, 0.08]} scale={1.05} />
+      <mesh geometry={brainstemGeo} material={outerMat} position={[0.03, -0.44, -0.12]} rotation={[0.3, 0, 0.08]} />
+      <mesh geometry={brainstemGeo} material={wireMat} position={[0.03, -0.44, -0.12]} rotation={[0.3, 0, 0.08]} />
 
       {/* Project node dots */}
       {PROJECTS.map((proj, i) => (
