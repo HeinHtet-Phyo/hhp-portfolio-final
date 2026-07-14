@@ -481,20 +481,20 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const groupRef = useRef<THREE.Group>(null);
   const wireOpRef = useRef(0.72);
 
-  // Subtle wireframe hint — low opacity so mesh cells fade into a soft glow, not sharp lines
+  // Bright white wireframe — the dominant visual, like the reference
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#ffffff",
     wireframe: true,
     transparent: true,
-    opacity: 0.18,
+    opacity: 0.72,
     depthWrite: false,
   }), []);
 
-  // Slightly brighter fill so brain shape reads clearly even with faint wireframe
+  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
   const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#1a1f2e",
+    color: "#050810",
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.55,
     depthWrite: true,
     side: THREE.FrontSide,
   }), []);
@@ -520,8 +520,8 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-    // Gentle wireframe pulse: 0.12 to 0.22 — subtle hint, not dominant
-    const targetOp = selected ? 0.10 : (0.12 + 0.10 * Math.sin(state.clock.elapsedTime * 0.8));
+    // Gentle wireframe pulse: 0.65 to 0.80
+    const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
     wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
     wireMat.opacity = wireOpRef.current;
     fillMat.opacity = selected ? 0.75 : 0.55;
