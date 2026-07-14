@@ -83,12 +83,14 @@ const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-// Project hotspot positions — placed ON the brain surface (brain radius ~0.28 at these angles)
+// Project hotspot positions — in spinning group LOCAL space
+// Brain center = [0, 0.08, 0], radius ~0.26 in world units
+// These positions sit on the brain surface and rotate WITH the brain
 const PROJECT_HOTSPOTS: [number, number, number][] = [
-  [-0.08,  0.20,  0.24],  // 0: MoodTunes — frontal lobe (top-front)
-  [ 0.12,  0.14,  0.22],  // 1: IT Career — parietal (top-right)
-  [-0.04,  0.00,  0.26],  // 2: CityPulse — temporal (mid-front)
-  [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
+  [-0.06,  0.26,  0.15],  // 0: MoodTunes — frontal lobe top
+  [ 0.14,  0.20,  0.10],  // 1: IT Career — parietal right
+  [ 0.00,  0.05,  0.24],  // 2: CityPulse — temporal front
+  [ 0.10, -0.04,  0.20],  // 3: PreventPath — lower front
 ];
 
 // ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
@@ -137,12 +139,12 @@ function HotspotDot({ position, index, active, onSelect }: {
     <group position={position}>
       {/* Tiny bright white dot — small clean sphere, no bloom sphere */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.005, 10, 10]} />
+        <sphereGeometry args={[0.003, 10, 10]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
       {/* Invisible click target — larger hitbox for usability */}
       <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.020, 8, 8]} />
+        <sphereGeometry args={[0.015, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* HTML label */}
@@ -529,7 +531,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
 
   return (
     <>
-      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
+      {/* Single spinning group — brain + wireframe + dots + lines all rotate together */}
       <group ref={groupRef}>
         {/* Dark fill — gives depth so back faces don't show through */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
@@ -546,19 +548,18 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
             scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
           />
         ))}
+        {/* Neural lines + hotspot dots — inside spinning group so they rotate with brain */}
+        <NeuralLines />
+        {PROJECTS.map((proj, i) => (
+          <HotspotDot
+            key={proj.id}
+            position={PROJECT_HOTSPOTS[i]}
+            index={i}
+            active={selected?.id === proj.id}
+            onSelect={() => onHotspotSelect(proj)}
+          />
+        ))}
       </group>
-      {/* Neural lines connecting the 4 project nodes — fixed in world space */}
-      <NeuralLines />
-      {/* Hotspot dots — fixed in world space */}
-      {PROJECTS.map((proj, i) => (
-        <HotspotDot
-          key={proj.id}
-          position={PROJECT_HOTSPOTS[i]}
-          index={i}
-          active={selected?.id === proj.id}
-          onSelect={() => onHotspotSelect(proj)}
-        />
-      ))}
     </>
   );
 }
