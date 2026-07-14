@@ -91,6 +91,31 @@ const PROJECT_HOTSPOTS: [number, number, number][] = [
   [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
 ];
 
+// ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
+function NeuralLines() {
+  const matRef = useRef<THREE.LineBasicMaterial>(null);
+  useFrame(({ clock }) => {
+    if (matRef.current) {
+      // Bright neural pulse — 0.55 to 0.80
+      matRef.current.opacity = 0.55 + 0.25 * Math.sin(clock.elapsedTime * 1.2);
+    }
+  });
+  const geo = useMemo(() => {
+    const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+    const pts: THREE.Vector3[] = [];
+    pairs.forEach(([a, b]) => {
+      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[a]));
+      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[b]));
+    });
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }, []);
+  return (
+    <lineSegments geometry={geo}>
+      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.65} depthWrite={false} />
+    </lineSegments>
+  );
+}
+
 // ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
 function HotspotDot({ position, index, active, onSelect }: {
   position: [number, number, number];
@@ -99,33 +124,26 @@ function HotspotDot({ position, index, active, onSelect }: {
   onSelect: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
-  const proj = PROJECTS[index];
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     if (meshRef.current) {
-      const s = active ? 1.4 : (1.0 + 0.15 * Math.sin(t * 2.5 + index));
+      const s = active ? 1.5 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
       meshRef.current.scale.setScalar(s);
-    }
-    if (ringRef.current) {
-      const rs = 1.0 + 0.4 * Math.sin(t * 2.0 + index * 1.2);
-      ringRef.current.scale.setScalar(rs);
-      (ringRef.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.9 : (0.3 + 0.3 * Math.sin(t * 2.0 + index));
     }
   });
 
   return (
     <group position={position}>
-      {/* Project node — clean white sphere, larger than neural dots, clickable */}
+      {/* Tiny bright white dot — small clean sphere, no bloom sphere */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.018, 20, 20]} />
+        <sphereGeometry args={[0.005, 10, 10]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-      {/* Soft white bloom — additive, no ring */}
-      <mesh>
-        <sphereGeometry args={[0.034, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.28 : 0.10} depthWrite={false} blending={THREE.AdditiveBlending} />
+      {/* Invisible click target — larger hitbox for usability */}
+      <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <sphereGeometry args={[0.020, 8, 8]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* HTML label */}
       <Html
@@ -461,94 +479,40 @@ function NeuralDots() {
 function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
+  const wireOpRef = useRef(0.72);
 
-  // Wireframe material — barely-there hint of mesh texture, not dominant
+  // Bright white wireframe — the dominant visual, like the reference
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#ffffff",
     wireframe: true,
     transparent: true,
-    opacity: 0.05,
+    opacity: 0.72,
     depthWrite: false,
   }), []);
 
-  // Solid diffuse brain shader — clearly shows folds/ridges, mostly opaque, clean grayscale
-  const mat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uTime:    { value: 0 },
-      uOpacity: { value: 1.0 },
-    },
-    vertexShader: /* glsl */`
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      varying vec3 vViewDir;
-      void main() {
-        vec4 wp = modelMatrix * vec4(position, 1.0);
-        vWorldPos = wp.xyz;
-        vNormal   = normalize(normalMatrix * normal);
-        vViewDir  = normalize(cameraPosition - wp.xyz);
-        gl_Position = projectionMatrix * viewMatrix * wp;
-      }
-    `,
-    fragmentShader: /* glsl */`
-      uniform float uTime;
-      uniform float uOpacity;
-      varying vec3 vNormal;
-      varying vec3 vWorldPos;
-      varying vec3 vViewDir;
-
-      void main() {
-        vec3 N = normalize(vNormal);
-        vec3 V = normalize(vViewDir);
-
-        // Key light from upper-left — reveals folds with strong diffuse shading
-        vec3 L1 = normalize(vec3(-1.2, 3.5, 2.0));
-        float diff1 = max(dot(N, L1), 0.0);
-
-        // Soft fill from right — lifts shadows so dark grooves aren't pitch black
-        vec3 L2 = normalize(vec3(2.5, 0.5, 1.5));
-        float diff2 = max(dot(N, L2), 0.0) * 0.35;
-
-        // Ambient — ensures even dark areas are still visible
-        float ambient = 0.28;
-
-        // Specular — subtle, just adds a little sheen on ridges
-        vec3 H1 = normalize(L1 + V);
-        float spec = pow(max(dot(N, H1), 0.0), 32.0) * 0.25;
-
-        // Grayscale: grooves are mid-dark, ridges are bright white
-        float lit = clamp(ambient + diff1 * 0.75 + diff2, 0.0, 1.0);
-        float gray = mix(0.22, 0.92, smoothstep(0.0, 1.0, lit));
-        vec3 base = vec3(gray) + vec3(spec);
-
-        // Mostly opaque — full surface visible, faint rim transparency only
-        float NdotV = max(dot(N, V), 0.0);
-        float rimTransp = pow(1.0 - NdotV, 3.5) * 0.25; // very subtle rim fade
-        float alpha = uOpacity * clamp(0.82 - rimTransp, 0.55, 1.0);
-
-        gl_FragColor = vec4(clamp(base, 0.0, 1.0), alpha);
-      }
-    `,
+  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
+  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: "#050810",
     transparent: true,
+    opacity: 0.55,
     depthWrite: true,
     side: THREE.FrontSide,
   }), []);
 
-  // Collect all brain meshes for wireframe cloning
+  // Collect brain meshes
   const brainMeshes = useMemo(() => {
     const meshes: THREE.Mesh[] = [];
     gltf.scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) {
-        meshes.push(child as THREE.Mesh);
-      }
+      if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
     });
     return meshes;
   }, [gltf]);
 
   useEffect(() => {
     brainMeshes.forEach((mesh) => {
-      mesh.material = mat;
+      mesh.material = fillMat;
     });
-  }, [brainMeshes, mat]);
+  }, [brainMeshes, fillMat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -556,28 +520,22 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-    mat.uniforms.uTime.value = state.clock.elapsedTime;
-    mat.uniforms.uOpacity.value = THREE.MathUtils.lerp(
-      mat.uniforms.uOpacity.value,
-      selected ? 0.65 : 1.0,
-      0.05
-    );
+    // Gentle wireframe pulse: 0.65 to 0.80
+    const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
+    wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
+    wireMat.opacity = wireOpRef.current;
+    fillMat.opacity = selected ? 0.75 : 0.55;
   });
 
   return (
     <>
-      {/* Bright inner core glow — tight sphere only, no large outer shadow */}
-      <mesh position={[0, 0.08, 0]}>
-        <sphereGeometry args={[0.13, 24, 24]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* Spinning brain group */}
+      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
       <group ref={groupRef}>
-        {/* Glass base layer */}
+        {/* Dark fill — gives depth so back faces don't show through */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Wireframe overlay — same geometry, same transform */}
+        {/* Bright white wireframe overlay — same geometry */}
         {brainMeshes.map((mesh, i) => (
           <mesh
             key={i}
@@ -589,7 +547,9 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
           />
         ))}
       </group>
-      {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
+      {/* Neural lines connecting the 4 project nodes — fixed in world space */}
+      <NeuralLines />
+      {/* Hotspot dots — fixed in world space */}
       {PROJECTS.map((proj, i) => (
         <HotspotDot
           key={proj.id}
