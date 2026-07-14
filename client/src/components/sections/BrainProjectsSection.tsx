@@ -96,7 +96,8 @@ function NeuralLines() {
   const matRef = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ clock }) => {
     if (matRef.current) {
-      matRef.current.opacity = 0.18 + 0.08 * Math.sin(clock.elapsedTime * 0.9);
+      // Bright neural pulse — 0.55 to 0.80
+      matRef.current.opacity = 0.55 + 0.25 * Math.sin(clock.elapsedTime * 1.2);
     }
   });
   const geo = useMemo(() => {
@@ -110,7 +111,7 @@ function NeuralLines() {
   }, []);
   return (
     <lineSegments geometry={geo}>
-      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.20} depthWrite={false} />
+      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.65} depthWrite={false} />
     </lineSegments>
   );
 }
@@ -134,15 +135,15 @@ function HotspotDot({ position, index, active, onSelect }: {
 
   return (
     <group position={position}>
-      {/* Tiny bright white dot */}
+      {/* Tiny bright white dot — small clean sphere, no bloom sphere */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.007, 12, 12]} />
+        <sphereGeometry args={[0.005, 10, 10]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-      {/* Very small additive glow — no dark halo */}
-      <mesh>
-        <sphereGeometry args={[0.013, 10, 10]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.35 : 0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
+      {/* Invisible click target — larger hitbox for usability */}
+      <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <sphereGeometry args={[0.020, 8, 8]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* HTML label */}
       <Html
