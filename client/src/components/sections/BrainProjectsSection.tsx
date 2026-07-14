@@ -481,18 +481,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const groupRef = useRef<THREE.Group>(null);
   const wireOpRef = useRef(0.72);
 
-  // Low-poly icosahedron — detail=2 gives 80 large triangular facets (gem/crystal look)
-  // Scaled and squashed to match the brain's oval proportions
-  const lowPolyGeo = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(0.52, 2);
-    // Squash slightly to match brain's oval shape (wider than tall)
-    geo.scale(1.15, 0.88, 0.95);
-    // Shift up slightly to center on brain
-    geo.translate(0, 0.04, 0);
-    return geo;
-  }, []);
-
-  // Bright white wireframe on the low-poly shell — large visible facet edges
+  // Bright white wireframe — the dominant visual, like the reference
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#ffffff",
     wireframe: true,
@@ -501,25 +490,16 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     depthWrite: false,
   }), []);
 
-  // Very faint dark fill on the low-poly shell — gives glass depth
-  const lowPolyFillMat = useMemo(() => new THREE.MeshBasicMaterial({
+  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
+  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#050810",
     transparent: true,
-    opacity: 0.30,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  }), []);
-
-  // Dark fill on original brain — shows the actual brain shape underneath
-  const brainFillMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#0a0d18",
-    transparent: true,
-    opacity: 0.65,
+    opacity: 0.55,
     depthWrite: true,
     side: THREE.FrontSide,
   }), []);
 
-  // Collect brain meshes for the dark fill layer
+  // Collect brain meshes
   const brainMeshes = useMemo(() => {
     const meshes: THREE.Mesh[] = [];
     gltf.scene.traverse((child) => {
@@ -529,8 +509,10 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   }, [gltf]);
 
   useEffect(() => {
-    brainMeshes.forEach((mesh) => { mesh.material = brainFillMat; });
-  }, [brainMeshes, brainFillMat]);
+    brainMeshes.forEach((mesh) => {
+      mesh.material = fillMat;
+    });
+  }, [brainMeshes, fillMat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -538,27 +520,36 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
+    // Gentle wireframe pulse: 0.65 to 0.80
     const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
     wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
     wireMat.opacity = wireOpRef.current;
-    brainFillMat.opacity = selected ? 0.80 : 0.65;
+    fillMat.opacity = selected ? 0.75 : 0.55;
   });
 
   return (
     <>
-      {/* Spinning group — everything rotates together */}
+      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
       <group ref={groupRef}>
-        {/* Original brain mesh — dark fill to show brain shape underneath */}
+        {/* Dark fill — gives depth so back faces don't show through */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Low-poly glass shell — large sparse facets with bright white edges */}
-        <mesh geometry={lowPolyGeo} material={lowPolyFillMat} />
-        <mesh geometry={lowPolyGeo} material={wireMat} />
+        {/* Bright white wireframe overlay — same geometry */}
+        {brainMeshes.map((mesh, i) => (
+          <mesh
+            key={i}
+            geometry={mesh.geometry}
+            material={wireMat}
+            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
+            position={new THREE.Vector3(0, 0.08, 0)}
+            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
+          />
+        ))}
       </group>
-      {/* Neural lines connecting the 4 project nodes */}
+      {/* Neural lines connecting the 4 project nodes — fixed in world space */}
       <NeuralLines />
-      {/* Hotspot dots */}
+      {/* Hotspot dots — fixed in world space */}
       {PROJECTS.map((proj, i) => (
         <HotspotDot
           key={proj.id}
