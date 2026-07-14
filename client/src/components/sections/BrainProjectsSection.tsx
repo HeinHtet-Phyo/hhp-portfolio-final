@@ -471,7 +471,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     depthWrite: false,
   }), []);
 
-  // Grayscale semi-transparent glass brain shader — base layer under wireframe
+  // Solid diffuse brain shader — clearly shows folds/ridges, mostly opaque, clean grayscale
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -499,42 +499,38 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
       void main() {
         vec3 N = normalize(vNormal);
         vec3 V = normalize(vViewDir);
-        float NdotV = max(dot(N, V), 0.0);
 
-        // Fresnel — glass edges more visible, center see-through
-        float fresnel = pow(1.0 - NdotV, 1.8);
-
-        // Key light from upper-left
-        vec3 L1 = normalize(vec3(-1.5, 3.0, 2.5));
+        // Key light from upper-left — reveals folds with strong diffuse shading
+        vec3 L1 = normalize(vec3(-1.2, 3.5, 2.0));
         float diff1 = max(dot(N, L1), 0.0);
 
-        // Fill from right
-        vec3 L2 = normalize(vec3(2.5, 1.0, 1.0));
-        float diff2 = max(dot(N, L2), 0.0) * 0.3;
+        // Soft fill from right — lifts shadows so dark grooves aren't pitch black
+        vec3 L2 = normalize(vec3(2.5, 0.5, 1.5));
+        float diff2 = max(dot(N, L2), 0.0) * 0.35;
 
-        // Glass specular — tight highlight
+        // Ambient — ensures even dark areas are still visible
+        float ambient = 0.28;
+
+        // Specular — subtle, just adds a little sheen on ridges
         vec3 H1 = normalize(L1 + V);
-        float spec = pow(max(dot(N, H1), 0.0), 64.0) * 0.6;
+        float spec = pow(max(dot(N, H1), 0.0), 32.0) * 0.25;
 
-        // Purely grayscale palette — no color
-        float lit = clamp(diff1 * 0.85 + diff2, 0.0, 1.0);
-        // Dark grooves, lighter ridges — all gray
-        float gray = mix(0.08, 0.42, smoothstep(0.0, 0.8, lit));
-        vec3 base = vec3(gray);
+        // Grayscale: grooves are mid-dark, ridges are bright white
+        float lit = clamp(ambient + diff1 * 0.75 + diff2, 0.0, 1.0);
+        float gray = mix(0.22, 0.92, smoothstep(0.0, 1.0, lit));
+        vec3 base = vec3(gray) + vec3(spec);
 
-        // Add specular and fresnel rim (both white/gray)
-        base += vec3(spec * 0.7);
-        base += vec3(fresnel * 0.35);
-
-        // Opacity: center transparent, edges more visible (glass)
-        float alpha = uOpacity * clamp(0.10 + fresnel * 0.60 + spec * 0.35 + lit * 0.12, 0.0, 0.88);
+        // Mostly opaque — full surface visible, faint rim transparency only
+        float NdotV = max(dot(N, V), 0.0);
+        float rimTransp = pow(1.0 - NdotV, 3.5) * 0.25; // very subtle rim fade
+        float alpha = uOpacity * clamp(0.82 - rimTransp, 0.55, 1.0);
 
         gl_FragColor = vec4(clamp(base, 0.0, 1.0), alpha);
       }
     `,
     transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
+    depthWrite: true,
+    side: THREE.FrontSide,
   }), []);
 
   // Collect all brain meshes for wireframe cloning
