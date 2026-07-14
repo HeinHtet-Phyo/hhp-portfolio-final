@@ -99,33 +99,27 @@ function HotspotDot({ position, index, active, onSelect }: {
   onSelect: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
-  const proj = PROJECTS[index];
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     if (meshRef.current) {
-      const s = active ? 1.4 : (1.0 + 0.15 * Math.sin(t * 2.5 + index));
+      // Gentle pulse — active is slightly larger, inactive breathes softly
+      const s = active ? 1.3 : (1.0 + 0.12 * Math.sin(t * 2.2 + index));
       meshRef.current.scale.setScalar(s);
-    }
-    if (ringRef.current) {
-      const rs = 1.0 + 0.4 * Math.sin(t * 2.0 + index * 1.2);
-      ringRef.current.scale.setScalar(rs);
-      (ringRef.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.9 : (0.3 + 0.3 * Math.sin(t * 2.0 + index));
     }
   });
 
   return (
     <group position={position}>
-      {/* Project node — clean white sphere, larger than neural dots, clickable */}
+      {/* Project node — small clean white sphere, clickable */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.018, 20, 20]} />
+        <sphereGeometry args={[0.009, 16, 16]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-      {/* Soft white bloom — additive, no ring */}
+      {/* Tiny additive white glow only — no dark halo, purely additive blending */}
       <mesh>
-        <sphereGeometry args={[0.034, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.28 : 0.10} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <sphereGeometry args={[0.016, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.30 : 0.12} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* HTML label */}
       <Html
@@ -400,58 +394,72 @@ function CameraController({ selected }: { selected: Project | null }) {
   return null;
 }
 
-// ─── Neural Network Dots + Lines (subtle, always-on, rotates with brain) ────────
-// Fixed set of small white dots connected by thin lines — "tech but understated"
-const NEURAL_POSITIONS: [number, number, number][] = [
-  [-0.18,  0.22,  0.12],
-  [ 0.20,  0.18,  0.08],
-  [-0.05,  0.28,  0.05],
-  [ 0.14, -0.05,  0.20],
-  [-0.22, -0.02,  0.10],
-  [ 0.05,  0.10,  0.26],
-  [-0.12,  0.05,  0.24],
-  [ 0.22,  0.08, -0.10],
-  [-0.08, -0.18,  0.18],
-  [ 0.16,  0.24, -0.05],
-  [-0.24,  0.12, -0.08],
-  [ 0.02, -0.22,  0.12],
-];
-// Edges: pairs of indices into NEURAL_POSITIONS
-const NEURAL_EDGES: [number, number][] = [
-  [0, 2], [1, 2], [2, 5], [3, 5], [3, 6], [4, 6],
-  [5, 6], [1, 9], [7, 9], [4, 10], [8, 11], [3, 8],
-];
+// ─── Neural Surface Dots + Lines (whole-brain coverage, rotates with brain) ────────
+// Points distributed across the brain surface using spherical distribution
+// Brain radius ~0.28 in world units at scale 0.0018 * ~155 mesh units
+function generateBrainSurfacePoints(count: number): [number, number, number][] {
+  const pts: [number, number, number][] = [];
+  const R = 0.26; // approximate brain radius
+  // Use Fibonacci sphere for even distribution
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i / (count - 1)) * 2;
+    const r = Math.sqrt(1 - y * y);
+    const theta = golden * i;
+    // Squish Z slightly to match brain's roughly ellipsoidal shape
+    pts.push([
+      R * r * Math.cos(theta) * 1.15,
+      R * y * 0.85 + 0.08,
+      R * r * Math.sin(theta) * 0.9,
+    ]);
+  }
+  return pts;
+}
+
+const NEURAL_PTS = generateBrainSurfacePoints(32);
+// Connect nearby points with edges
+const NEURAL_EDGES_SURF: [number, number][] = (() => {
+  const edges: [number, number][] = [];
+  for (let i = 0; i < NEURAL_PTS.length; i++) {
+    for (let j = i + 1; j < NEURAL_PTS.length; j++) {
+      const dx = NEURAL_PTS[i][0] - NEURAL_PTS[j][0];
+      const dy = NEURAL_PTS[i][1] - NEURAL_PTS[j][1];
+      const dz = NEURAL_PTS[i][2] - NEURAL_PTS[j][2];
+      const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      if (dist < 0.14 && edges.length < 40) edges.push([i, j]);
+    }
+  }
+  return edges;
+})();
 
 function NeuralDots() {
   const lineMatRef = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ clock }) => {
     if (lineMatRef.current) {
-      // Gentle opacity pulse on lines
-      lineMatRef.current.opacity = 0.08 + 0.04 * Math.sin(clock.elapsedTime * 0.8);
+      lineMatRef.current.opacity = 0.06 + 0.03 * Math.sin(clock.elapsedTime * 0.7);
     }
   });
 
-  const lineSegments = useMemo(() => {
+  const lineGeo = useMemo(() => {
     const points: THREE.Vector3[] = [];
-    NEURAL_EDGES.forEach(([a, b]) => {
-      points.push(new THREE.Vector3(...NEURAL_POSITIONS[a]));
-      points.push(new THREE.Vector3(...NEURAL_POSITIONS[b]));
+    NEURAL_EDGES_SURF.forEach(([a, b]) => {
+      points.push(new THREE.Vector3(...NEURAL_PTS[a]));
+      points.push(new THREE.Vector3(...NEURAL_PTS[b]));
     });
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    return geo;
+    return new THREE.BufferGeometry().setFromPoints(points);
   }, []);
 
   return (
     <group>
-      {/* Thin connecting lines */}
-      <lineSegments geometry={lineSegments}>
-        <lineBasicMaterial ref={lineMatRef} color="#ffffff" transparent opacity={0.10} depthWrite={false} />
+      {/* Thin connecting lines across whole brain */}
+      <lineSegments geometry={lineGeo}>
+        <lineBasicMaterial ref={lineMatRef} color="#ffffff" transparent opacity={0.07} depthWrite={false} />
       </lineSegments>
-      {/* Small neural dots */}
-      {NEURAL_POSITIONS.map((pos, i) => (
+      {/* Small ambient neural dots */}
+      {NEURAL_PTS.map((pos, i) => (
         <mesh key={i} position={pos}>
-          <sphereGeometry args={[0.006, 8, 8]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.45} depthWrite={false} />
+          <sphereGeometry args={[0.004, 6, 6]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       ))}
     </group>
@@ -462,16 +470,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
 
-  // Wireframe material — barely-there hint of mesh texture, not dominant
-  const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#ffffff",
-    wireframe: true,
-    transparent: true,
-    opacity: 0.05,
-    depthWrite: false,
-  }), []);
-
-  // Grayscale semi-transparent glass brain shader — base layer under wireframe
+  // Grayscale semi-transparent glass brain shader — true transparency, see-through
   const mat = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uTime:    { value: 0 },
@@ -516,18 +515,20 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
         vec3 H1 = normalize(L1 + V);
         float spec = pow(max(dot(N, H1), 0.0), 64.0) * 0.6;
 
-        // Purely grayscale palette — no color
-        float lit = clamp(diff1 * 0.85 + diff2, 0.0, 1.0);
-        // Dark grooves, lighter ridges — all gray
-        float gray = mix(0.08, 0.42, smoothstep(0.0, 0.8, lit));
+        // Purely white/gray glass — no color tint
+        float lit = clamp(diff1 * 0.7 + diff2, 0.0, 1.0);
+        // Very light gray base — almost white, not dark
+        float gray = mix(0.55, 0.90, smoothstep(0.0, 1.0, lit));
         vec3 base = vec3(gray);
 
-        // Add specular and fresnel rim (both white/gray)
-        base += vec3(spec * 0.7);
-        base += vec3(fresnel * 0.35);
+        // Sharp glass specular
+        base += vec3(spec * 0.8);
+        // Fresnel rim — bright edges
+        base += vec3(fresnel * 0.45);
 
-        // Opacity: center transparent, edges more visible (glass)
-        float alpha = uOpacity * clamp(0.10 + fresnel * 0.60 + spec * 0.35 + lit * 0.12, 0.0, 0.88);
+        // True glass opacity: mostly transparent, only edges/specular visible
+        // Center of brain nearly invisible, silhouette rim clearly defined
+        float alpha = uOpacity * clamp(fresnel * 0.55 + spec * 0.45 + lit * 0.04, 0.0, 0.75);
 
         gl_FragColor = vec4(clamp(base, 0.0, 1.0), alpha);
       }
@@ -537,22 +538,13 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     side: THREE.DoubleSide,
   }), []);
 
-  // Collect all brain meshes for wireframe cloning
-  const brainMeshes = useMemo(() => {
-    const meshes: THREE.Mesh[] = [];
+  useEffect(() => {
     gltf.scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        meshes.push(child as THREE.Mesh);
+        (child as THREE.Mesh).material = mat;
       }
     });
-    return meshes;
-  }, [gltf]);
-
-  useEffect(() => {
-    brainMeshes.forEach((mesh) => {
-      mesh.material = mat;
-    });
-  }, [brainMeshes, mat]);
+  }, [gltf, mat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -577,21 +569,12 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
       </mesh>
       {/* Spinning brain group */}
       <group ref={groupRef}>
-        {/* Glass base layer */}
+        {/* Glass brain surface */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Wireframe overlay — same geometry, same transform */}
-        {brainMeshes.map((mesh, i) => (
-          <mesh
-            key={i}
-            geometry={mesh.geometry}
-            material={wireMat}
-            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
-            position={new THREE.Vector3(0, 0.08, 0)}
-            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
-          />
-        ))}
+        {/* Neural network dots + lines rotating WITH the brain */}
+        <NeuralDots />
       </group>
       {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
       {PROJECTS.map((proj, i) => (
