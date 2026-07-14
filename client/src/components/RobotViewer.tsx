@@ -13,7 +13,7 @@ import { OrbitControls } from "@react-three/drei";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
 
-const ROBOT_URL = "/manus-storage/robot_8c5dc592.glb";
+const ROBOT_URL = "/models/robot_8c5dc592.glb";
 
 function RobotModel() {
   const gltf = useLoader(GLTFLoader, ROBOT_URL);

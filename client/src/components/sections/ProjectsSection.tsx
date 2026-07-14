@@ -406,7 +406,7 @@ function CameraController({ selected }: { selected: Project | null }) {
 }
 
 function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_afbd3b7b.glb");
+  const gltf     = useLoader(GLTFLoader, "/models/BrainUVs_afbd3b7b.glb");
   const groupRef = useRef<THREE.Group>(null);
 
   // Realistic flesh-tone brain shader

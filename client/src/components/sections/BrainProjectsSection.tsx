@@ -477,7 +477,7 @@ function NeuralDots() {
 }
 
 function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
-  const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
+  const gltf     = useLoader(GLTFLoader, "/models/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
   const wireOpRef = useRef(0.72);
 

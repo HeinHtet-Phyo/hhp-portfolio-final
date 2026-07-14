@@ -4,7 +4,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { useGLTF, OrbitControls, useAnimations } from "@react-three/drei";
 import * as THREE from "three";
 
-const MODEL_URL = "/manus-storage/sci_-_fi_computer_game_ready_575ecfbb.glb";
+const MODEL_URL = "/models/sci_-_fi_computer_game_ready_575ecfbb.glb";
 
 function RendererSetup() {
   const { gl } = useThree();

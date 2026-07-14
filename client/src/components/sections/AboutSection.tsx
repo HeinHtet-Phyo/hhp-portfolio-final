@@ -141,7 +141,7 @@ export default function AboutSection() {
               />
             ))}
               <img
-                src="/manus-storage/hein-photo_e7519650.jpg"
+                src="/images/hein-photo.jpg"
                 alt="Hein Htet Phyo"
                 style={{
                   width: "100%",
