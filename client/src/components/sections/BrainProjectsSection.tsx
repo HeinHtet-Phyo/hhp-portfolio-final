@@ -83,22 +83,24 @@ const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-// Project hotspot positions — placed ON the brain surface (brain radius ~0.28 at these angles)
+// Project hotspot positions — placed DEEPER inside the brain volume (not on the surface edge)
 const PROJECT_HOTSPOTS: [number, number, number][] = [
-  [-0.08,  0.20,  0.24],  // 0: MoodTunes — frontal lobe (top-front)
-  [ 0.12,  0.14,  0.22],  // 1: IT Career — parietal (top-right)
-  [-0.04,  0.00,  0.26],  // 2: CityPulse — temporal (mid-front)
-  [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
+  [-0.06,  0.14,  0.10],  // 0: MoodTunes — upper-front interior
+  [ 0.10,  0.08,  0.06],  // 1: IT Career — upper-right interior
+  [-0.04, -0.02,  0.12],  // 2: CityPulse — mid-centre interior
+  [ 0.06, -0.10,  0.08],  // 3: PreventPath — lower interior
 ];
 
 // ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
 function NeuralLines() {
-  const matRef = useRef<THREE.LineBasicMaterial>(null);
+  const matRef  = useRef<THREE.LineBasicMaterial>(null);
+  const mat2Ref = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ clock }) => {
-    if (matRef.current) {
-      // Bright neural pulse — 0.55 to 0.80
-      matRef.current.opacity = 0.55 + 0.25 * Math.sin(clock.elapsedTime * 1.2);
-    }
+    const t = clock.elapsedTime;
+    // Core bright line — pulses 0.85 → 1.0
+    if (matRef.current)  matRef.current.opacity  = 0.85 + 0.15 * Math.sin(t * 1.4);
+    // Wide soft glow halo — pulses 0.30 → 0.55
+    if (mat2Ref.current) mat2Ref.current.opacity = 0.30 + 0.25 * Math.sin(t * 1.4 + 0.5);
   });
   const geo = useMemo(() => {
     const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
@@ -110,9 +112,16 @@ function NeuralLines() {
     return new THREE.BufferGeometry().setFromPoints(pts);
   }, []);
   return (
-    <lineSegments geometry={geo}>
-      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.65} depthWrite={false} />
-    </lineSegments>
+    <>
+      {/* Outer soft glow halo — wide, additive, slightly blue-white */}
+      <lineSegments geometry={geo}>
+        <lineBasicMaterial ref={mat2Ref} color="#c8e8ff" transparent opacity={0.40} depthWrite={false} blending={THREE.AdditiveBlending} linewidth={3} />
+      </lineSegments>
+      {/* Core bright neon white line */}
+      <lineSegments geometry={geo}>
+        <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </lineSegments>
+    </>
   );
 }
 
@@ -123,26 +132,45 @@ function HotspotDot({ position, index, active, onSelect }: {
   active: boolean;
   onSelect: () => void;
 }) {
-  const meshRef = useRef<THREE.Mesh>(null);
+  const coreRef  = useRef<THREE.Mesh>(null);
+  const halo1Ref = useRef<THREE.Mesh>(null);
+  const halo2Ref = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (meshRef.current) {
-      const s = active ? 1.5 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
-      meshRef.current.scale.setScalar(s);
-    }
+    const pulse = active ? 1.6 : (1.0 + 0.22 * Math.sin(t * 2.2 + index));
+    if (coreRef.current)  coreRef.current.scale.setScalar(pulse);
+    // Inner halo — slightly larger, additive glow
+    const h1 = active ? 2.0 : (1.0 + 0.30 * Math.sin(t * 1.8 + index));
+    if (halo1Ref.current) halo1Ref.current.scale.setScalar(h1);
+    // Outer halo — slow breathe
+    const h2 = active ? 2.8 : (1.0 + 0.40 * Math.sin(t * 1.2 + index + 1.0));
+    if (halo2Ref.current) halo2Ref.current.scale.setScalar(h2);
+    // Opacity modulation on halos
+    if (halo1Ref.current) (halo1Ref.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.55 : (0.30 + 0.20 * Math.sin(t * 1.8 + index));
+    if (halo2Ref.current) (halo2Ref.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.30 : (0.12 + 0.10 * Math.sin(t * 1.2 + index + 1.0));
   });
 
   return (
     <group position={position}>
-      {/* Tiny bright white dot — small clean sphere, no bloom sphere */}
-      <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.005, 10, 10]} />
-        <meshBasicMaterial color="#ffffff" />
+      {/* Outer diffuse glow sphere — large, additive, very faint */}
+      <mesh ref={halo2Ref}>
+        <sphereGeometry args={[0.022, 12, 12]} />
+        <meshBasicMaterial color="#88ccff" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      {/* Inner glow halo — medium, bright blue-white */}
+      <mesh ref={halo1Ref}>
+        <sphereGeometry args={[0.012, 12, 12]} />
+        <meshBasicMaterial color="#d0eeff" transparent opacity={0.40} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      {/* Core bright white dot */}
+      <mesh ref={coreRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
+        <sphereGeometry args={[0.006, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* Invisible click target — larger hitbox for usability */}
       <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.020, 8, 8]} />
+        <sphereGeometry args={[0.025, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* HTML label */}
