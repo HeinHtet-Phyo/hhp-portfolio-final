@@ -91,6 +91,30 @@ const PROJECT_HOTSPOTS: [number, number, number][] = [
   [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
 ];
 
+// ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
+function NeuralLines() {
+  const matRef = useRef<THREE.LineBasicMaterial>(null);
+  useFrame(({ clock }) => {
+    if (matRef.current) {
+      matRef.current.opacity = 0.18 + 0.08 * Math.sin(clock.elapsedTime * 0.9);
+    }
+  });
+  const geo = useMemo(() => {
+    const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
+    const pts: THREE.Vector3[] = [];
+    pairs.forEach(([a, b]) => {
+      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[a]));
+      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[b]));
+    });
+    return new THREE.BufferGeometry().setFromPoints(pts);
+  }, []);
+  return (
+    <lineSegments geometry={geo}>
+      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.20} depthWrite={false} />
+    </lineSegments>
+  );
+}
+
 // ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
 function HotspotDot({ position, index, active, onSelect }: {
   position: [number, number, number];
@@ -99,33 +123,26 @@ function HotspotDot({ position, index, active, onSelect }: {
   onSelect: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const ringRef = useRef<THREE.Mesh>(null);
-  const proj = PROJECTS[index];
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
     if (meshRef.current) {
-      const s = active ? 1.4 : (1.0 + 0.15 * Math.sin(t * 2.5 + index));
+      const s = active ? 1.5 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
       meshRef.current.scale.setScalar(s);
-    }
-    if (ringRef.current) {
-      const rs = 1.0 + 0.4 * Math.sin(t * 2.0 + index * 1.2);
-      ringRef.current.scale.setScalar(rs);
-      (ringRef.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.9 : (0.3 + 0.3 * Math.sin(t * 2.0 + index));
     }
   });
 
   return (
     <group position={position}>
-      {/* Project node — clean white sphere, larger than neural dots, clickable */}
+      {/* Tiny bright white dot */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.018, 20, 20]} />
+        <sphereGeometry args={[0.007, 12, 12]} />
         <meshBasicMaterial color="#ffffff" />
       </mesh>
-      {/* Soft white bloom — additive, no ring */}
+      {/* Very small additive glow — no dark halo */}
       <mesh>
-        <sphereGeometry args={[0.034, 16, 16]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.28 : 0.10} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <sphereGeometry args={[0.013, 10, 10]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.35 : 0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* HTML label */}
       <Html
@@ -566,30 +583,15 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
 
   return (
     <>
-      {/* Bright inner core glow — tight sphere only, no large outer shadow */}
-      <mesh position={[0, 0.08, 0]}>
-        <sphereGeometry args={[0.13, 24, 24]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
       {/* Spinning brain group */}
       <group ref={groupRef}>
-        {/* Glass base layer */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Wireframe overlay — same geometry, same transform */}
-        {brainMeshes.map((mesh, i) => (
-          <mesh
-            key={i}
-            geometry={mesh.geometry}
-            material={wireMat}
-            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
-            position={new THREE.Vector3(0, 0.08, 0)}
-            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
-          />
-        ))}
       </group>
-      {/* Hotspot dots are OUTSIDE spinning group — fixed in world space */}
+      {/* Neural lines connecting the 4 project nodes — fixed in world space */}
+      <NeuralLines />
+      {/* Hotspot dots — fixed in world space */}
       {PROJECTS.map((proj, i) => (
         <HotspotDot
           key={proj.id}
