@@ -22,7 +22,6 @@ import { Html } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { SimplifyModifier } from "three/examples/jsm/modifiers/SimplifyModifier.js";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
@@ -480,61 +479,40 @@ function NeuralDots() {
 function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
-  const wireOpRef = useRef(0.65);
+  const wireOpRef = useRef(0.72);
 
-  // Decimate brain geometry to ~1500 vertices per mesh → large visible triangles
-  const decimatedGeos = useMemo(() => {
-    const modifier = new SimplifyModifier();
-    const result: THREE.BufferGeometry[] = [];
-    gltf.scene.traverse((child) => {
-      if (!(child as THREE.Mesh).isMesh) return;
-      const mesh = child as THREE.Mesh;
-      let geo = mesh.geometry.clone();
-      // Bake mesh world transform into geometry
-      const worldMatrix = new THREE.Matrix4();
-      mesh.updateWorldMatrix(true, false);
-      worldMatrix.copy(mesh.matrixWorld);
-      geo.applyMatrix4(worldMatrix);
-      // Convert to non-indexed for simplifier
-      if (!geo.index) geo = geo.toNonIndexed();
-      // Keep only position attribute
-      const posAttr = geo.getAttribute("position").clone();
-      const cleanGeo = new THREE.BufferGeometry();
-      cleanGeo.setAttribute("position", posAttr);
-      // Remove down to 1500 vertices — gives large visible triangles
-      const vertCount = cleanGeo.getAttribute("position").count;
-      const removeCount = Math.max(0, vertCount - 1500);
-      if (removeCount > 0) {
-        try {
-          const simplified = modifier.modify(cleanGeo, removeCount);
-          result.push(simplified);
-        } catch (_) {
-          result.push(cleanGeo); // fallback: use position-only geo
-        }
-      } else {
-        result.push(cleanGeo);
-      }
-    });
-    return result;
-  }, [gltf]);
-
-  // Bright white wireframe — large triangles now visible
+  // Bright white wireframe — the dominant visual, like the reference
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#ffffff",
     wireframe: true,
     transparent: true,
-    opacity: 0.65,
+    opacity: 0.72,
     depthWrite: false,
   }), []);
 
-  // Very faint dark fill — gives the brain volume/depth
+  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
   const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#050810",
     transparent: true,
-    opacity: 0.60,
+    opacity: 0.55,
     depthWrite: true,
     side: THREE.FrontSide,
   }), []);
+
+  // Collect brain meshes
+  const brainMeshes = useMemo(() => {
+    const meshes: THREE.Mesh[] = [];
+    gltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
+    });
+    return meshes;
+  }, [gltf]);
+
+  useEffect(() => {
+    brainMeshes.forEach((mesh) => {
+      mesh.material = fillMat;
+    });
+  }, [brainMeshes, fillMat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -542,23 +520,31 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-    const targetOp = selected ? 0.50 : (0.55 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
+    // Gentle wireframe pulse: 0.65 to 0.80
+    const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
     wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
     wireMat.opacity = wireOpRef.current;
-    fillMat.opacity = selected ? 0.75 : 0.60;
+    fillMat.opacity = selected ? 0.75 : 0.55;
   });
 
   return (
     <>
-      {/* Spinning brain group */}
+      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
       <group ref={groupRef}>
-        {/* Dark fill — gives depth */}
-        {decimatedGeos.map((geo, i) => (
-          <mesh key={`fill-${i}`} geometry={geo} material={fillMat} />
-        ))}
-        {/* Bright white wireframe — large triangles */}
-        {decimatedGeos.map((geo, i) => (
-          <mesh key={`wire-${i}`} geometry={geo} material={wireMat} />
+        {/* Dark fill — gives depth so back faces don't show through */}
+        <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
+          <primitive object={gltf.scene} />
+        </group>
+        {/* Bright white wireframe overlay — same geometry */}
+        {brainMeshes.map((mesh, i) => (
+          <mesh
+            key={i}
+            geometry={mesh.geometry}
+            material={wireMat}
+            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
+            position={new THREE.Vector3(0, 0.08, 0)}
+            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
+          />
         ))}
       </group>
       {/* Neural lines connecting the 4 project nodes — fixed in world space */}
