@@ -479,24 +479,18 @@ function NeuralDots() {
 function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   const gltf     = useLoader(GLTFLoader, "/manus-storage/BrainUVs_42a27899.glb");
   const groupRef = useRef<THREE.Group>(null);
-  const wireOpRef = useRef(0.72);
+  const opRef = useRef(0.45);
 
-  // Bright white wireframe — the dominant visual, like the reference
-  const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#ffffff",
-    wireframe: true,
+  // Semi-transparent white/gray brain material — shows all folds/ridges, see-through
+  const brainMat = useMemo(() => new THREE.MeshPhongMaterial({
+    color: new THREE.Color(0.85, 0.87, 0.92),   // very light blue-white
+    emissive: new THREE.Color(0.08, 0.09, 0.14), // faint inner glow
+    specular: new THREE.Color(1, 1, 1),
+    shininess: 60,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.45,
+    side: THREE.DoubleSide,   // see through to back faces
     depthWrite: false,
-  }), []);
-
-  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
-  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#050810",
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: true,
-    side: THREE.FrontSide,
   }), []);
 
   // Collect brain meshes
@@ -509,10 +503,8 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   }, [gltf]);
 
   useEffect(() => {
-    brainMeshes.forEach((mesh) => {
-      mesh.material = fillMat;
-    });
-  }, [brainMeshes, fillMat]);
+    brainMeshes.forEach((mesh) => { mesh.material = brainMat; });
+  }, [brainMeshes, brainMat]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -520,32 +512,19 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-    // Gentle wireframe pulse: 0.65 to 0.80
-    const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
-    wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
-    wireMat.opacity = wireOpRef.current;
-    fillMat.opacity = selected ? 0.75 : 0.55;
+    // Gentle opacity pulse: 0.40 to 0.55
+    const targetOp = selected ? 0.35 : (0.40 + 0.12 * Math.sin(state.clock.elapsedTime * 0.7));
+    opRef.current = THREE.MathUtils.lerp(opRef.current, targetOp, 0.03);
+    brainMat.opacity = opRef.current;
   });
 
   return (
     <>
-      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
+      {/* Spinning brain group — original geometry, transparent material */}
       <group ref={groupRef}>
-        {/* Dark fill — gives depth so back faces don't show through */}
         <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
           <primitive object={gltf.scene} />
         </group>
-        {/* Bright white wireframe overlay — same geometry */}
-        {brainMeshes.map((mesh, i) => (
-          <mesh
-            key={i}
-            geometry={mesh.geometry}
-            material={wireMat}
-            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
-            position={new THREE.Vector3(0, 0.08, 0)}
-            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
-          />
-        ))}
       </group>
       {/* Neural lines connecting the 4 project nodes — fixed in world space */}
       <NeuralLines />
