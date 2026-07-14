@@ -83,31 +83,25 @@ const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-// Project hotspot positions — clustered in the brain's centre core (brain centre is ~[0, 0.08, 0])
-// Spread slightly so labels don't overlap, but all well inside the brain volume
+// Project hotspot positions — placed DEEPER inside the brain volume (not on the surface edge)
 const PROJECT_HOTSPOTS: [number, number, number][] = [
-  [-0.05,  0.13,  0.04],  // 0: MoodTunes  — upper-left core
-  [ 0.07,  0.10,  0.02],  // 1: IT Career  — upper-right core
-  [-0.04,  0.04,  0.05],  // 2: CityPulse  — lower-left core
-  [ 0.06,  0.02,  0.03],  // 3: PreventPath — lower-right core
+  [-0.06,  0.14,  0.10],  // 0: MoodTunes — upper-front interior
+  [ 0.10,  0.08,  0.06],  // 1: IT Career — upper-right interior
+  [-0.04, -0.02,  0.12],  // 2: CityPulse — mid-centre interior
+  [ 0.06, -0.10,  0.08],  // 3: PreventPath — lower interior
 ];
 
-// ─── Neural Lines — neon white lightning beams connecting the 4 centre nodes ──
+// ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
 function NeuralLines() {
-  const coreRef  = useRef<THREE.LineBasicMaterial>(null);
-  const glowRef  = useRef<THREE.LineBasicMaterial>(null);
-  const outerRef = useRef<THREE.LineBasicMaterial>(null);
-
+  const matRef  = useRef<THREE.LineBasicMaterial>(null);
+  const mat2Ref = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    // Core: near-solid white, fast flicker
-    if (coreRef.current)  coreRef.current.opacity  = 0.90 + 0.10 * Math.sin(t * 3.5);
-    // Mid glow: blue-white, medium pulse
-    if (glowRef.current)  glowRef.current.opacity  = 0.55 + 0.25 * Math.sin(t * 2.0 + 0.8);
-    // Outer halo: wide soft bloom
-    if (outerRef.current) outerRef.current.opacity = 0.20 + 0.15 * Math.sin(t * 1.2 + 1.6);
+    // Core bright line — pulses 0.85 → 1.0
+    if (matRef.current)  matRef.current.opacity  = 0.85 + 0.15 * Math.sin(t * 1.4);
+    // Wide soft glow halo — pulses 0.30 → 0.55
+    if (mat2Ref.current) mat2Ref.current.opacity = 0.30 + 0.25 * Math.sin(t * 1.4 + 0.5);
   });
-
   const geo = useMemo(() => {
     const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
     const pts: THREE.Vector3[] = [];
@@ -117,91 +111,66 @@ function NeuralLines() {
     });
     return new THREE.BufferGeometry().setFromPoints(pts);
   }, []);
-
   return (
     <>
-      {/* Outermost soft bloom — widest, most transparent */}
+      {/* Outer soft glow halo — wide, additive, slightly blue-white */}
       <lineSegments geometry={geo}>
-        <lineBasicMaterial ref={outerRef} color="#aaddff" transparent opacity={0.20} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <lineBasicMaterial ref={mat2Ref} color="#c8e8ff" transparent opacity={0.40} depthWrite={false} blending={THREE.AdditiveBlending} linewidth={3} />
       </lineSegments>
-      {/* Mid glow — blue-white, additive */}
+      {/* Core bright neon white line */}
       <lineSegments geometry={geo}>
-        <lineBasicMaterial ref={glowRef} color="#ddf0ff" transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </lineSegments>
-      {/* Core neon white line — near solid */}
-      <lineSegments geometry={geo}>
-        <lineBasicMaterial ref={coreRef} color="#ffffff" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} />
+        <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.95} depthWrite={false} blending={THREE.AdditiveBlending} />
       </lineSegments>
     </>
   );
 }
 
-// ─── Hotspot Dot — lightning-bright energy node ───────────────────────────────
+// ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
 function HotspotDot({ position, index, active, onSelect }: {
   position: [number, number, number];
   index: number;
   active: boolean;
   onSelect: () => void;
 }) {
-  const coreRef   = useRef<THREE.Mesh>(null);
-  const ring1Ref  = useRef<THREE.Mesh>(null);
-  const ring2Ref  = useRef<THREE.Mesh>(null);
-  const ring3Ref  = useRef<THREE.Mesh>(null);
+  const coreRef  = useRef<THREE.Mesh>(null);
+  const halo1Ref = useRef<THREE.Mesh>(null);
+  const halo2Ref = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    // Core: fast electric flicker
-    const cPulse = active ? 2.0 : (1.0 + 0.35 * Math.sin(t * 4.0 + index * 1.3));
-    if (coreRef.current) coreRef.current.scale.setScalar(cPulse);
-
-    // Ring 1 — tight inner halo
-    const r1 = active ? 2.5 : (1.0 + 0.45 * Math.sin(t * 2.8 + index * 1.1));
-    if (ring1Ref.current) {
-      ring1Ref.current.scale.setScalar(r1);
-      (ring1Ref.current.material as THREE.MeshBasicMaterial).opacity =
-        active ? 0.70 : (0.40 + 0.30 * Math.sin(t * 2.8 + index * 1.1));
-    }
-    // Ring 2 — mid glow
-    const r2 = active ? 3.2 : (1.0 + 0.55 * Math.sin(t * 1.8 + index * 0.9 + 0.5));
-    if (ring2Ref.current) {
-      ring2Ref.current.scale.setScalar(r2);
-      (ring2Ref.current.material as THREE.MeshBasicMaterial).opacity =
-        active ? 0.45 : (0.22 + 0.18 * Math.sin(t * 1.8 + index * 0.9 + 0.5));
-    }
-    // Ring 3 — outer diffuse bloom
-    const r3 = active ? 4.5 : (1.0 + 0.65 * Math.sin(t * 1.2 + index * 0.7 + 1.2));
-    if (ring3Ref.current) {
-      ring3Ref.current.scale.setScalar(r3);
-      (ring3Ref.current.material as THREE.MeshBasicMaterial).opacity =
-        active ? 0.20 : (0.08 + 0.07 * Math.sin(t * 1.2 + index * 0.7 + 1.2));
-    }
+    const pulse = active ? 1.6 : (1.0 + 0.22 * Math.sin(t * 2.2 + index));
+    if (coreRef.current)  coreRef.current.scale.setScalar(pulse);
+    // Inner halo — slightly larger, additive glow
+    const h1 = active ? 2.0 : (1.0 + 0.30 * Math.sin(t * 1.8 + index));
+    if (halo1Ref.current) halo1Ref.current.scale.setScalar(h1);
+    // Outer halo — slow breathe
+    const h2 = active ? 2.8 : (1.0 + 0.40 * Math.sin(t * 1.2 + index + 1.0));
+    if (halo2Ref.current) halo2Ref.current.scale.setScalar(h2);
+    // Opacity modulation on halos
+    if (halo1Ref.current) (halo1Ref.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.55 : (0.30 + 0.20 * Math.sin(t * 1.8 + index));
+    if (halo2Ref.current) (halo2Ref.current.material as THREE.MeshBasicMaterial).opacity = active ? 0.30 : (0.12 + 0.10 * Math.sin(t * 1.2 + index + 1.0));
   });
 
   return (
     <group position={position}>
-      {/* Outer diffuse bloom — large, very faint, blue-white */}
-      <mesh ref={ring3Ref}>
-        <sphereGeometry args={[0.028, 12, 12]} />
-        <meshBasicMaterial color="#88bbff" transparent opacity={0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
+      {/* Outer diffuse glow sphere — large, additive, very faint */}
+      <mesh ref={halo2Ref}>
+        <sphereGeometry args={[0.022, 12, 12]} />
+        <meshBasicMaterial color="#88ccff" transparent opacity={0.15} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
-      {/* Mid glow ring — medium, additive */}
-      <mesh ref={ring2Ref}>
-        <sphereGeometry args={[0.016, 12, 12]} />
-        <meshBasicMaterial color="#cce8ff" transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
+      {/* Inner glow halo — medium, bright blue-white */}
+      <mesh ref={halo1Ref}>
+        <sphereGeometry args={[0.012, 12, 12]} />
+        <meshBasicMaterial color="#d0eeff" transparent opacity={0.40} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
-      {/* Inner tight halo — bright blue-white */}
-      <mesh ref={ring1Ref}>
-        <sphereGeometry args={[0.009, 12, 12]} />
-        <meshBasicMaterial color="#eef6ff" transparent opacity={0.50} depthWrite={false} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* Core — pure white, electric bright */}
+      {/* Core bright white dot */}
       <mesh ref={coreRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.005, 12, 12]} />
+        <sphereGeometry args={[0.006, 12, 12]} />
         <meshBasicMaterial color="#ffffff" depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
-      {/* Invisible click target */}
+      {/* Invisible click target — larger hitbox for usability */}
       <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.030, 8, 8]} />
+        <sphereGeometry args={[0.025, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
       {/* HTML label */}
@@ -211,14 +180,14 @@ function HotspotDot({ position, index, active, onSelect }: {
         distanceFactor={1.2}
       >
         <div style={{
-          background: active ? "rgba(255,255,255,0.15)" : "rgba(0,0,0,0.65)",
-          border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.35)"}`,
+          background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
+          border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
           borderRadius: 4, padding: "3px 7px",
           fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: active ? "#ffffff" : "#cccccc",
+          color: active ? "#ffffff" : "#aaaaaa",
           whiteSpace: "nowrap",
           backdropFilter: "blur(4px)",
-          boxShadow: active ? "0 0 14px rgba(180,220,255,0.7)" : "0 0 6px rgba(255,255,255,0.15)",
+          boxShadow: active ? "0 0 10px rgba(0,229,255,0.5)" : "none",
           transition: "all 0.2s ease",
         }}>
           {PROJECTS[index].title}
@@ -605,20 +574,19 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
             scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
           />
         ))}
-        {/* Neural lines + hotspot dots — INSIDE spinning group so they rotate with the brain */}
-        <group position={[0, 0.08, 0]}>
-          <NeuralLines />
-          {PROJECTS.map((proj, i) => (
-            <HotspotDot
-              key={proj.id}
-              position={PROJECT_HOTSPOTS[i]}
-              index={i}
-              active={selected?.id === proj.id}
-              onSelect={() => onHotspotSelect(proj)}
-            />
-          ))}
-        </group>
       </group>
+      {/* Neural lines connecting the 4 project nodes — fixed in world space */}
+      <NeuralLines />
+      {/* Hotspot dots — fixed in world space */}
+      {PROJECTS.map((proj, i) => (
+        <HotspotDot
+          key={proj.id}
+          position={PROJECT_HOTSPOTS[i]}
+          index={i}
+          active={selected?.id === proj.id}
+          onSelect={() => onHotspotSelect(proj)}
+        />
+      ))}
     </>
   );
 }
