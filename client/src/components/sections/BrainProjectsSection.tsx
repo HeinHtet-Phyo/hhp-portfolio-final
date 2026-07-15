@@ -22,6 +22,9 @@ import { Html } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
@@ -41,7 +44,9 @@ const PROJECTS = [
     tech: ["Python", "LightGBM", "Spotify API", "scikit-learn", "Pandas"],
     stats: [["0.5652", "F1 Score"], ["114K+", "Tracks"], ["5", "Moods"]] as [string, string][],
     github: "https://github.com/HeinHtet-Phyo/moodtunes-ai-group3",
+    demo: "#",
     code: "MOOD_AI_v2.3",
+    fullDesc: "LightGBM trained on 114K+ Spotify tracks. F1 score 0.5652 on 5-class mood classification with real-time recommendation API. Placeholder: extended write-up covering data pipeline, feature engineering, and model selection coming soon.",
   },
   {
     id: 1,
@@ -51,7 +56,9 @@ const PROJECTS = [
     tech: ["Python", "XGBoost", "SFIA", "scikit-learn", "Streamlit"],
     stats: [["99.75%", "Accuracy"], ["6,000", "Samples"], ["SFIA", "Framework"]] as [string, string][],
     github: "https://github.com/HeinHtet-Phyo/it-career-planner",
+    demo: "#",
     code: "CAREER_XGB_v1.1",
+    fullDesc: "XGBoost classifier at 99.75% accuracy across 6,000 samples. Maps SFIA framework skills to career paths with gap analysis. Placeholder: extended write-up covering the SFIA mapping methodology and gap-analysis scoring coming soon.",
   },
   {
     id: 2,
@@ -61,7 +68,9 @@ const PROJECTS = [
     tech: ["Python", "Pandas", "Plotly", "GeoPandas", "Streamlit"],
     stats: [["City", "Scale"], ["Real-time", "Data"], ["Interactive", "Maps"]] as [string, string][],
     github: "https://github.com/HeinHtet-Phyo",
+    demo: "#",
     code: "CITY_PULSE_v0.9",
+    fullDesc: "Interactive urban analytics platform aggregating transportation, demographic, and infrastructure data into city-level intelligence. Placeholder: extended write-up covering data sources and the analytics architecture coming soon.",
   },
   {
     id: 3,
@@ -71,10 +80,19 @@ const PROJECTS = [
     tech: ["Python", "scikit-learn", "Flask", "Healthcare ML", "Risk Scoring"],
     stats: [["AI", "Powered"], ["Personal", "Plans"], ["Risk", "Scoring"]] as [string, string][],
     github: "https://github.com/HeinHtet-Phyo",
+    demo: "#",
     code: "PREV_PATH_v1.0",
+    fullDesc: "ML pipeline predicting health risk factors from patient data, generating personalised prevention plans with risk scoring. Placeholder: extended write-up covering the risk-scoring model and clinical validation coming soon.",
   },
 ];
 type Project = (typeof PROJECTS)[0];
+
+// ─── Upcoming Projects (placeholder, classified) ──────────────────────────────
+const UPCOMING_PROJECTS = [
+  { code: "PROJECT_05" },
+  { code: "PROJECT_06" },
+  { code: "PROJECT_07" },
+];
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const TEAL       = "#ffffff";
@@ -83,37 +101,67 @@ const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-// Project hotspot positions — placed ON the brain surface (brain radius ~0.28 at these angles)
+// Project hotspot positions — spread across the upper-central region with real 3D
+// separation (pairwise distances ~0.09-0.15) so labels never stack on top of each
+// other at any rotation angle, instead of the old tight ~0.03-0.06 cluster.
 const PROJECT_HOTSPOTS: [number, number, number][] = [
-  [-0.08,  0.20,  0.24],  // 0: MoodTunes — frontal lobe (top-front)
-  [ 0.12,  0.14,  0.22],  // 1: IT Career — parietal (top-right)
-  [-0.04,  0.00,  0.26],  // 2: CityPulse — temporal (mid-front)
-  [ 0.08, -0.08,  0.22],  // 3: PreventPath — occipital (lower-front)
+  [-0.085,  0.160,  0.075],  // 0: MoodTunes — upper-left-front
+  [ 0.090,  0.150,  0.045],  // 1: IT Career — upper-right
+  [-0.025,  0.075,  0.150],  // 2: CityPulse — lower-front
+  [ 0.070,  0.055,  0.095],  // 3: PreventPath — lower-right
+];
+
+// Per-node label offset (in local space, before billboarding) so labels stay legible
+// even if two nodes ever line up close together on screen from some angle.
+const LABEL_OFFSETS: [number, number, number][] = [
+  [0.045,  0.028, 0],
+  [0.045,  0.010, 0],
+  [0.045, -0.010, 0],
+  [0.045, -0.028, 0],
 ];
 
 // ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
+// Fat neon lines (Line2/LineMaterial) — genuinely thicker in screen-space pixels,
+// unlike THREE.LineBasicMaterial whose linewidth is ignored by most GL drivers.
 function NeuralLines() {
-  const matRef = useRef<THREE.LineBasicMaterial>(null);
+  const matRef = useRef<LineMaterial>(null);
+  const { size } = useThree();
+
   useFrame(({ clock }) => {
     if (matRef.current) {
-      // Bright neural pulse — 0.55 to 0.80
-      matRef.current.opacity = 0.55 + 0.25 * Math.sin(clock.elapsedTime * 1.2);
+      // Bright neural pulse — 0.7 to 1.0, more luminous than the ambient web
+      matRef.current.opacity = 0.7 + 0.3 * Math.sin(clock.elapsedTime * 1.2);
+      matRef.current.resolution.set(size.width, size.height);
     }
   });
+
   const geo = useMemo(() => {
     const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
-    const pts: THREE.Vector3[] = [];
+    const positions: number[] = [];
     pairs.forEach(([a, b]) => {
-      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[a]));
-      pts.push(new THREE.Vector3(...PROJECT_HOTSPOTS[b]));
+      positions.push(...PROJECT_HOTSPOTS[a], ...PROJECT_HOTSPOTS[b]);
     });
-    return new THREE.BufferGeometry().setFromPoints(pts);
+    const g = new LineGeometry();
+    g.setPositions(positions);
+    return g;
   }, []);
-  return (
-    <lineSegments geometry={geo}>
-      <lineBasicMaterial ref={matRef} color="#ffffff" transparent opacity={0.65} depthWrite={false} />
-    </lineSegments>
-  );
+
+  const mat = useMemo(() => new LineMaterial({
+    color: 0xffffff,
+    linewidth: 2.5, // pixels
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+  }), []);
+
+  useEffect(() => { matRef.current = mat; }, [mat]);
+
+  const lineRef = useRef<Line2>(null);
+  useEffect(() => {
+    if (lineRef.current) lineRef.current.computeLineDistances();
+  }, [geo]);
+
+  return <primitive ref={lineRef} object={new Line2(geo, mat)} />;
 }
 
 // ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
@@ -124,32 +172,45 @@ function HotspotDot({ position, index, active, onSelect }: {
   onSelect: () => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const glow1Ref = useRef<THREE.Mesh>(null);
+  const glow2Ref = useRef<THREE.Mesh>(null);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    if (meshRef.current) {
-      const s = active ? 1.5 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
-      meshRef.current.scale.setScalar(s);
-    }
+    const s = active ? 1.6 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
+    if (meshRef.current) meshRef.current.scale.setScalar(s);
+    if (glow1Ref.current) glow1Ref.current.scale.setScalar(s);
+    if (glow2Ref.current) glow2Ref.current.scale.setScalar(s);
   });
 
   return (
     <group position={position}>
-      {/* Tiny bright white dot — small clean sphere, no bloom sphere */}
+      {/* Bright core — distinctly brighter/larger than the ambient neural dots */}
       <mesh ref={meshRef} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.005, 10, 10]} />
+        <sphereGeometry args={[0.009, 12, 12]} />
         <meshBasicMaterial color="#ffffff" />
+      </mesh>
+      {/* Soft bloom — pure spheres only (never a flat disc/torus), so there is no
+          ring/halo/Saturn-ring artifact from any viewing angle */}
+      <mesh ref={glow1Ref}>
+        <sphereGeometry args={[0.020, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.35 : 0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      <mesh ref={glow2Ref}>
+        <sphereGeometry args={[0.036, 12, 12]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.16 : 0.09} depthWrite={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* Invisible click target — larger hitbox for usability */}
       <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.020, 8, 8]} />
+        <sphereGeometry args={[0.026, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* HTML label */}
+      {/* HTML label — offset per-node so labels never stack */}
       <Html
-        position={[0.04, 0.02, 0]}
+        position={LABEL_OFFSETS[index]}
         style={{ pointerEvents: "none", userSelect: "none" }}
         distanceFactor={1.2}
+        occlude={false}
       >
         <div style={{
           background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
@@ -419,100 +480,167 @@ function CameraController({ selected }: { selected: Project | null }) {
 }
 
 // ─── Neural Network Dots + Lines (subtle, always-on, rotates with brain) ────────
-// Fixed set of small white dots connected by thin lines — "tech but understated"
-const NEURAL_POSITIONS: [number, number, number][] = [
-  [-0.18,  0.22,  0.12],
-  [ 0.20,  0.18,  0.08],
-  [-0.05,  0.28,  0.05],
-  [ 0.14, -0.05,  0.20],
-  [-0.22, -0.02,  0.10],
-  [ 0.05,  0.10,  0.26],
-  [-0.12,  0.05,  0.24],
-  [ 0.22,  0.08, -0.10],
-  [-0.08, -0.18,  0.18],
-  [ 0.16,  0.24, -0.05],
-  [-0.24,  0.12, -0.08],
-  [ 0.02, -0.22,  0.12],
-];
-// Edges: pairs of indices into NEURAL_POSITIONS
-const NEURAL_EDGES: [number, number][] = [
-  [0, 2], [1, 2], [2, 5], [3, 5], [3, 6], [4, 6],
-  [5, 6], [1, 9], [7, 9], [4, 10], [8, 11], [3, 8],
-];
+// ~80 points scattered inside an ellipsoid sized to sit comfortably within the brain's
+// silhouette (empirically fit to the same coordinate frame PROJECT_HOTSPOTS uses), each
+// connected to its 2 nearest neighbours within a short radius — a dim ambient web that
+// never breaks the surface.
+const NEURAL_FIELD_COUNT = 110;
+const NEURAL_ELLIPSOID = { rx: 0.130, ry: 0.165, rz: 0.120, cx: 0, cy: 0.05, cz: 0.00 };
+
+function seededRandom(seed: number) {
+  let s = seed % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+function buildNeuralField() {
+  const rand = seededRandom(42);
+  const { rx, ry, rz, cx, cy, cz } = NEURAL_ELLIPSOID;
+  const points: THREE.Vector3[] = [];
+  let guard = 0;
+  while (points.length < NEURAL_FIELD_COUNT && guard < 5000) {
+    guard++;
+    const x = rand() * 2 - 1;
+    const y = rand() * 2 - 1;
+    const z = rand() * 2 - 1;
+    if (x * x + y * y + z * z <= 1) {
+      points.push(new THREE.Vector3(cx + x * rx, cy + y * ry, cz + z * rz));
+    }
+  }
+
+  // Connect each point to its 5 nearest neighbours (deduped, distance-capped) — denser,
+  // more criss-crossing web than a minimal-spanning look, closer to the reference image's
+  // busy tangle of connections.
+  const edgeSet = new Set<string>();
+  const edges: [number, number][] = [];
+  const MAX_DIST = 0.085;
+  points.forEach((p, i) => {
+    const dists = points
+      .map((q, j) => ({ j, d: i === j ? Infinity : p.distanceTo(q) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 5);
+    dists.forEach(({ j, d }) => {
+      if (d > MAX_DIST) return;
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (!edgeSet.has(key)) {
+        edgeSet.add(key);
+        edges.push([i, j]);
+      }
+    });
+  });
+
+  return { points, edges };
+}
 
 function NeuralDots() {
   const lineMatRef = useRef<THREE.LineBasicMaterial>(null);
   useFrame(({ clock }) => {
     if (lineMatRef.current) {
-      // Gentle opacity pulse on lines
-      lineMatRef.current.opacity = 0.08 + 0.04 * Math.sin(clock.elapsedTime * 0.8);
+      // Gentle opacity pulse on lines — dim, ambient, never competing with the 4 nodes
+      lineMatRef.current.opacity = 0.10 + 0.04 * Math.sin(clock.elapsedTime * 0.8);
     }
   });
 
-  const lineSegments = useMemo(() => {
-    const points: THREE.Vector3[] = [];
-    NEURAL_EDGES.forEach(([a, b]) => {
-      points.push(new THREE.Vector3(...NEURAL_POSITIONS[a]));
-      points.push(new THREE.Vector3(...NEURAL_POSITIONS[b]));
+  const { points, lineSegments } = useMemo(() => {
+    const { points, edges } = buildNeuralField();
+    const linePts: THREE.Vector3[] = [];
+    edges.forEach(([a, b]) => {
+      linePts.push(points[a], points[b]);
     });
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    return geo;
+    const geo = new THREE.BufferGeometry().setFromPoints(linePts);
+    return { points, lineSegments: geo };
   }, []);
 
   return (
     <group>
-      {/* Thin connecting lines */}
+      {/* Thin faint connecting lines — additive so they glow through the crystal shell
+          instead of disappearing against brighter overlapping facets */}
       <lineSegments geometry={lineSegments}>
-        <lineBasicMaterial ref={lineMatRef} color="#ffffff" transparent opacity={0.10} depthWrite={false} />
+        <lineBasicMaterial ref={lineMatRef} color="#ffffff" transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} />
       </lineSegments>
-      {/* Small neural dots */}
-      {NEURAL_POSITIONS.map((pos, i) => (
+      {/* Small dim neural dots — shrunk to ~40% size/brightness so the 4 bright project
+          nodes stay the clear visual focus */}
+      {points.map((pos, i) => (
         <mesh key={i} position={pos}>
-          <sphereGeometry args={[0.006, 8, 8]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.45} depthWrite={false} />
+          <sphereGeometry args={[0.0017, 6, 6]} />
+          <meshBasicMaterial color="#bfe6ff" transparent opacity={0.22} depthWrite={false} blending={THREE.AdditiveBlending} />
         </mesh>
       ))}
     </group>
   );
 }
 
-function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
-  const gltf     = useLoader(GLTFLoader, "/models/BrainUVs_42a27899.glb");
-  const groupRef = useRef<THREE.Group>(null);
-  const wireOpRef = useRef(0.72);
+// Fresnel rim-glow shader — brightest along the silhouette edges / surfaces curving away
+// from the camera, dimmer on front-facing surfaces. Smooth (non-faceted) shading comes
+// from the geometry's interpolated vertex normals (computeVertexNormals below), not from
+// the material, so the mesh's real folds/ridges read as soft curves.
+const brainVertexShader = `
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+    vViewPosition = -mvPosition.xyz;
+    gl_Position = projectionMatrix * mvPosition;
+  }
+`;
 
-  // Bright white wireframe — the dominant visual, like the reference
-  const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#ffffff",
-    wireframe: true,
+const brainFragmentShader = `
+  uniform vec3 baseColor;
+  uniform vec3 glowColor;
+  uniform float baseOpacity;
+  uniform float rimPower;
+  uniform float rimIntensity;
+  varying vec3 vNormal;
+  varying vec3 vViewPosition;
+  void main() {
+    vec3 viewDir = normalize(vViewPosition);
+    vec3 normal = normalize(vNormal);
+    // abs() because DoubleSide can present either face toward the camera
+    float ndotv = abs(dot(normal, viewDir));
+    float fresnel = pow(1.0 - ndotv, rimPower);
+    vec3 color = mix(baseColor, glowColor, fresnel);
+    float alpha = clamp(baseOpacity + fresnel * rimIntensity, 0.0, 1.0);
+    gl_FragColor = vec4(color, alpha);
+  }
+`;
+
+function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
+  // Full-detail scan (not the decimated low-poly copy) — smooth shading needs real
+  // geometric folds/ridges to read as curves; a low-poly mesh would just look bulbous.
+  const brainGltf = useLoader(GLTFLoader, "/models/BrainUVs_42a27899.glb");
+  const groupRef = useRef<THREE.Group>(null);
+  const opRef = useRef(0.42);
+
+  const brainMat = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      baseColor:    { value: new THREE.Color("#dce8f0") },
+      glowColor:    { value: new THREE.Color("#ffffff") },
+      baseOpacity:  { value: 0.16 },
+      rimPower:     { value: 2.2 },
+      rimIntensity: { value: 0.9 },
+    },
+    vertexShader: brainVertexShader,
+    fragmentShader: brainFragmentShader,
     transparent: true,
-    opacity: 0.72,
+    side: THREE.DoubleSide,
     depthWrite: false,
   }), []);
 
-  // Very faint dark fill — gives the brain volume/depth without hiding the wireframe
-  const fillMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#050810",
-    transparent: true,
-    opacity: 0.55,
-    depthWrite: true,
-    side: THREE.FrontSide,
-  }), []);
-
-  // Collect brain meshes
+  // Collect brain meshes, forcing smooth (non-faceted) vertex normals
   const brainMeshes = useMemo(() => {
     const meshes: THREE.Mesh[] = [];
-    gltf.scene.traverse((child) => {
-      if ((child as THREE.Mesh).isMesh) meshes.push(child as THREE.Mesh);
+    brainGltf.scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        (child as THREE.Mesh).geometry.computeVertexNormals();
+        meshes.push(child as THREE.Mesh);
+      }
     });
     return meshes;
-  }, [gltf]);
-
-  useEffect(() => {
-    brainMeshes.forEach((mesh) => {
-      mesh.material = fillMat;
-    });
-  }, [brainMeshes, fillMat]);
+  }, [brainGltf]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = Math.PI / 2;
@@ -520,32 +648,30 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   useFrame((state) => {
     if (!groupRef.current) return;
     groupRef.current.rotation.y = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-    // Gentle wireframe pulse: 0.65 to 0.80
-    const targetOp = selected ? 0.50 : (0.65 + 0.15 * Math.sin(state.clock.elapsedTime * 0.8));
-    wireOpRef.current = THREE.MathUtils.lerp(wireOpRef.current, targetOp, 0.03);
-    wireMat.opacity = wireOpRef.current;
-    fillMat.opacity = selected ? 0.75 : 0.55;
+    // Gentle glow pulse — moderate translucency (~0.4-0.5 combined with rim boost)
+    const targetOp = selected ? 0.20 : (0.15 + 0.03 * Math.sin(state.clock.elapsedTime * 0.8));
+    opRef.current = THREE.MathUtils.lerp(opRef.current, targetOp, 0.03);
+    brainMat.uniforms.baseOpacity.value = opRef.current;
   });
+
+  const BRAIN_TRANSFORM = {
+    rotation: [0, -Math.PI / 2, 0] as [number, number, number],
+    position: [0, 0.08, 0] as [number, number, number],
+    scale: [0.0018, 0.0018, 0.0018] as [number, number, number],
+  };
 
   return (
     <>
-      {/* Spinning brain group — fill layer first (depth), then wireframe on top */}
+      {/* Spinning brain group */}
       <group ref={groupRef}>
-        {/* Dark fill — gives depth so back faces don't show through */}
-        <group rotation={[0, -Math.PI / 2, 0]} position={[0, 0.08, 0]} scale={[0.0018, 0.0018, 0.0018]}>
-          <primitive object={gltf.scene} />
+        {/* Smooth X-ray hologram surface — Fresnel rim glow, no facets/wireframe */}
+        <group {...BRAIN_TRANSFORM}>
+          {brainMeshes.map((mesh, i) => (
+            <mesh key={i} geometry={mesh.geometry} material={brainMat} />
+          ))}
         </group>
-        {/* Bright white wireframe overlay — same geometry */}
-        {brainMeshes.map((mesh, i) => (
-          <mesh
-            key={i}
-            geometry={mesh.geometry}
-            material={wireMat}
-            rotation={new THREE.Euler(0, -Math.PI / 2, 0)}
-            position={new THREE.Vector3(0, 0.08, 0)}
-            scale={new THREE.Vector3(0.0018, 0.0018, 0.0018)}
-          />
-        ))}
+        {/* Neural dots + faint lines contained within the brain volume */}
+        <NeuralDots />
       </group>
       {/* Neural lines connecting the 4 project nodes — fixed in world space */}
       <NeuralLines />
@@ -853,113 +979,83 @@ function HudCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
   return <div style={style}><div style={h} /><div style={v} /></div>;
 }
 
-// ─── Scrolling Code Panel (left side, like photo 2) ───────────────────────────
-const CODE_LINES = [
-  "NEURAL_NET.init()",
-  "loading brain_mesh.glb...",
-  "vertices: 48,527",
-  "faces: 94,174",
-  "shader: teal_hud_v2",
-  "rotation: 0.30 rad/s",
-  "platform: active",
-  "particles: 1,200",
-  "projects: 4 loaded",
-  "MoodTunes AI → F1: 0.5652",
-  "IT Career → ACC: 99.75%",
-  "CityPulse → LIVE",
-  "PreventPath → RISK_AI",
-  "status: ONLINE",
-  "ping: 12ms",
-  "uptime: 99.9%",
-  "HHP.portfolio v3.0",
-  "location: London, UK",
-  "available: TRUE",
-];
-
-function CodePanel() {
-  const [offset, setOffset] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setOffset((o) => (o + 1) % CODE_LINES.length), 1200);
-    return () => clearInterval(id);
-  }, []);
-
-  const visible = [...CODE_LINES.slice(offset), ...CODE_LINES.slice(0, offset)].slice(0, 9);
-
+// ─── Left Panel: Completed + Upcoming Projects ────────────────────────────────
+function LeftProjectsPanel({ selected, onSelect }: { selected: Project | null; onSelect: (p: Project | null) => void }) {
   return (
     <div style={{
       position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)",
-      width: 190, zIndex: 10, pointerEvents: "none",
+      width: "min(220px, 26vw)", zIndex: 10, display: "flex", flexDirection: "column", gap: 14,
     }}>
-      {/* Panel header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-        <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
-        <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
-          SYS.LOG
-        </span>
+      {/* Completed projects */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
+          <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
+            COMPLETED PROJECTS
+          </span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {PROJECTS.map((proj) => {
+            const active = selected?.id === proj.id;
+            return (
+              <button
+                key={proj.id}
+                onClick={() => onSelect(active ? null : proj)}
+                style={{
+                  background: active ? `rgba(255,255,255,0.08)` : "rgba(0,0,0,0.6)",
+                  border: `1px solid ${active ? TEAL + "80" : TEAL + "20"}`,
+                  borderRadius: 4, padding: "8px 10px", cursor: "pointer",
+                  textAlign: "left", backdropFilter: "blur(4px)",
+                  transition: "all 0.2s ease",
+                  boxShadow: active ? `0 0 12px ${TEAL}30` : "none",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                  <div style={{
+                    width: 5, height: 5, borderRadius: "50%",
+                    background: active ? TEAL : TEAL_DIM,
+                    boxShadow: active ? `0 0 8px ${TEAL}` : "none",
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "#aaaaaa", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {proj.title}
+                  </span>
+                </div>
+                <div style={{ fontSize: 8, color: `${TEAL_DIM}88`, fontFamily: "JetBrains Mono, monospace", paddingLeft: 11 }}>
+                  {proj.subtitle}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
-      {/* Border */}
-      <div style={{ border: `1px solid rgba(255,255,255,0.15)`, borderRadius: 4, padding: "10px 12px", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
-        {visible.map((line, i) => (
-          <div key={i} style={{
-            fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-            color: i === 0 ? TEAL : `${TEAL_DIM}${i < 3 ? "cc" : "55"}`,
-            marginBottom: 4, lineHeight: 1.5,
-            transition: "color 0.4s ease",
-          }}>
-            {i === 0 ? "▶ " : "  "}{line}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
-// ─── Project Cards Panel (right side) ─────────────────────────────────────────
-function ProjectsPanel({ selected, onSelect }: { selected: Project | null; onSelect: (p: Project | null) => void }) {
-  return (
-    <div style={{
-      position: "absolute", right: 18, top: "50%", transform: "translateY(-50%)",
-      width: 200, zIndex: 10, display: "flex", flexDirection: "column", gap: 6,
-    }}>
-      {/* Panel header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
-        <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
-        <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
-          PROJECTS [{PROJECTS.length}]
-        </span>
+      {/* Upcoming projects — dimmed, classified */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <div style={{ width: 6, height: 6, background: TEAL_DIM, borderRadius: "50%", opacity: 0.5 }} />
+          <span style={{ fontSize: 9, color: TEAL_DIM, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em", opacity: 0.6 }}>
+            UPCOMING PROJECTS
+          </span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {UPCOMING_PROJECTS.map((p) => (
+            <div key={p.code} style={{
+              background: "rgba(0,0,0,0.4)",
+              border: "1px dashed rgba(255,255,255,0.12)",
+              borderRadius: 4, padding: "8px 10px",
+              opacity: 0.35, cursor: "not-allowed",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 9 }}>🔒</span>
+                <span style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: "#aaaaaa", letterSpacing: "0.08em" }}>
+                  {p.code} · CLASSIFIED
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      {PROJECTS.map((proj) => {
-        const active = selected?.id === proj.id;
-        return (
-          <button
-            key={proj.id}
-            onClick={() => onSelect(active ? null : proj)}
-            style={{
-              background: active ? `rgba(255,255,255,0.08)` : "rgba(0,0,0,0.6)",
-              border: `1px solid ${active ? TEAL + "80" : TEAL + "20"}`,
-              borderRadius: 4, padding: "8px 10px", cursor: "pointer",
-              textAlign: "left", backdropFilter: "blur(4px)",
-              transition: "all 0.2s ease",
-              boxShadow: active ? `0 0 12px ${TEAL}30` : "none",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-              <div style={{
-                width: 5, height: 5, borderRadius: "50%",
-                background: active ? TEAL : TEAL_DIM,
-                boxShadow: active ? `0 0 8px ${TEAL}` : "none",
-                flexShrink: 0,
-              }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "#aaaaaa", fontFamily: "'Space Grotesk', sans-serif" }}>
-                {proj.title}
-              </span>
-            </div>
-            <div style={{ fontSize: 8, color: `${TEAL_DIM}88`, fontFamily: "JetBrains Mono, monospace", paddingLeft: 11 }}>
-              {proj.subtitle}
-            </div>
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -974,7 +1070,7 @@ function HudBottomBar({ selected }: { selected: Project | null }) {
 
   const data = selected
     ? selected.stats.map(([v, k]) => `${k}: ${v}`)
-    : ["VERTICES: 48,527", "FACES: 94,174", "ROTATION: ACTIVE", "STATUS: ONLINE", `TICK: ${String(tick).padStart(4, "0")}`];
+    : ["MODEL: CRYSTAL_BRAIN_v1", "NODES: 4/4", "ROTATION: ACTIVE", "STATUS: ONLINE", `TICK: ${String(tick).padStart(4, "0")}`];
 
   return (
     <div style={{
@@ -998,64 +1094,67 @@ function HudBottomBar({ selected }: { selected: Project | null }) {
   );
 }
 
-// ─── Project Detail Panel ─────────────────────────────────────────────────────
-function DetailPanel({ project, onClose }: { project: Project; onClose: () => void }) {
+// ─── Project Detail Panel (right side) ────────────────────────────────────────
+function RightDetailPanel({ project, onClose, onPrev, onNext }: {
+  project: Project; onClose: () => void; onPrev: () => void; onNext: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, x: 24 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 24 }}
       transition={{ duration: 0.3 }}
       style={{
-        position: "absolute", bottom: 50, left: "50%", transform: "translateX(-50%)",
-        width: 420, zIndex: 20,
+        position: "absolute", right: 18, top: 90, bottom: 46,
+        width: "min(340px, 32vw)", zIndex: 20,
         background: "rgba(0,0,0,0.88)",
         border: `1px solid ${TEAL}40`,
-        borderRadius: 8, padding: "18px 22px",
+        borderRadius: 8, padding: "18px 20px",
         backdropFilter: "blur(12px)",
         boxShadow: `0 0 30px ${TEAL}20`,
+        overflowY: "auto",
       }}
     >
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}80`, letterSpacing: "0.2em", marginBottom: 4 }}>
-            PROJECT.{String(project.id + 1).padStart(2, "0")} · {project.code}
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: TEAL, fontFamily: "'Space Grotesk', sans-serif" }}>
-            {project.title}
-          </div>
-          <div style={{ fontSize: 10, color: `${TEAL_DIM}99`, fontFamily: "JetBrains Mono, monospace", marginTop: 2 }}>
-            {project.subtitle}
-          </div>
-        </div>
-        <button onClick={onClose} style={{
-          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
-          color: `rgba(170,170,170,0.6)`, borderRadius: 4, padding: "4px 8px",
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
-        }}>ESC</button>
+      {/* Back button */}
+      <button onClick={onClose} style={{
+        background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
+        color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "4px 10px",
+        fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
+        marginBottom: 14,
+      }}>← BACK</button>
+
+      {/* Label */}
+      <div style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}80`, letterSpacing: "0.2em", marginBottom: 4 }}>
+        PROJECT · 2026
       </div>
 
-      {/* Stats */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 12 }}>
-        {project.stats.map(([val, key], i) => (
-          <div key={i} style={{
-            flex: 1, background: `rgba(255,255,255,0.04)`, border: `1px solid rgba(255,255,255,0.12)`,
-            borderRadius: 4, padding: "8px 10px", textAlign: "center",
-          }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: TEAL, fontFamily: "'Space Grotesk', sans-serif" }}>{val}</div>
-            <div style={{ fontSize: 8, color: `${TEAL_DIM}70`, fontFamily: "JetBrains Mono, monospace", marginTop: 2 }}>{key}</div>
-          </div>
-        ))}
+      {/* Title */}
+      <div style={{ fontSize: 20, fontWeight: 700, color: TEAL, fontFamily: "'Space Grotesk', sans-serif", marginBottom: 2 }}>
+        {project.title}
+      </div>
+      <div style={{ fontSize: 10, color: `${TEAL_DIM}99`, fontFamily: "JetBrains Mono, monospace", marginBottom: 14 }}>
+        {project.subtitle}
       </div>
 
-      {/* Description */}
-      <p style={{ fontSize: 11, color: `${TEAL_DIM}aa`, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6, marginBottom: 12 }}>
-        {project.desc}
+      {/* Description + Read More */}
+      <p style={{ fontSize: 11, color: `${TEAL_DIM}aa`, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6, marginBottom: 4 }}>
+        {expanded ? project.fullDesc : project.desc}
       </p>
+      <button onClick={() => setExpanded((e) => !e)} style={{
+        background: "transparent", border: "none", padding: 0, marginBottom: 14,
+        fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: TEAL,
+        cursor: "pointer", letterSpacing: "0.1em",
+      }}>
+        {expanded ? "READ LESS ▲" : "READ MORE ▼"}
+      </button>
 
       {/* Tech stack */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 14 }}>
+      <div style={{ fontSize: 8, color: `${TEAL_DIM}70`, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em", marginBottom: 6 }}>
+        TECH STACK
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
         {project.tech.map((t) => (
           <span key={t} style={{
             fontSize: 8, padding: "3px 7px", borderRadius: 3,
@@ -1065,17 +1164,43 @@ function DetailPanel({ project, onClose }: { project: Project; onClose: () => vo
         ))}
       </div>
 
-      {/* GitHub link */}
-      <a href={project.github} target="_blank" rel="noreferrer" style={{
-        display: "inline-flex", alignItems: "center", gap: 6,
-        fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-        color: TEAL, textDecoration: "none",
-        border: `1px solid rgba(255,255,255,0.25)`, borderRadius: 4, padding: "6px 12px",
-        background: `rgba(255,255,255,0.05)`,
-        transition: "all 0.2s ease",
-      }}>
-        ↗ VIEW ON GITHUB
-      </a>
+      {/* Live demo + GitHub buttons */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+        <a href={project.demo} target="_blank" rel="noreferrer" style={{
+          flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
+          color: "#000000", textDecoration: "none",
+          borderRadius: 4, padding: "8px 10px",
+          background: TEAL,
+          transition: "all 0.2s ease",
+        }}>
+          LIVE DEMO
+        </a>
+        <a href={project.github} target="_blank" rel="noreferrer" style={{
+          flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
+          color: TEAL, textDecoration: "none",
+          border: `1px solid rgba(255,255,255,0.25)`, borderRadius: 4, padding: "8px 10px",
+          background: `rgba(255,255,255,0.05)`,
+          transition: "all 0.2s ease",
+        }}>
+          GITHUB
+        </a>
+      </div>
+
+      {/* Prev / Next navigation */}
+      <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 12 }}>
+        <button onClick={onPrev} style={{
+          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
+          color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "6px 12px",
+          fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
+        }}>← PREV</button>
+        <button onClick={onNext} style={{
+          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
+          color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "6px 12px",
+          fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
+        }}>NEXT →</button>
+      </div>
     </motion.div>
   );
 }
@@ -1085,6 +1210,12 @@ export default function ProjectsSection() {
   const [selected, setSelected] = useState<Project | null>(null);
 
   const handleClose = useCallback(() => setSelected(null), []);
+  const handlePrev = useCallback(() => {
+    setSelected((s) => s ? PROJECTS[(s.id - 1 + PROJECTS.length) % PROJECTS.length] : s);
+  }, []);
+  const handleNext = useCallback(() => {
+    setSelected((s) => s ? PROJECTS[(s.id + 1) % PROJECTS.length] : s);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
@@ -1122,7 +1253,7 @@ export default function ProjectsSection() {
         </span>
       </div>
 
-      {/* 3D Canvas — transparent bg so TechBackground shows through */}
+      {/* 3D Canvas — transparent bg so the site starfield shows through */}
       <Canvas
         camera={{ position: [0, 0, 1.25], fov: 45, near: 0.01, far: 100 }}
         gl={{ antialias: true, alpha: true }}
@@ -1131,21 +1262,22 @@ export default function ProjectsSection() {
         <BrainScene selected={selected} onHotspotSelect={setSelected} />
       </Canvas>
 
-      {/* HUD Corners removed — not part of site theme */}
-
-      {/* Left code panel */}
-      <CodePanel />
-
-      {/* Right projects panel */}
-      <ProjectsPanel selected={selected} onSelect={setSelected} />
+      {/* Left panel: completed + upcoming projects */}
+      <LeftProjectsPanel selected={selected} onSelect={setSelected} />
 
       {/* Bottom data bar */}
       <HudBottomBar selected={selected} />
 
-      {/* Detail panel on project select */}
+      {/* Detail panel on project select (right side) */}
       <AnimatePresence>
         {selected && (
-          <DetailPanel key={selected.id} project={selected} onClose={handleClose} />
+          <RightDetailPanel
+            key={selected.id}
+            project={selected}
+            onClose={handleClose}
+            onPrev={handlePrev}
+            onNext={handleNext}
+          />
         )}
       </AnimatePresence>
     </section>
