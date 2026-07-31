@@ -1459,7 +1459,11 @@ function buildFoldNetwork(meshes: THREE.Mesh[]) {
 
   // Push every line vertex out along its own surface normal a hair, so hairline segments that
   // sit exactly on the mesh don't z-fight/clip against the opaque brain material underneath.
-  const OFFSET = 0.006;
+  // Raised from 0.006: at that distance the lines sat inside the depth-buffer's resolvable
+  // step at this camera range, so each frame the rasteriser could decide either way about
+  // which was in front — the flicker. 0.022 puts them unambiguously clear of the surface
+  // while staying far too small to read as floating.
+  const OFFSET = 0.022;
   const linePositions = new Float32Array(selected.length * 6);
   selected.forEach(({ a, b }, i) => {
     const pa = positions[a].clone().addScaledVector(normals[a], OFFSET);
@@ -1517,8 +1521,20 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
       {/* Thin hairline segments (not tubes) — LineBasicMaterial's ~1px screen-space width traces
           the real fold ridges/grooves directly, no dot/node markers anywhere — pure line +
           surface glow per the ethereal x-ray/bioluminescence reference. */}
+      {/* opacity 0.85 -> 0.52. With additive blending a pixel's bloom-eligible luminance is
+          ~color x opacity, so at 0.85 these 1px hairlines sat just ABOVE the bloom threshold.
+          A 1px line inevitably shimmers sub-pixel as the brain turns (MSAA barely touches line
+          primitives), and sitting on the threshold turned that subtle aliasing into a hard
+          per-frame flip in and out of bloom — the "bling". At 0.52 they are unambiguously
+          below the cut, so they still read clearly but can never trigger the flicker. */}
+      {/* opacity 0.85 -> 0.52. With additive blending a pixel's bloom-eligible luminance is
+          ~color x opacity, so at 0.85 these 1px hairlines sat just ABOVE the bloom threshold.
+          A 1px line inevitably shimmers sub-pixel as the brain turns (MSAA barely touches line
+          primitives), and sitting on the threshold turned that subtle aliasing into a hard
+          per-frame flip in and out of bloom — the "bling". At 0.52 they are unambiguously
+          below the cut, so they still read clearly but can never trigger the flicker. */}
       <lineSegments geometry={lineGeo} renderOrder={2}>
-        <lineBasicMaterial color="#ffffff" transparent opacity={0.85} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.52} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </lineSegments>
       <lineSegments geometry={trailGeo} renderOrder={2}>
         <lineBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
@@ -2231,15 +2247,16 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       </Suspense>
       <HolographicPedestal />
 
-      {/* Bloom — threshold was 0.72, which is why the neural network never visibly glowed:
-          with AdditiveBlending a pixel's bloom-eligible brightness is ~color*opacity, and
-          the majority "small" dot tier (0.75 color * 0.95 opacity ≈ 0.71) plus most
-          distance-dimmed lines landed just *under* that line, so bloom silently skipped
-          them — only the brightest hub dots ever qualified. Lowered so the actual dot/line
-          brightness range clearly qualifies, and intensity raised to make the resulting
-          glow read as "neon" rather than a faint fringe. The matte-lit brain body still
-          sits well below this lower threshold under current light levels, so it stays
-          clean while the dots/lines/rim (all near-full unlit brightness) bloom.
+      {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
+          network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
+          matter what, and any of them sitting NEAR the threshold converts that unavoidable
+          aliasing into a visible per-frame bloom flip. Pulling the cut up to 0.8 (together
+          with dropping the fold lines to 0.52) leaves the whole ambient network safely on one
+          side of the line, so it never flickers, while the project nodes — unlit pure white
+          at full opacity, luminance ~1.0 — still clear the bar and glow exactly as before.
+          luminanceSmoothing is deliberately left HIGH at 0.6: it widens the soft ramp around
+          the cut, and lowering it would sharpen the threshold into the hard on/off edge that
+          causes this class of flicker in the first place.
           mipmapBlur removed: it's a documented pmndrs/postprocessing bug where the mip-based
           blur doesn't carry the alpha channel correctly across the transparent/opaque
           boundary, which shows up as soft black scalloped halos around bloomed geometry on
@@ -2248,7 +2265,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           (non-mipmap) blur handles alpha correctly and doesn't have this artifact. */}
       <EffectComposer>
         <Bloom
-          luminanceThreshold={0.7}
+          luminanceThreshold={0.8}
           luminanceSmoothing={0.6}
           intensity={0.4}
           blendFunction={BlendFunction.SCREEN}
@@ -2567,8 +2584,15 @@ export default function ProjectsSection() {
 
       {/* 3D Canvas — transparent bg so the site starfield shows through */}
       <Canvas
-        camera={{ position: [0, 0, 1.25], fov: 45, near: 0.01, far: 100 }}
-        gl={{ antialias: true, alpha: true }}
+        // near/far were 0.01/100 — a 10,000:1 ratio. Depth-buffer precision is distributed
+        // hyperbolically, so almost the entire buffer was being spent on the first fraction of
+        // a unit and the region that actually holds the brain (~0.5–1.5 units out) was left
+        // with very few distinct depth values. That is what let the fold lines and the shell
+        // resolve differently from frame to frame as the camera moved — the sparkle. The
+        // camera only ever travels between z 0.75 and 1.25 and the whole scene fits inside a
+        // couple of units, so 0.1/20 clips nothing and buys back roughly 50x the precision.
+        camera={{ position: [0, 0, 1.25], fov: 45, near: 0.1, far: 20 }}
+        gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
         style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
       >
         <BrainScene selected={selected} onHotspotSelect={setSelected} />
