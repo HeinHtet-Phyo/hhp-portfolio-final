@@ -22,9 +22,6 @@ import { Html } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { Line2 } from "three/examples/jsm/lines/Line2.js";
-import { LineGeometry } from "three/examples/jsm/lines/LineGeometry.js";
-import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
@@ -87,12 +84,23 @@ const PROJECTS = [
     code: "PREV_PATH_v1.0",
     fullDesc: "ML pipeline predicting health risk factors from patient data, generating personalised prevention plans with risk scoring. Placeholder: extended write-up covering the risk-scoring model and clinical validation coming soon.",
   },
+  {
+    id: 4,
+    title: "PROJECT_05",
+    subtitle: "Classified · In Development",
+    desc: "Details classified — full write-up coming soon.",
+    tech: ["Classified"],
+    stats: [["???", "Status"], ["TBD", "Stack"], ["Soon", "Release"]] as [string, string][],
+    github: "#",
+    demo: "#",
+    code: "PROJECT_05",
+    fullDesc: "Details classified — full write-up coming soon.",
+  },
 ];
 type Project = (typeof PROJECTS)[0];
 
 // ─── Upcoming Projects (placeholder, classified) ──────────────────────────────
 const UPCOMING_PROJECTS = [
-  { code: "PROJECT_05" },
   { code: "PROJECT_06" },
   { code: "PROJECT_07" },
 ];
@@ -104,15 +112,97 @@ const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
-// Project hotspot positions — spread across the upper-central region with real 3D
-// separation (pairwise distances ~0.09-0.15) so labels never stack on top of each
-// other at any rotation angle, instead of the old tight ~0.03-0.06 cluster.
-const PROJECT_HOTSPOTS: [number, number, number][] = [
-  [-0.085,  0.160,  0.075],  // 0: MoodTunes — upper-left-front
-  [ 0.090,  0.150,  0.045],  // 1: IT Career — upper-right
-  [-0.025,  0.075,  0.150],  // 2: CityPulse — lower-front
-  [ 0.070,  0.055,  0.095],  // 3: PreventPath — lower-right
+// Project node config — percentages from the mesh's ACTUAL bounding-box centre toward its
+// half-extent on each axis (computed at runtime from the real loaded geometry, not guessed —
+// see computeProjectPositions below). 0 = centre, +/-1 = the bbox face on that axis. Sign
+// convention: +X = right, +Y = up, +Z = forward.
+const PROJECT_NODES: { name: string; region: string; pct: [number, number, number] }[] = [
+  { name: "MoodTunes AI",      region: "top inner surface",          pct: [ 0.00,  1.60,  0.10] },
+  { name: "IT Career Planner", region: "front inner surface",        pct: [ 0.00,  0.75,  1.70] },
+  { name: "CityPulse",         region: "back, lower",                pct: [ 0.00, -0.20, -1.80] },
+  { name: "PreventPath",       region: "left, lower",                pct: [-1.40, -0.30,  0.05] },
+  { name: "PROJECT_05",        region: "lower right inner surface",  pct: [ 1.40, -0.30,  0.15] },
 ];
+// Populated at runtime by computeProjectPositions() once the brain GLB has actually loaded —
+// starts as the raw percentage guess (harmless placeholder for the one frame before the real
+// mesh bounding box is known) and is mutated in place, so every consumer that already reads
+// this array by reference (GoldCircuit, the hotspot render loop, the camera controller) picks
+// up the real, validated positions without needing to be threaded a prop.
+const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [...n.pct]);
+
+// Reads the brain mesh's real bounding box, places each PROJECT_NODES entry as a percentage of
+// its actual half-extent, then validates every position with a 6-direction raycast (a point
+// counts as "inside" only if a ray fired from it in every one of +-X/+-Y/+-Z actually hits the
+// mesh — a ray from truly outside the hull will miss in at least one outward direction). Any
+// node that fails gets nudged 15% of the way toward the bbox centre and rechecked, up to 5
+// times. Finally enforces a minimum pairwise separation of 35% of the mesh's longest axis,
+// pushing any too-close pair apart along their connecting vector. Logs the real bbox and a
+// PASS/FAIL line per node to the console.
+function computeProjectPositions(meshes: THREE.Mesh[]): [number, number, number][] {
+  const box = new THREE.Box3();
+  meshes.forEach((m) => {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    box.union(m.geometry.boundingBox!);
+  });
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const half = size.clone().multiplyScalar(0.5);
+  const longestAxis = Math.max(size.x, size.y, size.z);
+
+  // eslint-disable-next-line no-console
+  console.log(
+    `[ProjectNodes] real bbox min=(${box.min.x.toFixed(3)}, ${box.min.y.toFixed(3)}, ${box.min.z.toFixed(3)}) max=(${box.max.x.toFixed(3)}, ${box.max.y.toFixed(3)}, ${box.max.z.toFixed(3)})`
+  );
+
+  const raycaster = new THREE.Raycaster();
+  raycaster.far = longestAxis * 1.5;
+  const DIRS = [
+    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+  ];
+  const isInside = (p: THREE.Vector3) => {
+    let hits = 0;
+    DIRS.forEach((d) => {
+      raycaster.set(p, d);
+      if (raycaster.intersectObjects(meshes, false).length > 0) hits++;
+    });
+    return hits === 6;
+  };
+
+  const positions = PROJECT_NODES.map((node) => {
+    const p = new THREE.Vector3(
+      center.x + node.pct[0] * half.x,
+      center.y + node.pct[1] * half.y,
+      center.z + node.pct[2] * half.z
+    );
+    let pass = isInside(p);
+    let iterations = 0;
+    while (!pass && iterations < 5) {
+      p.lerp(center, 0.15);
+      pass = isInside(p);
+      iterations++;
+    }
+    // eslint-disable-next-line no-console
+    console.log(`[ProjectNodes] ${node.name}: ${pass ? "PASS" : "FAIL"} at (${p.x.toFixed(3)}, ${p.y.toFixed(3)}, ${p.z.toFixed(3)}) after ${iterations} nudge(s)`);
+    return p;
+  });
+
+  const minDist = 0.35 * longestAxis;
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = i + 1; j < positions.length; j++) {
+      const d = positions[i].distanceTo(positions[j]);
+      if (d < minDist && d > 1e-6) {
+        const push = (minDist - d) / 2;
+        const dir = positions[j].clone().sub(positions[i]).normalize();
+        positions[i].addScaledVector(dir, -push);
+        positions[j].addScaledVector(dir, push);
+      }
+    }
+  }
+
+  return positions.map((p) => [p.x, p.y, p.z] as [number, number, number]);
+}
 
 // Per-node label offset (in local space, before billboarding) so labels stay legible
 // even if two nodes ever line up close together on screen from some angle.
@@ -121,55 +211,46 @@ const LABEL_OFFSETS: [number, number, number][] = [
   [0.045,  0.010, 0],
   [0.045, -0.010, 0],
   [0.045, -0.028, 0],
+  [0.045,  0.046, 0],
 ];
 
-// ─── Neural Lines connecting the 4 project hotspots ─────────────────────────
-// Fat neon lines (Line2/LineMaterial) — genuinely thicker in screen-space pixels,
-// unlike THREE.LineBasicMaterial whose linewidth is ignored by most GL drivers.
-function NeuralLines() {
-  const matRef = useRef<LineMaterial>(null);
-  const { size } = useThree();
-
-  useFrame(({ clock }) => {
-    if (matRef.current) {
-      // Bright neural pulse — 0.7 to 1.0, more luminous than the ambient web
-      matRef.current.opacity = 0.7 + 0.3 * Math.sin(clock.elapsedTime * 1.2);
-      matRef.current.resolution.set(size.width, size.height);
-    }
-  });
-
+// ─── Gold circuit connecting the 5 project nodes ─────────────────────────────
+// Complete graph — every node connects straight through the interior to every other node
+// (10 unique pairs from 5 nodes), the intentional cross-brain diagonals forming a spanning
+// circuit. Thicker than the ambient network's 0.0025 threads, warm gold, so it reads as its
+// own distinct layer against the white ambient web.
+function GoldCircuit() {
   const geo = useMemo(() => {
-    const pairs: [number, number][] = [[0,1],[0,2],[0,3],[1,2],[1,3],[2,3]];
-    const positions: number[] = [];
-    pairs.forEach(([a, b]) => {
-      positions.push(...PROJECT_HOTSPOTS[a], ...PROJECT_HOTSPOTS[b]);
+    const pairs: [number, number][] = [
+      [0, 1], [0, 2], [0, 3], [0, 4],
+      [1, 2], [1, 3], [1, 4],
+      [2, 3], [2, 4],
+      [3, 4],
+    ];
+    const tubes = pairs.map(([a, b]) => {
+      const A = new THREE.Vector3(...PROJECT_HOTSPOTS[a]);
+      const B = new THREE.Vector3(...PROJECT_HOTSPOTS[b]);
+      const curve = new THREE.LineCurve3(A, B);
+      return new THREE.TubeGeometry(curve, 1, 0.007, 5, false);
     });
-    const g = new LineGeometry();
-    g.setPositions(positions);
-    return g;
+    const merged = BufferGeometryUtils.mergeGeometries(tubes, false) ?? new THREE.BufferGeometry();
+    tubes.forEach((t) => t.dispose());
+    return merged;
   }, []);
 
-  const mat = useMemo(() => new LineMaterial({
-    color: 0xffffff,
-    linewidth: 2.5, // pixels
-    transparent: true,
-    opacity: 0.85,
-    depthWrite: false,
-    depthTest: false, // always visible over the now much more opaque brain surface
-    toneMapped: false, // keep at full brightness so bloom has real energy to work with
-  }), []);
-
-  useEffect(() => { matRef.current = mat; }, [mat]);
-
-  const lineRef = useRef<Line2>(null);
-  useEffect(() => {
-    if (lineRef.current) {
-      lineRef.current.computeLineDistances();
-      lineRef.current.renderOrder = 10;
-    }
-  }, [geo]);
-
-  return <primitive ref={lineRef} object={new Line2(geo, mat)} />;
+  return (
+    <mesh geometry={geo} renderOrder={5}>
+      <meshBasicMaterial
+        color="#FFFFFF"
+        transparent
+        opacity={0.55}
+        depthWrite={false}
+        depthTest={false}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+      />
+    </mesh>
+  );
 }
 
 // ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
@@ -182,6 +263,7 @@ function HotspotDot({ position, index, active, onSelect }: {
   const meshRef = useRef<THREE.Mesh>(null);
   const glow1Ref = useRef<THREE.Mesh>(null);
   const glow2Ref = useRef<THREE.Mesh>(null);
+  const [hovered, setHovered] = useState(false);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
@@ -197,56 +279,65 @@ function HotspotDot({ position, index, active, onSelect }: {
           can lose contrast wherever it lands on a bright fold; this dark halo sits just
           behind the bright core so the node pops regardless of what's behind it. */}
       <mesh renderOrder={9}>
-        <sphereGeometry args={[0.014, 12, 12]} />
+        <sphereGeometry args={[0.034, 12, 12]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.45} depthTest={false} depthWrite={false} />
       </mesh>
       {/* Bright core — renderOrder + depthTest:false so it always draws on top of the
-          brain surface, regardless of transparent-object sort order. Needed since the
-          brain went from ~0.2 to ~0.8 opacity — at that opacity, ordinary depth sorting
-          let a solid patch of brain mesh cover a node (this is what hid PreventPath). */}
+          brain surface, regardless of transparent-object sort order. ~33% smaller than the
+          previous gold build, bright electric yellow-white (not warm amber), unmistakably the
+          largest/brightest points in the scene. */}
       <mesh ref={meshRef} renderOrder={10} onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.009, 12, 12]} />
-        <meshBasicMaterial color="#ffffff" depthTest={false} depthWrite={false} toneMapped={false} />
+        <sphereGeometry args={[0.027, 12, 12]} />
+        <meshBasicMaterial color="#FFFFFF" depthTest={false} depthWrite={false} toneMapped={false} />
       </mesh>
       {/* Soft bloom — pure spheres only (never a flat disc/torus), so there is no
-          ring/halo/Saturn-ring artifact from any viewing angle. Bright white, enlarged so
-          bloom picks them up as glowing halos onto the brain surface around each node.
-          toneMapped:false keeps them at full unclamped brightness so bloom has real energy
-          to work with. */}
+          ring/halo/Saturn-ring artifact from any viewing angle. Same bright yellow-white
+          throughout (no amber falloff), toneMapped:false keeps them at full unclamped
+          brightness so bloom has real energy to work with — these are the only nodes meant to
+          bloom (the ambient network deliberately does not). */}
       <mesh ref={glow1Ref} renderOrder={10}>
-        <sphereGeometry args={[0.026, 12, 12]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.5 : 0.34} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <sphereGeometry args={[0.054, 12, 12]} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={active ? 0.62 : 0.46} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
       <mesh ref={glow2Ref} renderOrder={10}>
-        <sphereGeometry args={[0.048, 12, 12]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={active ? 0.26 : 0.15} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <sphereGeometry args={[0.092, 12, 12]} />
+        <meshBasicMaterial color="#F5F5FF" transparent opacity={active ? 0.34 : 0.22} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </mesh>
-      {/* Invisible click target — larger hitbox for usability */}
-      <mesh onClick={(e) => { e.stopPropagation(); onSelect(); }}>
-        <sphereGeometry args={[0.026, 8, 8]} />
+      {/* Invisible click target — larger hitbox for usability, also drives hover so the label
+          below only shows for the node actually being pointed at (previously every label was
+          always rendered, which is what caused nearby ones to overlap). */}
+      <mesh
+        onClick={(e) => { e.stopPropagation(); onSelect(); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={(e) => { e.stopPropagation(); setHovered(false); }}
+      >
+        <sphereGeometry args={[0.057, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* HTML label — offset per-node so labels never stack */}
-      <Html
-        position={LABEL_OFFSETS[index]}
-        style={{ pointerEvents: "none", userSelect: "none" }}
-        distanceFactor={1.2}
-        occlude={false}
-      >
-        <div style={{
-          background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
-          border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
-          borderRadius: 4, padding: "3px 7px",
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: active ? "#ffffff" : "#aaaaaa",
-          whiteSpace: "nowrap",
-          backdropFilter: "blur(4px)",
-          boxShadow: active ? "0 0 10px rgba(0,229,255,0.5)" : "none",
-          transition: "all 0.2s ease",
-        }}>
-          {PROJECTS[index].title}
-        </div>
-      </Html>
+      {/* HTML label — only rendered when hovered or active, so at most one label is ever
+          visible at a time regardless of how close two nodes are on screen. */}
+      {(hovered || active) && (
+        <Html
+          position={LABEL_OFFSETS[index]}
+          style={{ pointerEvents: "none", userSelect: "none" }}
+          distanceFactor={1.2}
+          occlude={false}
+        >
+          <div style={{
+            background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
+            border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
+            borderRadius: 4, padding: "3px 7px",
+            fontSize: 9, fontFamily: "JetBrains Mono, monospace",
+            color: active ? "#ffffff" : "#aaaaaa",
+            whiteSpace: "nowrap",
+            backdropFilter: "blur(4px)",
+            boxShadow: active ? "0 0 10px rgba(255,193,7,0.5)" : "none",
+            transition: "all 0.2s ease",
+          }}>
+            {PROJECTS[index].title}
+          </div>
+        </Html>
+      )}
     </group>
   );
 }
@@ -937,68 +1028,107 @@ function farthestPointSample(points: THREE.Vector3[], count: number, seedIndex =
 function buildMeshSampledNetwork(meshes: THREE.Mesh[]) {
   const rand = seededRandom(11);
 
-  // Fibonacci-sphere sampling: generate N directions that are mathematically the most even
-  // possible distribution over a full sphere (no lat/long pole clustering, no reliance on the
-  // mesh's own topology at all), then raycast each direction inward from outside the brain and
-  // snap to wherever it first hits the real surface. Since the directions themselves are
-  // uniform over the whole 4π solid angle — not just a forward-facing hemisphere — the rays
-  // collectively come from all the way around (top, bottom, front, back, sides), each finding
-  // its own nearest surface point in that direction.
+  // Area-weighted random triangle sampling: pick a random triangle from the mesh (weighted by
+  // its own area) then a random barycentric point within it — sampling the real, asymmetric
+  // triangulation directly instead of a mathematically even set of directions (the old
+  // Fibonacci-sphere-and-raycast method), so placement has no grid/mirror symmetry at all.
   meshes.forEach((m) => m.updateMatrixWorld(true));
 
-  const bbox = new THREE.Box3();
+  type Tri = { a: THREE.Vector3; b: THREE.Vector3; c: THREE.Vector3; na: THREE.Vector3; nb: THREE.Vector3; nc: THREE.Vector3; area: number };
+  const triangles: Tri[] = [];
+  let totalArea = 0;
   meshes.forEach((m) => {
-    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-    bbox.union(m.geometry.boundingBox!.clone().applyMatrix4(m.matrixWorld));
+    const geo = m.geometry;
+    const posAttr = geo.attributes.position;
+    const normAttr = geo.attributes.normal;
+    const index = geo.index;
+    const triCount = index ? index.count / 3 : posAttr.count / 3;
+    const getIndex = (t: number, v: number) => (index ? index.getX(t * 3 + v) : t * 3 + v);
+    for (let t = 0; t < triCount; t++) {
+      const ia = getIndex(t, 0), ib = getIndex(t, 1), ic = getIndex(t, 2);
+      const a = new THREE.Vector3().fromBufferAttribute(posAttr, ia);
+      const b = new THREE.Vector3().fromBufferAttribute(posAttr, ib);
+      const c = new THREE.Vector3().fromBufferAttribute(posAttr, ic);
+      const na = normAttr ? new THREE.Vector3().fromBufferAttribute(normAttr, ia) : new THREE.Vector3(0, 1, 0);
+      const nb = normAttr ? new THREE.Vector3().fromBufferAttribute(normAttr, ib) : new THREE.Vector3(0, 1, 0);
+      const nc = normAttr ? new THREE.Vector3().fromBufferAttribute(normAttr, ic) : new THREE.Vector3(0, 1, 0);
+      const area = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a)).length() * 0.5;
+      if (area <= 0) continue;
+      totalArea += area;
+      triangles.push({ a, b, c, na, nb, nc, area });
+    }
   });
-  const bboxCenter = new THREE.Vector3();
-  bbox.getCenter(bboxCenter);
-  const bboxSize = new THREE.Vector3();
-  bbox.getSize(bboxSize);
-  const outerRadius = Math.max(bboxSize.x, bboxSize.y, bboxSize.z) * 0.7;
+  const cumulative = new Float64Array(triangles.length);
+  let running = 0;
+  triangles.forEach((tri, i) => { running += tri.area; cumulative[i] = running; });
+  const pickTriangle = (): Tri => {
+    const target = rand() * totalArea;
+    let lo = 0, hi = triangles.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cumulative[mid] < target) lo = mid + 1; else hi = mid;
+    }
+    return triangles[lo];
+  };
 
-  const N = 700; // raised so enough candidates survive the large 0.22 MIN_DIST filter below
-  const goldenRatio = (1 + Math.sqrt(5)) / 2;
-  const raycaster = new THREE.Raycaster();
+  // TWO-LAYER distribution: the surface-wrapped network (dots + lines on the shell, as in the
+  // previous design) PLUS interior nodes diffused evenly through the whole 3D volume, woven
+  // together into one continuous network by the shared connection pass below.
   type P = { pos: THREE.Vector3; normal: THREE.Vector3 };
-  const rawHits: P[] = [];
-  for (let i = 0; i < N; i++) {
-    const theta = Math.acos(1 - (2 * (i + 0.5)) / N); // polar angle
-    const phi = (2 * Math.PI * i) / goldenRatio; // azimuthal angle
-    const dir = new THREE.Vector3(
-      Math.sin(theta) * Math.cos(phi),
-      Math.cos(theta),
-      Math.sin(theta) * Math.sin(phi)
-    );
-    const origin = dir.clone().multiplyScalar(outerRadius).add(bboxCenter);
-    const direction = bboxCenter.clone().sub(origin).normalize();
-    raycaster.set(origin, direction);
-    const hits = raycaster.intersectObjects(meshes, false);
-    if (hits.length === 0) continue;
-    const hit = hits[0];
-    const hitObject = hit.object as THREE.Mesh;
-    const normal = (hit.face?.normal
-      ? hit.face.normal.clone().transformDirection(hitObject.matrixWorld)
-      : hit.point.clone().sub(bboxCenter)
-    ).normalize();
-    // Push the point outward along the surface normal at the SOURCE, not just when placing
-    // the dot instances — the line/tube geometry uses these same points as its endpoints, so
-    // if only the dots got offset, every tube would still start/end exactly on the raw
-    // surface (straddling it, half embedded) even though the dots themselves looked fine.
-    const pushedOut = hit.point.clone().addScaledVector(normal, 0.015);
-    rawHits.push({ pos: pushedOut, normal });
+
+  const sampleSurface = () => {
+    const tri = pickTriangle();
+    const r1 = rand(), r2 = rand();
+    const sq1 = Math.sqrt(r1);
+    const u = 1 - sq1, v = r2 * sq1, w = 1 - u - v;
+    const pos = new THREE.Vector3().addScaledVector(tri.a, u).addScaledVector(tri.b, v).addScaledVector(tri.c, w);
+    const normal = new THREE.Vector3().addScaledVector(tri.na, u).addScaledVector(tri.nb, v).addScaledVector(tri.nc, w).normalize();
+    return { pos, normal };
+  };
+
+  // Centroid of the surface (area-weighted sampling average ≈ mesh centroid).
+  const centroid = new THREE.Vector3();
+  {
+    const CN = 1500;
+    for (let i = 0; i < CN; i++) centroid.add(sampleSurface().pos);
+    centroid.multiplyScalar(1 / CN);
   }
 
-  // Filter out points within 0.04 of one already kept — with N bumped to 400, some Fibonacci
-  // directions land close enough together (after snapping to the real, non-spherical surface)
-  // to need this so they don't read as a doubled-up dot.
-  const MIN_DIST = 0.15;
-  const filtered: P[] = [];
-  for (const p of rawHits) {
-    if (!filtered.some((f) => f.pos.distanceTo(p.pos) < MIN_DIST)) filtered.push(p);
+  // Layer 1 — surface network, restored exactly per the previous design: even Poisson spacing
+  // across the shell, each point lifted slightly outward along its own normal.
+  const N_SURF = 6000;
+  const MIN_DIST_SURF = 0.12; // widened from 0.078 — ~55-60% fewer surface nodes, still evenly spread
+  const surfacePts: P[] = [];
+  for (let i = 0; i < N_SURF; i++) {
+    const s = sampleSurface();
+    const pos = s.pos.clone().addScaledVector(s.normal, 0.03);
+    if (!surfacePts.some((f) => f.pos.distanceTo(pos) < MIN_DIST_SURF)) surfacePts.push({ pos, normal: s.normal });
   }
-  const points = filtered.map((f) => f.pos);
-  const normals = filtered.map((f) => f.normal);
+
+  // Layer 2 — interior volume, diffused EVENLY through the whole interior. The previous pass
+  // clumped centrally because a uniform-random depth along each surface→centroid ray packs far
+  // more candidates into the tiny volume near the centroid. Fix: distribute the radial fraction
+  // s (measured from the centroid outward) as cbrt(random) — the exact volume-uniform law for a
+  // star-shaped region — so density is flat everywhere from just beneath the shell to the core,
+  // and lobe extremities (temporal, occipital, cerebellum interiors) fill via their own rays.
+  // Scaled by 0.9 so nothing sits closer than ~10% below the surface (never pokes through).
+  const N_INT = 5000;
+  const MIN_DIST_INT = 0.17; // widened again — interior is a light scattering (~60-80), just depth hints
+  const MAX_INTERIOR = 80;
+  const interiorPts: P[] = [];
+  for (let i = 0; i < N_INT && interiorPts.length < MAX_INTERIOR; i++) {
+    const s = sampleSurface();
+    const radial = 0.55 + rand() * 0.35; // outer shell band only (55%-90% of the way to the surface) — no deep-core dots anymore
+    const pos = centroid.clone().lerp(s.pos, radial);
+    if (interiorPts.some((f) => f.pos.distanceTo(pos) < MIN_DIST_INT)) continue;
+    if (surfacePts.some((f) => f.pos.distanceTo(pos) < MIN_DIST_INT * 0.8)) continue;
+    interiorPts.push({ pos, normal: s.normal });
+  }
+
+  const surfaceCount = surfacePts.length;
+  const points = [...surfacePts.map((f) => f.pos), ...interiorPts.map((f) => f.pos)];
+  const normals = [...surfacePts.map((f) => f.normal), ...interiorPts.map((f) => f.normal)];
+  const isInterior = points.map((_, i) => i >= surfaceCount);
 
   const hotSet = new Set<number>();
   const hotCount = 10 + Math.floor(rand() * 6); // 10-15 hot nodes
@@ -1013,16 +1143,19 @@ function buildMeshSampledNetwork(meshes: THREE.Mesh[]) {
     return best;
   });
   const avgNearestDist = nearestDists.reduce((a, b) => a + b, 0) / (nearestDists.length || 1);
-  const MAX_DIST = avgNearestDist * 3.8;
-  // Two points can be close in straight-line 3D distance while sitting on genuinely different
-  // parts of the surface — e.g. across a thin fold, or a front-facing point near a
-  // back-facing one where the mesh curves back on itself — and no amount of bulging the line
-  // between them fixes that, because their surface normals point in substantially different
-  // directions, so there's no single "outward" direction that clears the mesh for that whole
-  // connection. Rejecting pairs whose normals aren't roughly aligned (dot product > 0.2, i.e.
-  // within ~78° of each other) stops those bad connections from being created in the first
-  // place, rather than trying to geometrically patch an edge that was never really between two
-  // adjacent surface points to begin with.
+  // Absolute cap as a fraction of the brain's own bounding-box diagonal ("diameter") — the old
+  // purely-adaptive multiplier (avgNearestDist * 3.8) had no ceiling tied to the brain's actual
+  // size, which is what let connections reach all the way across the interior as long chords.
+  // Capping to ~18% of the diagonal keeps every connection local to nearby neighbours only.
+  const bboxMin = new THREE.Vector3(Infinity, Infinity, Infinity);
+  const bboxMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+  points.forEach((p) => { bboxMin.min(p); bboxMax.max(p); });
+  const brainDiagonal = bboxMin.distanceTo(bboxMax);
+  const MAX_DIST = Math.min(avgNearestDist * 3.4, brainDiagonal * 0.17); // loosened proportionally to the wider node spacing
+  // Surface-to-surface pairs keep the normal-alignment filter from the previous surface design
+  // (rejects connections across folds where the mesh curves back on itself). Any pair involving
+  // an interior node skips it — interior links run through open volume in every direction, and
+  // it's exactly those surface↔interior cross-links that weave the two layers into one network.
   const NORMAL_ALIGN_MIN = 0.2;
   const edgeSet = new Set<string>();
   const edges: { a: number; b: number; d: number }[] = [];
@@ -1033,20 +1166,64 @@ function buildMeshSampledNetwork(meshes: THREE.Mesh[]) {
     edges.push({ a: i, b: j, d });
   };
   points.forEach((p, i) => {
-    const k = 4; // max 4 connections per dot — clean triangles instead of star-burst clutter
-    points
-      .map((q, j) => ({ j, d: i === j ? Infinity : p.distanceTo(q) }))
-      .filter((x) => x.d < MAX_DIST && normals[i].dot(normals[x.j]) > NORMAL_ALIGN_MIN)
+    // Surface nodes carry the dominant web (5-7 links); interior nodes stay subtle with just
+    // 3-4 short local links — the layer hierarchy is surface-first, interior as depth hints.
+    const k = isInterior[i] ? 3 + Math.floor(rand() * 2) : 5 + Math.floor(rand() * 3);
+    const candidates = points.map((q, j) => ({ j, d: i === j ? Infinity : p.distanceTo(q) }));
+    candidates
+      .filter((x) => {
+        const involvesInterior = isInterior[i] || isInterior[x.j];
+        const cap = involvesInterior ? MAX_DIST * 0.75 : MAX_DIST; // interior links kept short
+        return x.d < cap && (involvesInterior || normals[i].dot(normals[x.j]) > NORMAL_ALIGN_MIN);
+      })
       .sort((a, b) => a.d - b.d)
       .slice(0, k)
       .forEach(({ j, d }) => addEdge(i, j, d));
+    // Occasional medium-length surface link past the local cap — length variety keeps the
+    // surface web organic rather than a uniform mesh.
+    if (!isInterior[i] && rand() < 0.15) {
+      const medium = candidates.filter((x) => !isInterior[x.j] && x.d >= MAX_DIST && x.d < MAX_DIST * 1.7);
+      if (medium.length > 0) {
+        const pick = medium[Math.floor(rand() * medium.length)];
+        addEdge(i, pick.j, pick.d);
+      }
+    }
   });
 
+  // Repair pass: no node with fewer than 3 connections (avoids orphaned nodes floating without
+  // links). Any node below the floor gets linked to its next-nearest neighbours out to a
+  // relaxed distance cap until it reaches 3.
+  const connectionCount = new Array(points.length).fill(0);
+  edges.forEach(({ a, b }) => { connectionCount[a]++; connectionCount[b]++; });
+  points.forEach((p, i) => {
+    if (connectionCount[i] >= 3) return;
+    const candidates = points
+      .map((q, j) => ({ j, d: i === j ? Infinity : p.distanceTo(q) }))
+      .filter((x) => x.d < MAX_DIST * 1.8)
+      .sort((a, b) => a.d - b.d);
+    for (const { j, d } of candidates) {
+      if (connectionCount[i] >= 3) break;
+      const key = i < j ? `${i}-${j}` : `${j}-${i}`;
+      if (edgeSet.has(key)) continue;
+      addEdge(i, j, d);
+      connectionCount[i]++;
+      connectionCount[j]++;
+    }
+  });
 
   const edgeDists = edges.map((e) => e.d).slice().sort((a, b) => a - b);
   const maxEdgeDist = edgeDists[edgeDists.length - 1] ?? 0;
   const isolatedCount = points.filter((_, i) => !edges.some((e) => e.a === i || e.b === i)).length;
   const inTarget = edges.length >= 400 && edges.length <= 900;
+
+  // Natural size variation: ~60% medium, 25% small, 15% larger.
+  const sizes = points.map(() => {
+    const roll = rand();
+    if (roll < 0.25) return 0.65 + rand() * 0.2;   // small
+    if (roll < 0.85) return 1.0 + rand() * 0.2;    // medium
+    return 1.4 + rand() * 0.35;                     // larger
+  });
+
   // eslint-disable-next-line no-console
   console.log(
     `[NeuralDots] ${points.length} dots, ${edges.length} connections (target 400-900${inTarget ? ", OK" : ", OUT OF RANGE"}), max edge length ${maxEdgeDist.toFixed(4)} (limit ${MAX_DIST}), ${isolatedCount} isolated dot(s)`
@@ -1055,21 +1232,20 @@ function buildMeshSampledNetwork(meshes: THREE.Mesh[]) {
   // Each connection bulged slightly outward at its midpoint along the local surface normal
   // (average of the two endpoints' own raycast normals) — a straight line between two
   // surface-adjacent points can still dip inside the mesh partway along its length wherever
-  // the surface curves or folds between them, and depthTest then correctly hides that
-  // mid-segment behind the opaque brain, which is exactly what read as "some lines not
-  // visible." Lifting the midpoint clear of the surface keeps the whole tube in front of the
-  // brain's depth buffer along its entire length, not just at its two endpoints.
+  // Dead-straight chords per the plexus reference — no midpoint arc/bulge. The midpoint is the
+  // plain unlofted centre of A→B, so the quadratic bezier downstream degenerates into an exact
+  // straight line. Straight chords slightly clipping through convex folds is fine and matches
+  // the reference's faceted low-poly shell look, especially with the brain body now highly
+  // transparent.
   const HOT_LINE_BOOST = 1.4;
-  const linePaths: { path: THREE.Vector3[]; brightness: number[] }[] = [];
+  // Split into two layers: surface-only edges (the dominant visible web) and any edge touching
+  // an interior node (the subtle depth layer, rendered much dimmer by the component).
+  const surfaceLinePaths: { path: THREE.Vector3[]; brightness: number[] }[] = [];
+  const interiorLinePaths: { path: THREE.Vector3[]; brightness: number[] }[] = [];
   edges.forEach(({ a, b, d }) => {
     const A = points[a], B = points[b];
-    const midNormal = normals[a].clone().add(normals[b]).normalize();
-    // Bulge scales with edge length (25% of it, floored at 0.02) — a longer connection is
-    // more likely to span a deeper fold or sharper curve between its two endpoints, so a
-    // fixed small bulge that worked for short edges wasn't enough clearance for long ones.
-    const bulge = Math.max(0.02, d * 0.25);
-    const bulgedMid = A.clone().add(B).multiplyScalar(0.5).addScaledVector(midNormal, bulge);
-    const path = [A, bulgedMid, B];
+    const straightMid = A.clone().add(B).multiplyScalar(0.5);
+    const path = [A, straightMid, B];
 
     const t = maxEdgeDist > 0 ? d / maxEdgeDist : 0;
     const baseBrightness = 0.85 - t * 0.15;
@@ -1082,24 +1258,11 @@ function buildMeshSampledNetwork(meshes: THREE.Mesh[]) {
       const f = aIsHot ? 1 - i / (pn - 1) : i / (pn - 1);
       return baseBrightness * (1 + (HOT_LINE_BOOST - 1) * f);
     });
-    linePaths.push({ path, brightness });
+    if (isInterior[a] || isInterior[b]) interiorLinePaths.push({ path, brightness });
+    else surfaceLinePaths.push({ path, brightness });
   });
 
-
-  // A handful of thin loose-end lines trailing off a few peripheral points into empty space —
-  // straight single segments (no curve/bulge, no continuation), giving the reference's "still
-  // forming"/unclosed-mesh look rather than a perfectly sealed triangulation.
-  const edgeCandidates = points
-    .map((p, i) => ({ i, n: normals[i] }))
-    .sort((a, b) => rand() - 0.5)
-    .slice(0, 10);
-  edgeCandidates.forEach(({ i, n }) => {
-    const start = points[i];
-    const end = start.clone().addScaledVector(n, 0.05 + rand() * 0.06);
-    linePaths.push({ path: [start, start.clone().add(end).multiplyScalar(0.5), end], brightness: [0.4, 0.3, 0.15] });
-  });
-
-  return { points, normals, hotSet, linePaths };
+  return { points, normals, hotSet, surfaceLinePaths, interiorLinePaths, sizes, surfaceCount };
 }
 
 // Fine wireframe overlay traced directly from the real mesh triangulation — this is what
@@ -1129,68 +1292,91 @@ function WireframeBrain({ meshes }: { meshes: THREE.Mesh[] }) {
 }
 
 function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
-  const instRef = useRef<THREE.InstancedMesh>(null);
-  const haloRef = useRef<THREE.InstancedMesh>(null);
+  const surfDotRef = useRef<THREE.InstancedMesh>(null);
+  const surfHaloRef = useRef<THREE.InstancedMesh>(null);
+  const intDotRef = useRef<THREE.InstancedMesh>(null);
 
-  // Merged TubeGeometry (real visible thickness, unlike LineBasicMaterial's ~1px lines).
-  const { points, normals, tubeGeo, hotSet } = useMemo(() => {
-    const { points, normals, hotSet, linePaths } = buildMeshSampledNetwork(meshes);
-    const tubes: THREE.BufferGeometry[] = linePaths.map(({ path }) => {
-      const curve = new THREE.QuadraticBezierCurve3(path[0], path[1], path[2]);
-      return new THREE.TubeGeometry(curve, 6, 0.004, 4, false);
-    });
-    const merged = BufferGeometryUtils.mergeGeometries(tubes, false) ?? new THREE.BufferGeometry();
-    tubes.forEach((t) => t.dispose());
-    return { points, normals, tubeGeo: merged, hotSet };
+  // Two merged TubeGeometries — surface web (dominant layer) and interior web (subtle depth
+  // layer), rendered at very different opacities to enforce the visual hierarchy.
+  const { points, sizes, surfaceCount, surfTubeGeo, intTubeGeo } = useMemo(() => {
+    const { points, surfaceLinePaths, interiorLinePaths, sizes, surfaceCount } = buildMeshSampledNetwork(meshes);
+    const buildTubes = (paths: { path: THREE.Vector3[] }[]) => {
+      const tubes = paths.map(({ path }) => {
+        const curve = new THREE.QuadraticBezierCurve3(path[0], path[1], path[2]);
+        return new THREE.TubeGeometry(curve, 4, 0.0025, 4, false);
+      });
+      const merged = BufferGeometryUtils.mergeGeometries(tubes, false) ?? new THREE.BufferGeometry();
+      tubes.forEach((t) => t.dispose());
+      return merged;
+    };
+    return {
+      points,
+      sizes,
+      surfaceCount,
+      surfTubeGeo: buildTubes(surfaceLinePaths),
+      intTubeGeo: buildTubes(interiorLinePaths),
+    };
   }, [meshes]);
 
-  // InstancedMesh nodes, one per sampled surface vertex, rendered INSIDE the brain's own
-  // scaled/positioned group (see BrainModel), using the mesh's raw local vertex coordinates
-  // directly. Every instance — core and halo alike — gets the exact same scale; no size
-  // variation between hot and regular nodes.
+  const interiorCount = points.length - surfaceCount;
+
   useEffect(() => {
-    const mesh = instRef.current;
-    const halo = haloRef.current;
-    if (!mesh || !halo) return;
+    const surf = surfDotRef.current;
+    const halo = surfHaloRef.current;
+    const int = intDotRef.current;
+    if (!surf || !halo || !int) return;
     const dummy = new THREE.Object3D();
-    const CORE_RADIUS = 0.011;
-    points.forEach((p, i) => {
-      const n = normals[i];
-      const clearance = CORE_RADIUS * 1.4;
-      const pos = p.clone().addScaledVector(n, clearance);
-
-      dummy.position.copy(pos);
-      dummy.scale.set(1, 1, 1);
+    for (let i = 0; i < surfaceCount; i++) {
+      dummy.position.copy(points[i]);
+      dummy.scale.setScalar(sizes[i] ?? 1);
       dummy.rotation.set(0, 0, 0);
       dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
-
-      dummy.scale.set(1, 1, 1);
-      dummy.rotation.set(0, 0, 0);
-      dummy.updateMatrix();
+      surf.setMatrixAt(i, dummy.matrix);
       halo.setMatrixAt(i, dummy.matrix);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
+    }
+    for (let i = 0; i < interiorCount; i++) {
+      const p = points[surfaceCount + i];
+      dummy.position.copy(p);
+      dummy.scale.setScalar(sizes[surfaceCount + i] ?? 1);
+      dummy.rotation.set(0, 0, 0);
+      dummy.updateMatrix();
+      int.setMatrixAt(i, dummy.matrix);
+    }
+    surf.instanceMatrix.needsUpdate = true;
     halo.instanceMatrix.needsUpdate = true;
-  }, [points, normals, hotSet]);
+    int.instanceMatrix.needsUpdate = true;
+  }, [points, sizes, surfaceCount, interiorCount]);
 
   return (
     <group>
-      {/* depthTest ON — keeps the brain reading as solid (depthTest:false let the far/hidden
-          side of the network show through the front, which read as brainMat being
-          transparent even though it's fully opaque). Relies on the geometric fixes (surface
-          offset, per-length midpoint bulge, normal-alignment filtering) to keep lines off the
-          interior, accepting that an occasional line may still clip in an extreme fold. */}
-      <mesh geometry={tubeGeo} renderOrder={2}>
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.2} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      {/* SURFACE layer — the dominant web. Normal depth testing: the depth-writing brain shell
+          occludes the far side, so the network wraps a clearly readable brain form instead of
+          both sides stacking into an unreadable ball of webbing. */}
+      <mesh geometry={surfTubeGeo} renderOrder={2}>
+        <meshBasicMaterial color="#e6fbff" transparent opacity={0.2} depthWrite={false} />
       </mesh>
-      <instancedMesh ref={haloRef} args={[undefined, undefined, points.length]} renderOrder={2}>
-        <sphereGeometry args={[0.018, 6, 6]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.18} depthWrite={false} depthTest blending={THREE.AdditiveBlending} toneMapped={false} />
+      {/* Faint far-side hint of the surface web (draws only where hidden behind written depth). */}
+      <mesh geometry={surfTubeGeo} renderOrder={3}>
+        <meshBasicMaterial color="#e6fbff" transparent opacity={0.04} depthWrite={false} depthFunc={THREE.GreaterDepth} />
+      </mesh>
+      <instancedMesh ref={surfHaloRef} args={[undefined, undefined, surfaceCount]} renderOrder={2}>
+        <sphereGeometry args={[0.008, 6, 6]} />
+        <meshBasicMaterial color="#e6fbff" transparent opacity={0.15} depthWrite={false} depthTest />
       </instancedMesh>
-      <instancedMesh ref={instRef} args={[undefined, undefined, points.length]} renderOrder={2}>
-        <sphereGeometry args={[0.011, 8, 8]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} depthTest blending={THREE.AdditiveBlending} toneMapped={false} />
+      <instancedMesh ref={surfDotRef} args={[undefined, undefined, surfaceCount]} renderOrder={2}>
+        <sphereGeometry args={[0.0058, 8, 8]} />
+        <meshBasicMaterial color="#f2feff" transparent opacity={0.78} depthWrite={false} depthTest />
+      </instancedMesh>
+
+      {/* INTERIOR layer — subtle depth hints at ~40-50% of the surface layer's weight.
+          depthTest OFF so it shows through the depth-writing shell (whose material is
+          untouched), dim enough that it never competes with the surface web. */}
+      <mesh geometry={intTubeGeo} renderOrder={4}>
+        <meshBasicMaterial color="#e6fbff" transparent opacity={0.08} depthWrite={false} depthTest={false} />
+      </mesh>
+      <instancedMesh ref={intDotRef} args={[undefined, undefined, interiorCount]} renderOrder={4}>
+        <sphereGeometry args={[0.005, 8, 8]} />
+        <meshBasicMaterial color="#dff5fa" transparent opacity={0.35} depthWrite={false} depthTest={false} />
       </instancedMesh>
     </group>
   );
@@ -1207,6 +1393,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
 // that specifically traces fold contours, rather than a uniform full wireframe (which reads as
 // static noise) or an approximate dot-to-dot chord network (which cuts across folds).
 function buildFoldNetwork(meshes: THREE.Mesh[]) {
+  const rand = seededRandom(23);
   const positions: THREE.Vector3[] = [];
   const normals: THREE.Vector3[] = [];
   const adjacency: Map<number, Set<number>> = new Map();
@@ -1274,41 +1461,44 @@ function buildFoldNetwork(meshes: THREE.Mesh[]) {
   // sit exactly on the mesh don't z-fight/clip against the opaque brain material underneath.
   const OFFSET = 0.006;
   const linePositions = new Float32Array(selected.length * 6);
-  const nodeIndexSet = new Set<number>();
   selected.forEach(({ a, b }, i) => {
     const pa = positions[a].clone().addScaledVector(normals[a], OFFSET);
     const pb = positions[b].clone().addScaledVector(normals[b], OFFSET);
     linePositions[i * 6] = pa.x; linePositions[i * 6 + 1] = pa.y; linePositions[i * 6 + 2] = pa.z;
     linePositions[i * 6 + 3] = pb.x; linePositions[i * 6 + 4] = pb.y; linePositions[i * 6 + 5] = pb.z;
-    nodeIndexSet.add(a);
-    nodeIndexSet.add(b);
   });
 
-  // Dot nodes sit at fold-line vertices (intersections and endpoints fall out naturally, since
-  // those are just vertices shared by multiple/only-one selected edge). Downsampled with a
-  // stride for instancing headroom rather than one dot per fold vertex.
-  const nodeIndices = Array.from(nodeIndexSet);
-  const NODE_BUDGET = 4000;
-  const stride = Math.max(1, Math.floor(nodeIndices.length / NODE_BUDGET));
-  const nodePositions: THREE.Vector3[] = [];
-  for (let i = 0; i < nodeIndices.length; i += stride) {
-    const idx = nodeIndices[i];
-    nodePositions.push(positions[idx].clone().addScaledVector(normals[idx], OFFSET));
-  }
+  // Brainstem trailing lines — a handful of thin strands continuing down from the lowest
+  // (brainstem-region) vertices, each fading toward its tip via a separate lower-opacity pass,
+  // matching the reference's glowing lines trailing off into empty space below the brain.
+  let minY = Infinity;
+  positions.forEach((p) => { if (p.y < minY) minY = p.y; });
+  const brainstemSources = positions
+    .map((p, i) => ({ i, p }))
+    .filter(({ p }) => p.y < minY + 0.07)
+    .sort(() => rand() - 0.5)
+    .slice(0, 10);
+  const trailSegments: number[] = [];
+  brainstemSources.forEach(({ i, p }) => {
+    let prev = p.clone().addScaledVector(normals[i], OFFSET);
+    for (let s = 0; s < 3; s++) {
+      const next = prev.clone().add(new THREE.Vector3((rand() - 0.5) * 0.02, -(0.03 + rand() * 0.025), (rand() - 0.5) * 0.02));
+      trailSegments.push(prev.x, prev.y, prev.z, next.x, next.y, next.z);
+      prev = next;
+    }
+  });
+  const trailPositions = new Float32Array(trailSegments);
 
   // eslint-disable-next-line no-console
   console.log(
-    `[FoldNetwork] ${positions.length} verts, ${edgeList.length} candidate edges, ${selected.length} fold-lines drawn, ${nodePositions.length} dots`
+    `[FoldNetwork] ${positions.length} verts, ${edgeList.length} candidate edges, ${selected.length} fold-lines drawn, ${brainstemSources.length} brainstem trails`
   );
 
-  return { linePositions, nodePositions };
+  return { linePositions, trailPositions };
 }
 
 function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
-  const haloRef = useRef<THREE.InstancedMesh>(null);
-  const coreRef = useRef<THREE.InstancedMesh>(null);
-
-  const { linePositions, nodePositions } = useMemo(() => buildFoldNetwork(meshes), [meshes]);
+  const { linePositions, trailPositions } = useMemo(() => buildFoldNetwork(meshes), [meshes]);
 
   const lineGeo = useMemo(() => {
     const g = new THREE.BufferGeometry();
@@ -1316,37 +1506,23 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
     return g;
   }, [linePositions]);
 
-  useEffect(() => {
-    const halo = haloRef.current;
-    const core = coreRef.current;
-    if (!halo || !core) return;
-    const dummy = new THREE.Object3D();
-    nodePositions.forEach((p, i) => {
-      dummy.position.copy(p);
-      dummy.updateMatrix();
-      halo.setMatrixAt(i, dummy.matrix);
-      core.setMatrixAt(i, dummy.matrix);
-    });
-    halo.instanceMatrix.needsUpdate = true;
-    core.instanceMatrix.needsUpdate = true;
-  }, [nodePositions]);
+  const trailGeo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
+    return g;
+  }, [trailPositions]);
 
   return (
     <group>
-      {/* Thin hairline segments (not tubes) — LineBasicMaterial's ~1px screen-space width is
-          exactly the "fine mesh, not thick cables" look, and avoids generating/merging
-          thousands of TubeGeometries for a 14k-edge network. */}
+      {/* Thin hairline segments (not tubes) — LineBasicMaterial's ~1px screen-space width traces
+          the real fold ridges/grooves directly, no dot/node markers anywhere — pure line +
+          surface glow per the ethereal x-ray/bioluminescence reference. */}
       <lineSegments geometry={lineGeo} renderOrder={2}>
         <lineBasicMaterial color="#ffffff" transparent opacity={0.85} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
       </lineSegments>
-      <instancedMesh ref={haloRef} args={[undefined, undefined, nodePositions.length]} renderOrder={2}>
-        <sphereGeometry args={[0.012, 6, 6]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </instancedMesh>
-      <instancedMesh ref={coreRef} args={[undefined, undefined, nodePositions.length]} renderOrder={2}>
-        <sphereGeometry args={[0.006, 6, 6]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
-      </instancedMesh>
+      <lineSegments geometry={trailGeo} renderOrder={2}>
+        <lineBasicMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+      </lineSegments>
     </group>
   );
 }
@@ -1422,28 +1598,89 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   // normal z-buffer instead of alpha blending, which removes that entirely — every triangle
   // is either drawn or fully occluded, never partially blended, so the surface reads as one
   // flat uniform tone.
+  // Subtly translucent glass/charcoal — MeshPhysicalMaterial's transmission gives real
+  // see-through depth at a low value (0.2, not full glass) so it reads as frosted material
+  // rather than flat matte plastic, while staying a single flat dark charcoal tone (no
+  // map/vertexColors, so the earlier patchiness can't come back). Lower roughness + a touch of
+  // clearcoat than the old flat MeshStandardMaterial so the big folds still catch soft
+  // dimensional highlights under the raking light, without going glossy/noisy over every small
+  // ridge.
   const brainMat = useMemo(() => {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0x1a1a1a,
-      roughness: 0.6,
-      metalness: 0.1,
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: "#141414",
+      roughness: 0.35,
+      metalness: 0.05,
+      transmission: 0.12,
+      thickness: 0.3,
+      ior: 1.4,
+      clearcoat: 0.12,
+      clearcoatRoughness: 0.4,
+      transparent: true,
+      // Ghostly see-through body: low opacity dark shell, but depthWrite kept ON so the shell
+      // still occludes the far-side network — with depthWrite off, near AND far lines all
+      // rendered at full brightness and the dense mesh stacked into a solid white mass. The
+      // transparency now reads through the shell's own low opacity (background/starfield
+      // showing through the dark tint), while the network stays near-side only.
+      opacity: 0.18,
       side: THREE.FrontSide,
       depthWrite: true,
     });
     mat.map = null;
     mat.vertexColors = false;
+    // True per-pixel fresnel emissive: brighten additively based on the angle between the
+    // surface normal and the view direction, so grazing/edge-on surface (silhouette AND any
+    // narrow/sharply-curved area like the brainstem, which is mostly grazing angle from most
+    // camera positions) glows white, while surface facing the camera head-on stays dark. This
+    // is the genuine view-angle-dependent version of the effect, layered on top of (not
+    // replacing) the geometric backface rim below — if this reproduces the old "crack" seam-
+    // normal artifact, the geometric rim still gives a clean fallback outline underneath it.
+    mat.onBeforeCompile = (shader) => {
+      // ~35% stronger than the previous 0.9 — soft x-ray luminescence along the silhouette and
+      // steep fold contours; power kept at 3.0 so the glow stays hugging the edges.
+      shader.uniforms.fresnelPower = { value: 3.0 };
+      shader.uniforms.fresnelIntensity = { value: 1.2 };
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          "#include <common>",
+          `#include <common>
+           varying vec3 vFresnelNormal;
+           varying vec3 vFresnelViewDir;`
+        )
+        .replace(
+          "#include <begin_vertex>",
+          `#include <begin_vertex>
+           vFresnelNormal = normalize(normalMatrix * normal);
+           vFresnelViewDir = normalize(-(modelViewMatrix * vec4(position, 1.0)).xyz);`
+        );
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          "#include <common>",
+          `#include <common>
+           varying vec3 vFresnelNormal;
+           varying vec3 vFresnelViewDir;
+           uniform float fresnelPower;
+           uniform float fresnelIntensity;`
+        )
+        .replace(
+          "#include <dithering_fragment>",
+          `float fresnelTerm = pow(1.0 - max(dot(normalize(vFresnelNormal), normalize(vFresnelViewDir)), 0.0), fresnelPower);
+           gl_FragColor.rgb += vec3(1.0) * fresnelTerm * fresnelIntensity;
+           #include <dithering_fragment>`
+        );
+    };
     return mat;
   }, []);
 
   // Backface-outline rim technique: a slightly enlarged copy of the same geometry,
   // rendered BackSide-only, so only the sliver right at the silhouette edge shows (the
   // front-facing part of the enlarged shell is hidden behind the real front shell). This
-  // is purely geometric — unlike the earlier fresnel-shader rim, it doesn't depend on the
+  // is purely geometric — unlike the fresnel-shader rim above, it doesn't depend on the
   // mesh's (imperfect, seam-heavy) normals at all, so it can't reproduce the "crack" bug.
+  // Kept as a clean fallback outline underneath the new per-pixel fresnel glow.
   const rimMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: "#ffffff",
     transparent: true,
-    opacity: 0.3,
+    opacity: 0.35,
     side: THREE.BackSide,
     depthWrite: false,
     toneMapped: false, // full brightness so bloom picks up the silhouette as a soft halo
@@ -1470,6 +1707,19 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     });
     return meshes;
   }, [brainGltf]);
+
+  // Runs once brainMeshes is real (the actual loaded/baked geometry, not a guess) and mutates
+  // the shared PROJECT_HOTSPOTS array in place BEFORE this component's own JSX renders below —
+  // useMemo executes synchronously during render, ahead of the GoldCircuit/HotspotDot children
+  // in the return statement, so they see the real validated positions on the very first frame,
+  // not one render behind.
+  useMemo(() => {
+    computeProjectPositions(brainMeshes).forEach((pos, i) => {
+      PROJECT_HOTSPOTS[i][0] = pos[0];
+      PROJECT_HOTSPOTS[i][1] = pos[1];
+      PROJECT_HOTSPOTS[i][2] = pos[2];
+    });
+  }, [brainMeshes]);
 
   const SPIN_SPEED = 0.25;
   const Y_OFFSET = -Math.PI / 2; // best-guess starting yaw for a left-lateral view — needs visual confirmation, see note above
@@ -1507,8 +1757,22 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
               it) because it now samples straight from these meshes' own RAW vertex buffers
               (see buildMeshSampledNetwork) instead of a separately pre-scaled baked array, so
               it needs to share this exact same coordinate space/scale to land on the surface
-              correctly. */}
+              correctly. Added on top of the existing brain material + fresnel rim, neither of
+              which is modified here. */}
           <NeuralDots meshes={brainMeshes} />
+          {/* Gold circuit linking all 5 project nodes through the interior. */}
+          <GoldCircuit />
+          {/* The 5 project markers — gold glowing focal points scattered across the brain's
+              interior regions (see PROJECT_NODES config). */}
+          {PROJECT_HOTSPOTS.map((pos, i) => (
+            <HotspotDot
+              key={PROJECTS[i].id}
+              position={pos}
+              index={i}
+              active={selected?.id === PROJECTS[i].id}
+              onSelect={() => onHotspotSelect(PROJECTS[i])}
+            />
+          ))}
         </group>
       </group>
     </>
@@ -1755,6 +2019,189 @@ function AmbientParticles() {
   return <points ref={ref} geometry={geo} material={mat} />;
 }
 
+// ─── Holographic Pedestal ───────────────────────────────────────────────────────
+// A low, wide sci-fi launch-pad podium: a ring of 10 chunky outward-tilted trapezoid panels
+// (each bevelled and carrying a white glowing dot) forming the side wall, a neon seam line
+// ringing the body, stacked plates above, and a bright glowing ring + centre disc on top with
+// soft light rays fanning up into the brain. Light silver-grey metal, white glow, no blue.
+//
+// Four scene-specific constraints the numbers below encode:
+//
+// 1. SCALE. Every literal size in the design brief (radius 2.4, height 2.8, centre at Y -2.4)
+//    is written for a scene where the brain is roughly unit-scale. This scene's brain is a
+//    ~0.25-unit-wide object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so every
+//    radius/height multiplies the brief's number by S = 0.15, and the podium sits at the
+//    previously-dialled-in gap under the brainstem rather than -2.4. Proportions are as spec'd.
+//
+// 2. LIGHT INTENSITY vs SCALE. Point-light intensity is in candela and falls off with decay 2,
+//    so the brief's 2.2 / 1.0 (written for lights ~1.5 units away) would be ~44x too bright at
+//    this scene's ~0.2-unit distances. They're scaled by S² to land at the same *illumination*,
+//    which is why they read as ~0.05 rather than 2.2 — the same order as the scene's existing
+//    pointLight (0.08).
+//
+// 3. WHY THE METAL WAS COMING OUT BLACK. metalness 0.6 means 60% of the surface response is
+//    *reflection of the surrounding environment* — and this scene has no environment map, so
+//    that 60% reflects pure black no matter how many lights are added. Lights alone cannot fix
+//    it; that's the actual root cause, not underexposure. Every metal material below therefore
+//    carries a low white emissive (0.2) as a stand-in for ambient environment light. It's well
+//    under the bloom threshold (0.7) so it lifts the body to a solid light grey without making
+//    it glow. This is what guarantees "light silver, never black".
+//
+// 4. NO GLOBAL AMBIENT BUMP. The brief asks for scene ambient 0.7 (vs the current 0.2), but
+//    ambientLight is global and un-maskable — at 0.7 it would flood the brain's
+//    MeshPhysicalMaterial and flatten out the anatomical fold detail the scene lighting was
+//    tuned for, i.e. it would "touch the brain". The emissive lift in note 3 achieves the same
+//    bright-metal read while leaving the brain's lighting exactly as it was. If a global lift
+//    is wanted anyway, it's the one `ambientLight` intensity in BrainScene.
+function HolographicPedestal() {
+  // Master size knob — every radius and height below is expressed as (design value × S), so
+  // this one number scales the whole podium coherently. The design brief's literals assume a
+  // unit-scale scene; this scene's brain is a ~0.25-unit object near the origin
+  // (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings them into range.
+  const S = 0.072;
+  const groundY = -0.26; // the plane the podium stands on
+
+  const spinRef = useRef<THREE.Group>(null);
+  const heroRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  const innerRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
+  const dotMatRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    // Safe to spin this group's own Y: it has no prior X/Z tilt, so its local Y and world Y are
+    // the same axis. (Spinning a mesh that has already been tipped flat precesses it around a
+    // horizontal axis instead — that was the cause of an earlier "diagonal streak" artifact.)
+    if (spinRef.current) spinRef.current.rotation.y += 0.003;
+    // Every accent is held under the scene's 0.7 bloom threshold, so nothing on the podium
+    // blooms — these pulse as a faint sheen, not a glow.
+    if (heroRingMatRef.current) heroRingMatRef.current.emissiveIntensity = 0.5 + 0.1 * Math.sin(t * 1.5);
+    if (innerRingMatRef.current) innerRingMatRef.current.emissiveIntensity = 0.4 + 0.1 * Math.sin(t * 1.5);
+    dotMatRefs.current.forEach((m, i) => {
+      if (m) m.emissiveIntensity = 0.55 + 0.2 * Math.sin(t * 2 + i * 0.9);
+    });
+  });
+
+  // ── PROFILE ── a straight-walled stack: every cylinder below has radiusTop === radiusBottom,
+  // so no surface slopes. Each tier just steps in to a smaller radius than the one under it.
+  // Values are LOCAL to the group, which is itself already positioned at groundY.
+  const DIVISIONS = 10;   // how many dividers/dots ring the wall
+  const ROUND = 96;       // radial segments for the body — high, so the wall reads as smooth
+  const plinthR = 2.25, plinthH = 0.12;
+  const drumR = 2.2, drumH = 0.26;                // the main upright wall
+  const t2R = 1.75, t2H = 0.16;
+  const t3R = 1.35, t3H = 0.14;
+  const ringWallR = 1.0, ringWallH = 0.1;
+
+  const plinthTop = plinthH;
+  const drumTop = plinthTop + drumH;
+  const t2Top = drumTop + t2H;
+  const t3Top = t2Top + t3H;
+  const wallTop = t3Top + ringWallH;
+
+  // The wall is a smooth cylinder, so the surface radius is simply drumR everywhere — there are
+  // no facet vertices to line up with any more, and dividers/dots just need even spacing. The
+  // helper converts an index into the rotation this component uses to place things radially:
+  // a group turned by -a puts its local +X at (cos a, sin a) in the XZ plane. Dots are offset a
+  // half step from the dividers so they land midway between them.
+  const angleAt = (k: number) => Math.PI / 2 - (k / DIVISIONS) * Math.PI * 2;
+  const proud = 0.006;
+
+  // Shared look for every metal part. The white `emissive` is not decoration: metalness 0.6
+  // means 60% of the surface response is reflection of the surrounding environment, and this
+  // scene has no environment map, so that 60% resolves to pure black no matter how many lights
+  // are added — this is what made earlier builds render near-black. With the podium's own point
+  // lights removed, this emissive floor is the main thing keeping the body readable. It sits
+  // under the bloom threshold (0.7), so the body never glows.
+  const metal = (color: string) => (
+    <meshStandardMaterial color={color} metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
+  );
+
+  return (
+    <group position={[0, groundY, 0]}>
+      {/* No podium-local lights, no floor glow, no beam — the body is lit purely by the
+          scene's existing ambient/directional rig plus the emissive floor in `metal()`. */}
+      <group ref={spinRef}>
+        {/* ── PLINTH ── straight-walled foot, a touch wider than the drum so it reads as a base
+            lip rather than a taper. */}
+        <mesh position={[0, (plinthH / 2) * S, 0]}>
+          <cylinderGeometry args={[plinthR * S, plinthR * S, plinthH * S, ROUND]} />
+          {metal("#7e7e7e")}
+        </mesh>
+
+        {/* ── MAIN DRUM ── the upright wall: smooth and circular (high radialSegments), and
+            straight vertical (radiusTop === radiusBottom), so it neither facets nor slopes. */}
+        <mesh position={[0, (plinthTop + drumH / 2) * S, 0]}>
+          <cylinderGeometry args={[drumR * S, drumR * S, drumH * S, ROUND]} />
+          {metal("#8a8a8a")}
+        </mesh>
+
+        {/* ── VERTICAL DIVIDERS ── evenly spaced around the wall, running its full height,
+            perfectly aligned with Y (no tilt — the wall doesn't slope). Seated at the wall
+            radius, which is now uniform all the way round. */}
+        {Array.from({ length: DIVISIONS }, (_, k) => (
+          <group key={k} rotation={[0, -angleAt(k), 0]}>
+            <mesh position={[(drumR + proud) * S, (plinthTop + drumH / 2) * S, 0]}>
+              <boxGeometry args={[0.03 * S, drumH * S * 0.98, 0.05 * S]} />
+              <meshStandardMaterial color="#6f6f6f" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
+            </mesh>
+          </group>
+        ))}
+
+        {/* ── PANEL DOTS ── one midway between each pair of dividers. */}
+        {Array.from({ length: DIVISIONS }, (_, i) => (
+          <group key={i} rotation={[0, -angleAt(i + 0.5), 0]}>
+            <mesh
+              position={[(drumR + proud) * S, (plinthTop + drumH * 0.62) * S, 0]}
+              rotation={[0, Math.PI / 2, 0]}
+            >
+              <circleGeometry args={[0.06 * S, 20]} />
+              <meshStandardMaterial
+                ref={(m) => { if (m) dotMatRefs.current[i] = m; }}
+                color="#ffffff" emissive="#ffffff" emissiveIntensity={0.55} metalness={0} roughness={1} toneMapped={false}
+              />
+            </mesh>
+          </group>
+        ))}
+
+        {/* ── SEAM RING ── pale line where the drum meets tier 2. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (drumTop - 0.01) * S, 0]}>
+          <torusGeometry args={[drumR * 0.99 * S, 0.028 * S, 8, 96]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        </mesh>
+
+        {/* ── TIERS 2 & 3 ── each straight-walled (radiusTop === radiusBottom), each stepping in
+            to a smaller radius, so the stack reads as a wedding cake rather than a cone. */}
+        <mesh position={[0, (drumTop + t2H / 2) * S, 0]}>
+          <cylinderGeometry args={[t2R * S, t2R * S, t2H * S, 64]} />
+          {metal("#bcbcbc")}
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t2Top - 0.01) * S, 0]}>
+          <torusGeometry args={[t2R * S, 0.025 * S, 8, 80]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, (t2Top + t3H / 2) * S, 0]}>
+          <cylinderGeometry args={[t3R * S, t3R * S, t3H * S, 56]} />
+          {metal("#c8c8c8")}
+        </mesh>
+
+        {/* ── TOP RINGS ── hero ring on the tier-3 deck, low ring wall, inner ring. Unchanged. */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t3Top + 0.01) * S, 0]}>
+          <torusGeometry args={[1.3 * S, 0.055 * S, 12, 96]} />
+          <meshStandardMaterial ref={heroRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} metalness={0} roughness={1} toneMapped={false} />
+        </mesh>
+        <mesh position={[0, (t3Top + ringWallH / 2) * S, 0]}>
+          <cylinderGeometry args={[ringWallR * S, ringWallR * S, ringWallH * S, 48, 1, true]} />
+          <meshStandardMaterial color="#b0b0b0" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} side={THREE.DoubleSide} />
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, wallTop * S, 0]}>
+          <torusGeometry args={[ringWallR * 0.98 * S, 0.03 * S, 10, 80]} />
+          <meshStandardMaterial ref={innerRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        </mesh>
+      </group>
+    </group>
+  );
+}
+
 // ─── Scene ────────────────────────────────────────────────────────────────────
 function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
   return (
@@ -1776,12 +2223,13 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       {/* Soft blue ambient glow for the dark-navy brain material — kept at a wide falloff
           distance and modest intensity so it doesn't blow out the nearest geometry into a
           hotspot the way the earlier white-brain point light did. */}
-      <pointLight position={[0, 0, 0]} color="#ffffff" intensity={0.3} distance={3} decay={2} />
+      <pointLight position={[0, 0, 0]} color="#ffffff" intensity={0.08} distance={3} decay={2} />
 
       <CameraController selected={selected} />
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
+      <HolographicPedestal />
 
       {/* Bloom — threshold was 0.72, which is why the neural network never visibly glowed:
           with AdditiveBlending a pixel's bloom-eligible brightness is ~color*opacity, and
@@ -1800,9 +2248,9 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           (non-mipmap) blur handles alpha correctly and doesn't have this artifact. */}
       <EffectComposer>
         <Bloom
-          luminanceThreshold={0.65}
+          luminanceThreshold={0.7}
           luminanceSmoothing={0.6}
-          intensity={1.2}
+          intensity={0.4}
           blendFunction={BlendFunction.SCREEN}
         />
       </EffectComposer>
