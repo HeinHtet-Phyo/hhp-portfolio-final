@@ -297,11 +297,11 @@ function HotspotDot({ position, index, active, onSelect }: {
           bloom (the ambient network deliberately does not). */}
       <mesh ref={glow1Ref} renderOrder={10}>
         <sphereGeometry args={[0.054, 12, 12]} />
-        <meshBasicMaterial color="#FFFFFF" transparent opacity={active ? 0.62 : 0.46} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial color="#FFFFFF" transparent opacity={active ? 0.35 : 0.2} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} />
       </mesh>
       <mesh ref={glow2Ref} renderOrder={10}>
         <sphereGeometry args={[0.092, 12, 12]} />
-        <meshBasicMaterial color="#F5F5FF" transparent opacity={active ? 0.34 : 0.22} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+        <meshBasicMaterial color="#F5F5FF" transparent opacity={active ? 0.18 : 0.1} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* Invisible click target — larger hitbox for usability, also drives hover so the label
           below only shows for the node actually being pointed at (previously every label was
@@ -1622,68 +1622,19 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   // dimensional highlights under the raking light, without going glossy/noisy over every small
   // ridge.
   const brainMat = useMemo(() => {
-    const mat = new THREE.MeshPhysicalMaterial({
-      color: "#141414",
-      roughness: 0.35,
-      metalness: 0.05,
-      transmission: 0.12,
-      thickness: 0.3,
-      ior: 1.4,
-      clearcoat: 0.12,
-      clearcoatRoughness: 0.4,
-      transparent: true,
-      // Ghostly see-through body: low opacity dark shell, but depthWrite kept ON so the shell
-      // still occludes the far-side network — with depthWrite off, near AND far lines all
-      // rendered at full brightness and the dense mesh stacked into a solid white mass. The
-      // transparency now reads through the shell's own low opacity (background/starfield
-      // showing through the dark tint), while the network stays near-side only.
-      opacity: 0.18,
+    // Opaque dark shell with subtle lighting to show brain folds.
+    // Fully opaque = blocks all far-side lines = consistent color at all angles.
+    // MeshStandardMaterial responds to scene lights so brain folds are visible.
+    const mat = new THREE.MeshStandardMaterial({
+      color: "#303030",
+      roughness: 0.42,
+      metalness: 0.0,
+      transparent: false,
       side: THREE.FrontSide,
       depthWrite: true,
     });
-    mat.map = null;
     mat.vertexColors = false;
-    // True per-pixel fresnel emissive: brighten additively based on the angle between the
-    // surface normal and the view direction, so grazing/edge-on surface (silhouette AND any
-    // narrow/sharply-curved area like the brainstem, which is mostly grazing angle from most
-    // camera positions) glows white, while surface facing the camera head-on stays dark. This
-    // is the genuine view-angle-dependent version of the effect, layered on top of (not
-    // replacing) the geometric backface rim below — if this reproduces the old "crack" seam-
-    // normal artifact, the geometric rim still gives a clean fallback outline underneath it.
-    mat.onBeforeCompile = (shader) => {
-      // ~35% stronger than the previous 0.9 — soft x-ray luminescence along the silhouette and
-      // steep fold contours; power kept at 3.0 so the glow stays hugging the edges.
-      shader.uniforms.fresnelPower = { value: 3.0 };
-      shader.uniforms.fresnelIntensity = { value: 1.2 };
-      shader.vertexShader = shader.vertexShader
-        .replace(
-          "#include <common>",
-          `#include <common>
-           varying vec3 vFresnelNormal;
-           varying vec3 vFresnelViewDir;`
-        )
-        .replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>
-           vFresnelNormal = normalize(normalMatrix * normal);
-           vFresnelViewDir = normalize(-(modelViewMatrix * vec4(position, 1.0)).xyz);`
-        );
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          "#include <common>",
-          `#include <common>
-           varying vec3 vFresnelNormal;
-           varying vec3 vFresnelViewDir;
-           uniform float fresnelPower;
-           uniform float fresnelIntensity;`
-        )
-        .replace(
-          "#include <dithering_fragment>",
-          `float fresnelTerm = pow(1.0 - max(dot(normalize(vFresnelNormal), normalize(vFresnelViewDir)), 0.0), fresnelPower);
-           gl_FragColor.rgb += vec3(1.0) * fresnelTerm * fresnelIntensity;
-           #include <dithering_fragment>`
-        );
-    };
+    mat.map = null;
     return mat;
   }, []);
 
@@ -2226,9 +2177,9 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           / custom ShaderMaterial) so intensity never actually mattered. Now that the brain
           uses a real MeshPhysicalMaterial, the old 2.0/2.5 intensities blew its clearcoat
           highlights out to solid white — toned down to reasonable PBR levels. */}
-      <ambientLight intensity={0.2} />
-      <directionalLight position={[-2, 4, 3]} intensity={0.4} color="#ffffff" />
-      <directionalLight position={[3, 1, 1]}  intensity={0.2} color="#e0e8ff" />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[-2, 4, 3]} intensity={0.7} color="#ffffff" />
+      <directionalLight position={[3, 1, 1]}  intensity={0.4} color="#e0e8ff" />
       {/* Raking light, low and to the side rather than from above — this is what actually
           reveals the anatomical fold detail (gyri/sulci) as bright specular highlight along
           each ridge with real shadow in each groove, now that the brain material is glossy
@@ -2239,7 +2190,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       {/* Soft blue ambient glow for the dark-navy brain material — kept at a wide falloff
           distance and modest intensity so it doesn't blow out the nearest geometry into a
           hotspot the way the earlier white-brain point light did. */}
-      <pointLight position={[0, 0, 0]} color="#ffffff" intensity={0.08} distance={3} decay={2} />
+      {/* Point light removed — was causing bright centre */}
 
       <CameraController selected={selected} />
       <Suspense fallback={null}>
