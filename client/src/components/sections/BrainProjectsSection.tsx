@@ -2021,13 +2021,13 @@ function HolographicPedestal() {
   // (design value × S). The brief's literals assume a unit-scale scene; this scene's brain is a
   // ~0.25-unit object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings
   // them into range and the platform sits at the dialled-in gap under the brainstem.
-  const S = 0.0535;   // +10%
+  const S = 0.0590;
   const groundY = -0.26;
 
   const { gl } = useThree();
   const spinRef = useRef<THREE.Group>(null);
   const accentRefs = useRef<THREE.MeshStandardMaterial[]>([]);
-  const ACCENT_BASE = [2.5, 1.2, 2.5];
+  const ACCENT_BASE = [2.5, 1.2, 4];
 
   // ── PROFILE ── design units, ground at 0. Low and wide: 0.76 tall against a 5.4 span.
   // One clean step: no stacked foot rings. The panel band sits directly on the ground, so
@@ -2079,8 +2079,8 @@ function HolographicPedestal() {
     const ctx = c.getContext("2d")!;
     const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
     g.addColorStop(0.0, "rgba(255,255,255,1)");
-    g.addColorStop(0.4, "rgba(255,255,255,0.4)");
-    g.addColorStop(0.75, "rgba(255,255,255,0.1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.4)");
+    g.addColorStop(0.7, "rgba(255,255,255,0.1)");
     g.addColorStop(1.0, "rgba(255,255,255,0)");
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 256, 256);
@@ -2088,6 +2088,76 @@ function HolographicPedestal() {
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }, []);
+
+  // Radius/height the ring-interior glow disc is anchored to — matches the existing top ring
+  // exactly, and sits just above its standing wall.
+  const RING_R = 1.9 * 0.9;
+  const RING_TOP = DECK_TOP + 0.012 + 0.06;
+  // The dome's outer radius matches RING_R * 0.92 — the exact radius the interior-glow disc
+  // above already uses for "just inside the ring", so the dome now fills the same lit circle
+  // that glow was already painted onto, right up to the ring, instead of a much smaller
+  // hardcoded 0.55 that left a visible gap of bare deck between the dome and the ring.
+  const DOME_R = RING_R * 0.92;
+
+  // ══ SHORT CENTRE BURST ══
+  // Deliberately kept to CORE_H = 0.3 design units. The pedestal-to-brain gap at this scale is
+  // ~0.079 world units; 0.3 design units × S works out to ~0.018 world units, i.e. about 22% of
+  // that gap — comfortably inside the "20-25%, must not approach the brain" requirement, with
+  // roughly three-quarters of the gap left as open dark space above it.
+  //
+  const CORE_H = 0.3; // design units — the low surface burst; the tall beam below is separate
+
+  // ══ STREAKY LIGHT BEAM ══
+  // BEAM_H reaches most of the way to the brain without touching it. The gap from the beam's
+  // base (RING_TOP) to the brain's underside is ~1.38 design units at this scale, so 1.15
+  // covers ~83% of it and stops just short.
+  const BEAM_H = 1.15;
+
+  // Streak texture. This is what turns the cones from one flat soft gradient into visible
+  // individual light strands: vertical stripes across U (which wraps the circumference) give
+  // the strands, and a vertical ramp across V gives the bright-at-base / wispy-at-top falloff —
+  // one texture doing both jobs, so no extra geometry is needed per strand.
+  // On CylinderGeometry, UV.y is 0 at the BOTTOM and 1 at the top; CanvasTexture defaults to
+  // flipY=true, so the canvas's BOTTOM row is what lands at the cylinder's base. Hence the
+  // gradient is authored bright-at-canvas-bottom.
+  const beamStreakTex = useMemo(() => {
+    const W = 512, H = 256;
+    const c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    const ctx = c.getContext("2d")!;
+
+    // vertical falloff: brightest near the base, fading to nothing toward the top
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0.0, "rgba(255,255,255,0)");     // cylinder TOP
+    g.addColorStop(0.45, "rgba(255,255,255,0.45)");
+    g.addColorStop(0.85, "rgba(255,255,255,1)");
+    g.addColorStop(1.0, "rgba(255,255,255,0.9)");   // cylinder BASE
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // mask it down to stripes — deterministic hash rather than Math.random() so the strand
+    // pattern is stable across re-renders instead of reshuffling
+    ctx.globalCompositeOperation = "destination-in";
+    const hash = (n: number) => ((Math.sin(n * 12.9898) * 43758.5453) % 1 + 1) % 1;
+    for (let i = 0; i < 30; i++) {
+      const x = hash(i + 1) * W;
+      const w = 2 + hash(i + 40) * 12;          // varied strand thickness
+      const a = 0.35 + hash(i + 80) * 0.65;     // varied strand brightness
+      // soft-edged stripe: opaque centre falling to transparent at both edges, so each strand
+      // has feathered sides rather than a hard-cut bar
+      const sg = ctx.createLinearGradient(x - w, 0, x + w, 0);
+      sg.addColorStop(0, "rgba(255,255,255,0)");
+      sg.addColorStop(0.5, `rgba(255,255,255,${a})`);
+      sg.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = sg;
+      ctx.fillRect(x - w, 0, w * 2, H);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    return tex;
+  }, []);
+
 
   useFrame(({ clock }) => {
     if (spinRef.current) spinRef.current.rotation.y += 0.002;
@@ -2112,14 +2182,18 @@ function HolographicPedestal() {
           brief's 2.2 / 1 are scaled by S² for this scene's fractional distances — the raw
           values would be hundreds of times too hot at these ranges. The key is what strikes the
           bright rim highlight along the lip. */}
-      <pointLight position={[2.5 * S, 1.8 * S, 3 * S]} color="#ffffff" intensity={2.5 * S * S} distance={12 * S} decay={2} />
-      <pointLight position={[-3 * S, 0.5 * S, -2 * S]} color="#ffffff" intensity={0.7 * S * S} distance={12 * S} decay={2} />
+      <pointLight position={[2.5 * S, 1.8 * S, 3 * S]} color="#ffffff" intensity={3.2 * S * S} distance={12 * S} decay={2} />
+      <pointLight position={[-3 * S, 0.5 * S, -2 * S]} color="#ffffff" intensity={2.0 * S * S} distance={12 * S} decay={2} />
 
       {/* ── FLOOR ── very subtle contact pool. A flat CircleGeometry has constant alpha to its
           rim and reads as a grey disc outline; a gradient texture fades out with no edge. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.003, 0]}>
-        <planeGeometry args={[7 * S, 7 * S]} />
-        <meshBasicMaterial map={floorTex} color="#ffffff" transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <planeGeometry args={[5 * S, 5 * S]} />
+        <meshBasicMaterial map={floorTex} color="#ffffff" transparent opacity={0.07} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.0025, 0]}>
+        <planeGeometry args={[3.5 * S, 3.5 * S]} />
+        <meshBasicMaterial map={floorTex} color="#ffffff" transparent opacity={0.13} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
 
       <group ref={spinRef}>
@@ -2147,12 +2221,12 @@ function HolographicPedestal() {
                 {/* chamfered border plate */}
                 <mesh>
                   <boxGeometry args={[0.28 * S, PANEL_H * S, 0.95 * S]} />
-                  {metal("#050506", 0.7, 0.35)}
+                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
                 {/* raised face, proud of the border */}
                 <mesh position={[0.05 * S, 0, 0]}>
                   <boxGeometry args={[0.2 * S, PANEL_H * 0.78 * S, 0.78 * S]} />
-                  {metal("#0a0a0c", 0.7, 0.35)}
+                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
               </group>
               {/* recessed vertical groove, half a step round */}
@@ -2169,11 +2243,17 @@ function HolographicPedestal() {
         {/* ══ STEPPED RAISED LIP ══ with a lighter rim torus to catch the key light. */}
         <mesh position={[0, (BAND_TOP + LIP_H / 2) * S, 0]}>
           <cylinderGeometry args={[2.05 * S, 2.15 * S, LIP_H * S, 128]} />
-          {metal("#0c0c0e", 0.7, 0.3)}
+          {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, LIP_TOP * S, 0]}>
           <torusGeometry args={[2.05 * S, 0.05 * S, 20, 192]} />
           {metal("#333333", 0.85, 0.18, 0.04, 1.1)}
+        </mesh>
+        {/* true emissive rim line on the same edge — visible from every angle, unlike the
+            reflective torus above which only catches a highlight when a light lines up with it */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (LIP_TOP + 0.001) * S, 0]}>
+          <torusGeometry args={[2.05 * S, 0.014 * S, 12, 192]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
         </mesh>
 
         {/* ══ FLAT RECESSED TOP DECK ══ rougher and less metallic than the lip, so it reads as
@@ -2188,26 +2268,25 @@ function HolographicPedestal() {
           {metal("#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
-        {/* ══ TOP RIM GLOW ══ same material values as the mid-body circuit line (tube 0.02,
-            emissive 2.5, opacity 0.9, bloom tube 0.07/opacity 0.12) — but the flat torus alone
-            was nearly invisible: it lies in a HORIZONTAL plane, and this scene's camera sits
-            close to level, so a flat ring is seen almost edge-on and only ever shows a thin
-            sliver no matter how bright its material is. The circuit line looks bold because it
-            runs around a VERTICAL wall that faces the camera directly.
-            Fix: add a short standing wall (open-ended cylinder) at the same radius, with actual
-            vertical-facing surface area, so it catches the camera the same way the circuit line
-            does. The flat torus stays underneath it as the crisp top edge of that wall. */}
-        <mesh position={[0, (DECK_TOP + 0.012 + 0.02) * S, 0]}>
-          <cylinderGeometry args={[1.9 * 0.9 * S, 1.9 * 0.9 * S, 0.04 * S, 128, 1, true]} />
-          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} side={THREE.DoubleSide} toneMapped={false} />
+        {/* ══ TOP RIM GLOW — bright neon spec ══ tube 0.035, emissiveIntensity 4, bloom tube
+            0.15 / opacity 0.18, for a punchier read than the mid-body circuit line.
+            A flat torus alone lies in a HORIZONTAL plane, and this scene's camera sits close
+            to level, so it is seen almost edge-on and only ever shows a thin sliver no matter
+            how bright its material is — that is why a standing wall (open-ended cylinder) is
+            still needed at the same radius: it has genuine vertical-facing surface area, so it
+            actually catches the camera instead of just adding brightness that can't be seen.
+            The flat torus sits on top as the crisp top edge of that wall. */}
+        <mesh position={[0, (DECK_TOP + 0.012 + 0.03) * S, 0]}>
+          <cylinderGeometry args={[1.9 * 0.9 * S, 1.9 * 0.9 * S, 0.06 * S, 128, 1, true]} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]}>
-          <torusGeometry args={[1.9 * 0.9 * S, 0.02 * S, 12, 256]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} toneMapped={false} />
+          <torusGeometry args={[1.9 * 0.9 * S, 0.035 * S, 12, 256]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]} renderOrder={1}>
-          <torusGeometry args={[1.9 * 0.9 * S, 0.07 * S, 12, 192]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          <torusGeometry args={[1.9 * 0.9 * S, 0.15 * S, 12, 192]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.18} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
 
         {/* ══ CIRCUIT TRACE ══ level runs across each panel, joined by short DIAGONAL ramps
@@ -2259,10 +2338,115 @@ function HolographicPedestal() {
 
         {/* faint line where the body meets the ground */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03 * S, 0]}>
-          <torusGeometry args={[2.46 * S, 0.012 * S, 10, 192]} />
-          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[1] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={1.2} metalness={0} roughness={1} transparent opacity={0.6} toneMapped={false} />
+          <torusGeometry args={[2.46 * S, 0.018 * S, 10, 192]} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[1] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
         </mesh>
+
+        {/* ══ PANEL SEAM RIM LINES ══ a thin bright line at each of the 16 seams, tracing the
+            side edge of every panel — combined with the bottom and lip rings above, this closes
+            the silhouette outline the whole way round: bottom ring, 16 verticals, top ring. Sits
+            proud of the existing dark groove at the same seam so it reads as the groove's own
+            edge catching light, not a separate stripe. */}
+        {Array.from({ length: PANELS }, (_, i) => {
+          const a = i * STEP;
+          return (
+            <group key={i} rotation={[0, -(a + STEP / 2), 0]}>
+              <mesh position={[2.31 * S, PANEL_CY * S, 0]}>
+                <boxGeometry args={[0.012 * S, PANEL_H * 0.92 * S, 0.02 * S]} />
+                <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.7} toneMapped={false} />
+              </mesh>
+            </group>
+          );
+        })}
       </group>
+
+      {/* ══ RING INTERIOR GLOW ══ two stacked discs filling the area the neon ring encloses, so
+          the ring's own interior reads as a glowing pool rather than the ring being a bare
+          outline. Sized well inside RING_R so neither disc touches the ring wall. Outside the
+          spin group: radially symmetric, so rotating it would be wasted work. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (RING_TOP + 0.002) * S, 0]} renderOrder={2}>
+        <circleGeometry args={[RING_R * 0.92 * S, 64]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.4} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (RING_TOP + 0.004) * S, 0]} renderOrder={2}>
+        <circleGeometry args={[RING_R * 0.6 * S, 56]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.6} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+
+      {/* ══ SHORT CENTRE BURST ══ a bright compact glow that sits low and fades to nothing well
+          short of the brain — see the CORE_H comment above for the exact math. Outside the spin
+          group: radially symmetric (the wisps are a scatter, not a rotating pattern), so
+          spinning it would be wasted work. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (RING_TOP + 0.006) * S, 0]} renderOrder={2}>
+        <circleGeometry args={[0.5 * S, 48]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (RING_TOP + 0.005) * S, 0]} renderOrder={2}>
+        <circleGeometry args={[0.9 * S, 48]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+
+      {/* ══ STREAKY BEAM ══ four nested cones, each carrying the streak texture so the beam
+          reads as individual light strands rather than one solid soft gradient. Radii step
+          outward with falling opacity — bright core at the centre, thin wispy edges.
+          Kept CONTAINED: each cone's top radius is only ~1.5x its base, so the beam stays
+          narrow rather than flaring wide.
+          Each layer is rotated a different amount on Y so their strand patterns don't align —
+          overlapping offset stripes read as many distinct rays, whereas identical rotations
+          would just stack into one thicker set of bars.
+          depthWrite/depthTest stay false, and blending stays additive, so this cannot
+          reintroduce the dark-oval veil. */}
+      {([[0.45, 0.70, 0.20, 0.0], [0.70, 1.00, 0.13, 0.9], [0.95, 1.30, 0.085, 1.9], [1.20, 1.60, 0.05, 2.7]] as [number, number, number, number][]).map(
+        ([rBot, rTop, op, rot], i) => (
+          <mesh
+            key={i}
+            position={[0, RING_TOP * S + (BEAM_H * S) / 2, 0]}
+            rotation={[0, rot, 0]}
+            renderOrder={1}
+          >
+            <cylinderGeometry args={[rTop * S, rBot * S, BEAM_H * S, 48, 1, true]} />
+            <meshBasicMaterial
+              map={beamStreakTex} color="#ffffff" transparent opacity={op} blending={THREE.AdditiveBlending}
+              depthWrite={false} depthTest={false} side={THREE.DoubleSide} toneMapped={false}
+            />
+          </mesh>
+        )
+      )}
+
+      {/* ══ GLOWING DOME ══ a half-sphere sitting inside the existing centre ring, flat side
+          down. SphereGeometry's theta is measured from the +Y pole, so thetaStart=0 with
+          thetaLength=PI/2 sweeps only the UPPER hemisphere — the geometry's own equatorial cut
+          plane sits at its local y=0, which is why no Y offset is needed beyond RING_TOP: the
+          flat side lands exactly on the deck surface and the dome bulges up from there.
+          Sized to DOME_R = RING_R * 0.92, matching the interior-glow disc's own radius, so
+          the dome's base fills the lit circle right up to the ring — no bare deck visible
+          between the dome's edge and the ring. Segment counts raised (48/32 etc.) since the
+          dome is now more than twice its previous size and the facets would otherwise show. */}
+      <mesh position={[0, RING_TOP * S, 0]} scale={[1, 0.125, 1]} renderOrder={2}>
+        <sphereGeometry args={[DOME_R * S, 48, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial
+          color="#ffffff" emissive="#ffffff" emissiveIntensity={1.5} transparent opacity={0.55}
+          metalness={0.1} roughness={0.2} envMap={envMap} envMapIntensity={0.4}
+          side={THREE.DoubleSide} toneMapped={false}
+        />
+      </mesh>
+      {/* brighter inner dome, additive so it reads as light glowing through the outer shell
+          rather than a second solid layer */}
+      <mesh position={[0, RING_TOP * S + 0.002 * S, 0]} scale={[1, 0.125, 1]} renderOrder={2}>
+        <sphereGeometry args={[DOME_R * 0.73 * S, 40, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* bright core glow flat at the dome's base — also visually plugs the open equatorial cut
+          the two hemispheres above leave, so nothing hollow is visible looking up into them */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, RING_TOP * S + 0.001 * S, 0]} renderOrder={2}>
+        <circleGeometry args={[DOME_R * 0.45 * S, 40]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.7} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+      {/* soft outer halo, larger and very faint, for bloom around the dome */}
+      <mesh position={[0, RING_TOP * S - 0.001 * S, 0]} scale={[1, 0.125, 1]} renderOrder={1}>
+        <sphereGeometry args={[DOME_R * 1.1 * S, 40, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.15} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
     </group>
   );
 }
@@ -2313,10 +2497,28 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           obvious the moment anything lighter sits behind it — e.g. light mode). The default
           (non-mipmap) blur handles alpha correctly and doesn't have this artifact. */}
       <EffectComposer>
+        {/* Tuned after confirming (by disabling bloom entirely) that the dark oval around the
+            pedestal was this pass veiling the DOM starfield: bloom raises canvas alpha with
+            near-black RGB across its falloff, and the browser composites
+            result = canvasRGB + pageRGB x (1 - canvasAlpha), so a wide faint halo dims the
+            stars behind it.
+            The two levers that shrink that veil are THRESHOLD (excludes the mid-grey falloff
+            that was spreading alpha over a wide area, rather than the bright cores we actually
+            want glowing) and RADIUS (keeps what does bloom tight to its source). Intensity is
+            reduced more modestly, since it scales the glow the brain needs rather than the
+            area the veil covers.
+            NOTE ON mipmapBlur: enabled here as requested, but the previous comment at this
+            location recorded it being deliberately REMOVED for causing this exact symptom —
+            "the mip-based blur doesn't carry the alpha channel correctly across the
+            transparent/opaque boundary ... soft black scalloped halos around bloomed geometry
+            on a transparent canvas". If the veil returns, this flag is the first thing to turn
+            back off. */}
         <Bloom
-          luminanceThreshold={0.8}
-          luminanceSmoothing={0.6}
-          intensity={0.4}
+          mipmapBlur
+          luminanceThreshold={0.9}
+          luminanceSmoothing={0.3}
+          intensity={0.3}
+          radius={0.4}
           blendFunction={BlendFunction.SCREEN}
         />
       </EffectComposer>
