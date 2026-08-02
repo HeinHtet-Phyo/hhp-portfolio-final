@@ -42,6 +42,7 @@ const EduCard = ({
         padding: "1.5rem 1.7rem",
         width: "100%",
         maxWidth: "280px",
+        minHeight: "200px",
         boxShadow: hovered
           ? gold ? "0 0 28px rgba(212,175,55,0.12)" : "0 0 24px rgba(255,255,255,0.06)"
           : "none",
@@ -75,8 +76,9 @@ const EduCard = ({
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.76rem", opacity: 0.55, marginBottom: "0.7rem", lineHeight: 1.5 }}>
         {degree}
       </div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.32, display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
-        <span>{period}</span><span>·</span><span>{location}</span>
+      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.6rem", letterSpacing: "0.1em", textTransform: "uppercase", opacity: 0.32, display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+        <span>{period}</span>
+        <span>{location}</span>
       </div>
     </div>
   );
@@ -112,17 +114,17 @@ export default function EducationSection() {
     const svgW = wRect.width;
     const svgH = wRect.height;
 
-    // TL: bottom-right corner of top-left card
+    // TL: bottom-right corner of top-left card + 30px gap below
     const tlX = tlRect.right - wRect.left - 10;
-    const tlY = tlRect.bottom - wRect.top;
+    const tlY = tlRect.bottom - wRect.top + 30;
 
-    // BC: top-centre of bottom-centre card
+    // BC: top-centre of bottom-centre card - 30px gap above
     const bcX = bcRect.left - wRect.left + bcRect.width / 2;
-    const bcY = bcRect.top - wRect.top - 16;
+    const bcY = bcRect.top - wRect.top - 30;
 
-    // TR: bottom-left corner of top-right card
+    // TR: bottom-left corner of top-right card + 30px gap below
     const trX = trRect.left - wRect.left + 10;
-    const trY = trRect.bottom - wRect.top;
+    const trY = trRect.bottom - wRect.top + 30;
 
     setGeo({ svgW, svgH, tlX, tlY, bcX, bcY, trX, trY });
   }, []);
@@ -208,7 +210,7 @@ export default function EducationSection() {
         )}
 
         {/* Top row: UWE (left) + GUSTO HND (right) */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "5rem", position: "relative", zIndex: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "10rem", position: "relative", zIndex: 2 }}>
           <EduCard
             badge="First Class Honours"
             institution="UWE Bristol"
