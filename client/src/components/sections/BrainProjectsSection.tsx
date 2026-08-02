@@ -1987,182 +1987,280 @@ function AmbientParticles() {
 }
 
 // ─── Holographic Pedestal ───────────────────────────────────────────────────────
-// A low, wide sci-fi launch-pad podium: a ring of 10 chunky outward-tilted trapezoid panels
-// (each bevelled and carrying a white glowing dot) forming the side wall, a neon seam line
-// ringing the body, stacked plates above, and a bright glowing ring + centre disc on top with
-// soft light rays fanning up into the brain. Light silver-grey metal, white glow, no blue.
+// A smooth-sided glossy BLACK sci-fi podium: one continuous tapered cylinder wall (no panels,
+// seams, grooves or dots), a bevelled top rim, a dark glassy top plate, and neon white glow
+// strips as the only bright detail on the body — plus concentric rings, a luminous dome and
+// light rays fanning up into the brain.
 //
-// Four scene-specific constraints the numbers below encode:
+// Three scene-specific constraints the numbers below encode:
 //
-// 1. SCALE. Every literal size in the design brief (radius 2.4, height 2.8, centre at Y -2.4)
-//    is written for a scene where the brain is roughly unit-scale. This scene's brain is a
-//    ~0.25-unit-wide object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so every
-//    radius/height multiplies the brief's number by S = 0.15, and the podium sits at the
-//    previously-dialled-in gap under the brainstem rather than -2.4. Proportions are as spec'd.
+// 1. SCALE. Every literal size in the design brief (radius 2.4, ray height 3.2, centre at
+//    Y -2.4) is written for a scene where the brain is roughly unit-scale. This scene's brain
+//    is a ~0.25-unit-wide object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so
+//    every radius/height multiplies the brief's number by S, and the podium sits at the
+//    dialled-in gap under the brainstem rather than -2.4. Proportions are as spec'd.
 //
-// 2. LIGHT INTENSITY vs SCALE. Point-light intensity is in candela and falls off with decay 2,
-//    so the brief's 2.2 / 1.0 (written for lights ~1.5 units away) would be ~44x too bright at
-//    this scene's ~0.2-unit distances. They're scaled by S² to land at the same *illumination*,
-//    which is why they read as ~0.05 rather than 2.2 — the same order as the scene's existing
-//    pointLight (0.08).
+// 2. LIGHT INTENSITY vs SCALE. Point-light intensity is candela and falls off with decay 2, so
+//    values written for lights a few units away would be far too hot at this scene's fractional
+//    distances. They're scaled by S² to land at the same illumination, which is why they read
+//    as small numbers rather than the brief's 2.8 / 2.0.
 //
-// 3. WHY THE METAL WAS COMING OUT BLACK. metalness 0.6 means 60% of the surface response is
-//    *reflection of the surrounding environment* — and this scene has no environment map, so
-//    that 60% reflects pure black no matter how many lights are added. Lights alone cannot fix
-//    it; that's the actual root cause, not underexposure. Every metal material below therefore
-//    carries a low white emissive (0.2) as a stand-in for ambient environment light. It's well
-//    under the bloom threshold (0.7) so it lifts the body to a solid light grey without making
-//    it glow. This is what guarantees "light silver, never black".
+// 3. NO ENVIRONMENT MAP — which here is a FEATURE, not a bug. At metalness 0.9 nearly the whole
+//    surface response is reflection of the surroundings, and this scene has no environment map,
+//    so the body resolves to near-black with only sharp specular highlights from the two point
+//    lights. That is exactly the intended look. Note this is the same physics that made the
+//    earlier LIGHT-grey podiums render black by accident — there the fix was a low white
+//    emissive floor standing in for ambient environment light; here no such floor is wanted,
+//    because black is the goal. The two lights are load-bearing: remove them and this becomes a
+//    featureless black silhouette.
 //
-// 4. NO GLOBAL AMBIENT BUMP. The brief asks for scene ambient 0.7 (vs the current 0.2), but
-//    ambientLight is global and un-maskable — at 0.7 it would flood the brain's
-//    MeshPhysicalMaterial and flatten out the anatomical fold detail the scene lighting was
-//    tuned for, i.e. it would "touch the brain". The emissive lift in note 3 achieves the same
-//    bright-metal read while leaving the brain's lighting exactly as it was. If a global lift
-//    is wanted anyway, it's the one `ambientLight` intensity in BrainScene.
+// Scene ambientLight is deliberately left alone. It is global and un-maskable, so lowering it
+// to darken this podium would also darken the brain.
 function HolographicPedestal() {
-  // Master size knob — every radius and height below is expressed as (design value × S), so
-  // this one number scales the whole podium coherently. The design brief's literals assume a
-  // unit-scale scene; this scene's brain is a ~0.25-unit object near the origin
-  // (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings them into range.
-  const S = 0.072;
-  const groundY = -0.26; // the plane the podium stands on
+  // Master size knob — every radius, height, light position and light intensity below is
+  // (design value × S). The brief's literals assume a unit-scale scene; this scene's brain is a
+  // ~0.25-unit object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings
+  // them into range and the platform sits at the dialled-in gap under the brainstem.
+  const S = 0.0535;   // +10%
+  const groundY = -0.26;
 
+  const { gl } = useThree();
   const spinRef = useRef<THREE.Group>(null);
-  const heroRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
-  const innerRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
-  const dotMatRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+  const accentRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+  const ACCENT_BASE = [2.5, 1.2, 2.5];
+
+  // ── PROFILE ── design units, ground at 0. Low and wide: 0.76 tall against a 5.4 span.
+  // One clean step: no stacked foot rings. The panel band sits directly on the ground, so
+  // nothing overhangs below it.
+  const PANEL_H = 0.46, PANEL_CY = PANEL_H / 2;           // panel band, from y=0
+  const BAND_TOP = PANEL_H;
+  const MID_Y = PANEL_CY;                                 // vertical centre of the panel faces
+  const TRACE_R = 2.52;                                   // just proud of the panel faces
+  const TRACE_JOG = 0.05;                                 // how far the trace steps at a seam
+  const TRACE_ARC = 0.78;                                 // fraction of a panel the level run covers
+  const LIP_H = 0.14, LIP_TOP = BAND_TOP + LIP_H;         // stepped raised lip
+  const DECK_H = 0.08;
+  const DECK_TOP = LIP_TOP - 0.06;                        // top surface, recessed below the lip
+  const PANELS = 16, STEP = (Math.PI * 2) / PANELS;
+
+  // ── ENVIRONMENT ──
+  // Built locally rather than with drei's <Environment preset="night" />. The purpose is right —
+  // at metalness 0.8 most of the surface response is environment reflection, so without one the
+  // body renders as a flat black silhouette and the rim highlights the reference depends on
+  // never appear. But the component is wrong twice here: presets are fetched from a CDN at
+  // runtime (so the metal silently goes black if that fails), and <Environment> assigns
+  // scene.environment, which is GLOBAL and would relight the brain's MeshPhysicalMaterial.
+  // This is a gradient with a bright horizon band, PMREM-filtered so roughness blurs it
+  // correctly, attached per material via `envMap`. No network, brain untouched.
+  const envMap = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = 256; c.height = 128;
+    const ctx = c.getContext("2d")!;
+    const g = ctx.createLinearGradient(0, 0, 0, c.height);
+    g.addColorStop(0.0, "#020304");
+    g.addColorStop(0.455, "#1c1f25");
+    g.addColorStop(0.487, "#ffffff");  // narrow bright band — the crisp edge streak on black
+    g.addColorStop(0.515, "#16191e");
+    g.addColorStop(1.0, "#010203");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, c.width, c.height);
+    const tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const rt = pmrem.fromEquirectangular(tex);
+    tex.dispose(); pmrem.dispose();
+    return rt.texture;
+  }, [gl]);
+
+  const floorTex = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const ctx = c.getContext("2d")!;
+    const g = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    g.addColorStop(0.0, "rgba(255,255,255,1)");
+    g.addColorStop(0.4, "rgba(255,255,255,0.4)");
+    g.addColorStop(0.75, "rgba(255,255,255,0.1)");
+    g.addColorStop(1.0, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
 
   useFrame(({ clock }) => {
-    const t = clock.elapsedTime;
-    // Safe to spin this group's own Y: it has no prior X/Z tilt, so its local Y and world Y are
-    // the same axis. (Spinning a mesh that has already been tipped flat precesses it around a
-    // horizontal axis instead — that was the cause of an earlier "diagonal streak" artifact.)
-    if (spinRef.current) spinRef.current.rotation.y += 0.003;
-    // Every accent is held under the scene's 0.7 bloom threshold, so nothing on the podium
-    // blooms — these pulse as a faint sheen, not a glow.
-    if (heroRingMatRef.current) heroRingMatRef.current.emissiveIntensity = 0.5 + 0.1 * Math.sin(t * 1.5);
-    if (innerRingMatRef.current) innerRingMatRef.current.emissiveIntensity = 0.4 + 0.1 * Math.sin(t * 1.5);
-    dotMatRefs.current.forEach((m, i) => {
-      if (m) m.emissiveIntensity = 0.55 + 0.2 * Math.sin(t * 2 + i * 0.9);
-    });
+    if (spinRef.current) spinRef.current.rotation.y += 0.002;
+    const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 1.3);
+    accentRefs.current.forEach((m, i) => { if (m) m.emissiveIntensity = ACCENT_BASE[i] - 0.3 + 0.5 * pulse; });
   });
 
-  // ── PROFILE ── a straight-walled stack: every cylinder below has radiusTop === radiusBottom,
-  // so no surface slopes. Each tier just steps in to a smaller radius than the one under it.
-  // Values are LOCAL to the group, which is itself already positioned at groundY.
-  const DIVISIONS = 10;   // how many dividers/dots ring the wall
-  const ROUND = 96;       // radial segments for the body — high, so the wall reads as smooth
-  const plinthR = 2.25, plinthH = 0.12;
-  const drumR = 2.2, drumH = 0.26;                // the main upright wall
-  const t2R = 1.75, t2H = 0.16;
-  const t3R = 1.35, t3H = 0.14;
-  const ringWallR = 1.0, ringWallH = 0.1;
-
-  const plinthTop = plinthH;
-  const drumTop = plinthTop + drumH;
-  const t2Top = drumTop + t2H;
-  const t3Top = t2Top + t3H;
-  const wallTop = t3Top + ringWallH;
-
-  // The wall is a smooth cylinder, so the surface radius is simply drumR everywhere — there are
-  // no facet vertices to line up with any more, and dividers/dots just need even spacing. The
-  // helper converts an index into the rotation this component uses to place things radially:
-  // a group turned by -a puts its local +X at (cos a, sin a) in the XZ plane. Dots are offset a
-  // half step from the dividers so they land midway between them.
-  const angleAt = (k: number) => Math.PI / 2 - (k / DIVISIONS) * Math.PI * 2;
-  const proud = 0.006;
-
-  // Shared look for every metal part. The white `emissive` is not decoration: metalness 0.6
-  // means 60% of the surface response is reflection of the surrounding environment, and this
-  // scene has no environment map, so that 60% resolves to pure black no matter how many lights
-  // are added — this is what made earlier builds render near-black. With the podium's own point
-  // lights removed, this emissive floor is the main thing keeping the body readable. It sits
-  // under the bloom threshold (0.7), so the body never glows.
-  const metal = (color: string) => (
-    <meshStandardMaterial color={color} metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
+  // metalness/roughness vary per part: the deck is deliberately rougher and less metallic so it
+  // reads as textured concrete-metal against the polished lip.
+  // envMapIntensity 1.0 -> 0.3, and the emissive floor cut to a token amount. These, not the
+  // base colour, are what made the body read grey: at full intensity a metal surface shows the
+  // environment's mid-tones no matter how dark its albedo, and a white self-lit floor adds a
+  // constant lift on top. Only the top rim keeps a strong reflection (passed explicitly) so the
+  // silhouette still catches its highlight.
+  const metal = (color: string, metalness = 0.8, roughness = 0.4, e = 0.006, envI = 0.3) => (
+    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} emissive="#ffffff" emissiveIntensity={e} envMap={envMap} envMapIntensity={envI} />
   );
 
   return (
     <group position={[0, groundY, 0]}>
-      {/* No podium-local lights, no floor glow, no beam — the body is lit purely by the
-          scene's existing ambient/directional rig plus the emissive floor in `metal()`. */}
+      {/* Key from above-front plus a weaker fill. Intensity is candela with decay 2, so the
+          brief's 2.2 / 1 are scaled by S² for this scene's fractional distances — the raw
+          values would be hundreds of times too hot at these ranges. The key is what strikes the
+          bright rim highlight along the lip. */}
+      <pointLight position={[2.5 * S, 1.8 * S, 3 * S]} color="#ffffff" intensity={2.5 * S * S} distance={12 * S} decay={2} />
+      <pointLight position={[-3 * S, 0.5 * S, -2 * S]} color="#ffffff" intensity={0.7 * S * S} distance={12 * S} decay={2} />
+
+      {/* ── FLOOR ── very subtle contact pool. A flat CircleGeometry has constant alpha to its
+          rim and reads as a grey disc outline; a gradient texture fades out with no edge. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.003, 0]}>
+        <planeGeometry args={[7 * S, 7 * S]} />
+        <meshBasicMaterial map={floorTex} color="#ffffff" transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+
       <group ref={spinRef}>
-        {/* ── PLINTH ── straight-walled foot, a touch wider than the drum so it reads as a base
-            lip rather than a taper. */}
-        <mesh position={[0, (plinthH / 2) * S, 0]}>
-          <cylinderGeometry args={[plinthR * S, plinthR * S, plinthH * S, ROUND]} />
-          {metal("#7e7e7e")}
+        {/* ══ INNER DRUM ══ the core the panels clad. Deliberately near-black: what shows in the
+            gaps between panels IS this surface, which is what makes those gaps read as deep
+            recessed grooves rather than pale slots. */}
+        <mesh position={[0, PANEL_CY * S, 0]}>
+          <cylinderGeometry args={[2.28 * S, 2.28 * S, PANEL_H * S, 128]} />
+          {metal("#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
-        {/* ── MAIN DRUM ── the upright wall: smooth and circular (high radialSegments), and
-            straight vertical (radiusTop === radiusBottom), so it neither facets nor slopes. */}
-        <mesh position={[0, (plinthTop + drumH / 2) * S, 0]}>
-          <cylinderGeometry args={[drumR * S, drumR * S, drumH * S, ROUND]} />
-          {metal("#8a8a8a")}
+        {/* ══ 16 CHUNKY BEVELLED PANELS ══
+            Each panel lives in a group turned to its angle, then a child group pushes out along
+            +X and tilts. Inside that child the axes are local and identical for every panel —
+            X radial-out, Y up, Z tangential — so ONE rotation.z leans all sixteen outward the
+            same way. Writing it as rotation={[0.08, -a, 0]} instead would tilt every panel
+            about the same WORLD X and splay them inconsistently around the ring.
+            Three layers per panel: a chamfer border, the raised face proud of it, and a dark
+            groove beside it — all sharing PANEL_H, so nothing can overhang the band. */}
+        {Array.from({ length: PANELS }, (_, i) => {
+          const a = i * STEP;
+          return (
+            <group key={i} rotation={[0, -a, 0]}>
+              <group position={[2.35 * S, PANEL_CY * S, 0]} rotation={[0, 0, -0.08]}>
+                {/* chamfered border plate */}
+                <mesh>
+                  <boxGeometry args={[0.28 * S, PANEL_H * S, 0.95 * S]} />
+                  {metal("#050506", 0.7, 0.35)}
+                </mesh>
+                {/* raised face, proud of the border */}
+                <mesh position={[0.05 * S, 0, 0]}>
+                  <boxGeometry args={[0.2 * S, PANEL_H * 0.78 * S, 0.78 * S]} />
+                  {metal("#0a0a0c", 0.7, 0.35)}
+                </mesh>
+              </group>
+              {/* recessed vertical groove, half a step round */}
+              <group rotation={[0, -STEP / 2, 0]}>
+                <mesh position={[2.3 * S, PANEL_CY * S, 0]}>
+                  <boxGeometry args={[0.2 * S, PANEL_H * S, 0.1 * S]} />
+                  {metal("#000000", 0.6, 0.45, 0.004)}
+                </mesh>
+              </group>
+            </group>
+          );
+        })}
+
+        {/* ══ STEPPED RAISED LIP ══ with a lighter rim torus to catch the key light. */}
+        <mesh position={[0, (BAND_TOP + LIP_H / 2) * S, 0]}>
+          <cylinderGeometry args={[2.05 * S, 2.15 * S, LIP_H * S, 128]} />
+          {metal("#0c0c0e", 0.7, 0.3)}
+        </mesh>
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, LIP_TOP * S, 0]}>
+          <torusGeometry args={[2.05 * S, 0.05 * S, 20, 192]} />
+          {metal("#333333", 0.85, 0.18, 0.04, 1.1)}
         </mesh>
 
-        {/* ── VERTICAL DIVIDERS ── evenly spaced around the wall, running its full height,
-            perfectly aligned with Y (no tilt — the wall doesn't slope). Seated at the wall
-            radius, which is now uniform all the way round. */}
-        {Array.from({ length: DIVISIONS }, (_, k) => (
-          <group key={k} rotation={[0, -angleAt(k), 0]}>
-            <mesh position={[(drumR + proud) * S, (plinthTop + drumH / 2) * S, 0]}>
-              <boxGeometry args={[0.03 * S, drumH * S * 0.98, 0.05 * S]} />
-              <meshStandardMaterial color="#6f6f6f" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
-            </mesh>
-          </group>
-        ))}
-
-        {/* ── PANEL DOTS ── one midway between each pair of dividers. */}
-        {Array.from({ length: DIVISIONS }, (_, i) => (
-          <group key={i} rotation={[0, -angleAt(i + 0.5), 0]}>
-            <mesh
-              position={[(drumR + proud) * S, (plinthTop + drumH * 0.62) * S, 0]}
-              rotation={[0, Math.PI / 2, 0]}
-            >
-              <circleGeometry args={[0.06 * S, 20]} />
-              <meshStandardMaterial
-                ref={(m) => { if (m) dotMatRefs.current[i] = m; }}
-                color="#ffffff" emissive="#ffffff" emissiveIntensity={0.55} metalness={0} roughness={1} toneMapped={false}
-              />
-            </mesh>
-          </group>
-        ))}
-
-        {/* ── SEAM RING ── pale line where the drum meets tier 2. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (drumTop - 0.01) * S, 0]}>
-          <torusGeometry args={[drumR * 0.99 * S, 0.028 * S, 8, 96]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        {/* ══ FLAT RECESSED TOP DECK ══ rougher and less metallic than the lip, so it reads as
+            textured concrete-metal rather than polished steel. */}
+        <mesh position={[0, (DECK_TOP - DECK_H / 2) * S, 0]}>
+          <cylinderGeometry args={[1.9 * S, 1.9 * S, DECK_H * S, 128]} />
+          {metal("#141416", 0.6, 0.45, 0.02)}
+        </mesh>
+        {/* thin dark inset ring separating the deck from the lip */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, DECK_TOP * S, 0]}>
+          <torusGeometry args={[1.93 * S, 0.025 * S, 12, 192]} />
+          {metal("#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
-        {/* ── TIERS 2 & 3 ── each straight-walled (radiusTop === radiusBottom), each stepping in
-            to a smaller radius, so the stack reads as a wedding cake rather than a cone. */}
-        <mesh position={[0, (drumTop + t2H / 2) * S, 0]}>
-          <cylinderGeometry args={[t2R * S, t2R * S, t2H * S, 64]} />
-          {metal("#bcbcbc")}
+        {/* ══ TOP RIM GLOW ══ same material values as the mid-body circuit line (tube 0.02,
+            emissive 2.5, opacity 0.9, bloom tube 0.07/opacity 0.12) — but the flat torus alone
+            was nearly invisible: it lies in a HORIZONTAL plane, and this scene's camera sits
+            close to level, so a flat ring is seen almost edge-on and only ever shows a thin
+            sliver no matter how bright its material is. The circuit line looks bold because it
+            runs around a VERTICAL wall that faces the camera directly.
+            Fix: add a short standing wall (open-ended cylinder) at the same radius, with actual
+            vertical-facing surface area, so it catches the camera the same way the circuit line
+            does. The flat torus stays underneath it as the crisp top edge of that wall. */}
+        <mesh position={[0, (DECK_TOP + 0.012 + 0.02) * S, 0]}>
+          <cylinderGeometry args={[1.9 * 0.9 * S, 1.9 * 0.9 * S, 0.04 * S, 128, 1, true]} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t2Top - 0.01) * S, 0]}>
-          <torusGeometry args={[t2R * S, 0.025 * S, 8, 80]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]}>
+          <torusGeometry args={[1.9 * 0.9 * S, 0.02 * S, 12, 256]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} toneMapped={false} />
         </mesh>
-        <mesh position={[0, (t2Top + t3H / 2) * S, 0]}>
-          <cylinderGeometry args={[t3R * S, t3R * S, t3H * S, 56]} />
-          {metal("#c8c8c8")}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]} renderOrder={1}>
+          <torusGeometry args={[1.9 * 0.9 * S, 0.07 * S, 12, 192]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
         </mesh>
 
-        {/* ── TOP RINGS ── hero ring on the tier-3 deck, low ring wall, inner ring. Unchanged. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t3Top + 0.01) * S, 0]}>
-          <torusGeometry args={[1.3 * S, 0.055 * S, 12, 96]} />
-          <meshStandardMaterial ref={heroRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} metalness={0} roughness={1} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, (t3Top + ringWallH / 2) * S, 0]}>
-          <cylinderGeometry args={[ringWallR * S, ringWallR * S, ringWallH * S, 48, 1, true]} />
-          <meshStandardMaterial color="#b0b0b0" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, wallTop * S, 0]}>
-          <torusGeometry args={[ringWallR * 0.98 * S, 0.03 * S, 10, 80]} />
-          <meshStandardMaterial ref={innerRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
+        {/* ══ CIRCUIT TRACE ══ level runs across each panel, joined by short DIAGONAL ramps
+            at the seams — the stepped look from the reference. Alternating panels sit above and
+            below the band's centre line.
+
+            Two bits of geometry care:
+            • Aligning an arc with a panel needs a conversion between conventions. A panel placed
+              by a group rotated -a lands at (cos a, 0, sin a), but a flat torus arc starting at
+              `start` puts its angle psi at (cos psi, 0, -sin psi). Matching gives psi = -a, so an
+              arc centred on panel i needs start = -a - arc/2. Without it the trace would sit
+              rotated off the panels and the ramps would land mid-panel instead of on the seams.
+            • The ramp is a box whose long axis (+Z, tangential here) is tilted toward +Y by
+              rotation.x, so it spans the seam gap and the height change at once — a genuine
+              diagonal rather than a vertical step. */}
+        {Array.from({ length: PANELS }, (_, i) => {
+          const a = i * STEP;
+          const arc = STEP * TRACE_ARC;
+          const up = i % 2 === 0;
+          const y = MID_Y + (up ? TRACE_JOG : -TRACE_JOG);
+          // seam gap measured as real arc length, so the ramp's slope is correct at any radius
+          const gap = STEP * (1 - TRACE_ARC) * TRACE_R;
+          const rampLen = Math.hypot(gap, TRACE_JOG * 2);
+          const rampTilt = Math.atan2(TRACE_JOG * 2, gap) * (up ? 1 : -1);
+          return (
+            <group key={i}>
+              {/* level run across the panel face */}
+              <mesh rotation={[-Math.PI / 2, 0, -a - arc / 2]} position={[0, y * S, 0]}>
+                <torusGeometry args={[TRACE_R * S, 0.02 * S, 10, 28, arc]} />
+                <meshStandardMaterial
+                  ref={(m) => { if (m && i === 0) accentRefs.current[0] = m; }}
+                  color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} toneMapped={false}
+                />
+              </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, -a - arc / 2]} position={[0, y * S, 0]} renderOrder={1}>
+                <torusGeometry args={[TRACE_R * S, 0.07 * S, 10, 24, arc]} />
+                <meshBasicMaterial color="#ffffff" transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+              </mesh>
+              {/* diagonal ramp bridging this run to the next level */}
+              <group rotation={[0, -(a + STEP / 2), 0]}>
+                <mesh position={[TRACE_R * S, MID_Y * S, 0]} rotation={[rampTilt, 0, 0]}>
+                  <boxGeometry args={[0.02 * S, 0.02 * S, rampLen * S]} />
+                  <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2.5} metalness={0} roughness={1} transparent opacity={0.9} toneMapped={false} />
+                </mesh>
+              </group>
+            </group>
+          );
+        })}
+
+        {/* faint line where the body meets the ground */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03 * S, 0]}>
+          <torusGeometry args={[2.46 * S, 0.012 * S, 10, 192]} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[1] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={1.2} metalness={0} roughness={1} transparent opacity={0.6} toneMapped={false} />
         </mesh>
       </group>
     </group>
