@@ -1,5 +1,5 @@
-// CertificateGallery — horizontal drag-scroll certificate cards
-// Colored gradient image areas, emoji icons, cyan glow on hover/focus
+// CertificateGallery — matches the screenshot exactly
+// Flat cards, colored gradient image area, cyan tab at top, emoji, colored date
 
 import { useState, useEffect, useRef } from "react";
 
@@ -26,45 +26,60 @@ const CERTS = [
     title: "IOT Challenge Winner",
     org: "GUSTO College",
     date: "Jan 2024",
-    gradient: "linear-gradient(135deg, rgba(180,130,30,0.45) 0%, rgba(90,55,5,0.25) 100%)",
-    accentColor: "rgba(212,175,55,0.7)",
-    glowColor: "rgba(180,130,30,0.3)",
+    // Dark brown/gold gradient like screenshot card 1
+    gradient: "linear-gradient(160deg, #2a1a00 0%, #1a1000 60%, #0d0800 100%)",
+    tabColor: "#22d3ee",
+          dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(245,158,11,0.25)",
+    borderHover: "rgba(245,158,11,0.45)",
   },
   {
     emoji: "🚀",
     title: "Innovation Hackathon — FixIt App",
     org: "GUSTO College",
     date: "Mar 2025",
-    gradient: "linear-gradient(135deg, rgba(34,120,80,0.45) 0%, rgba(10,55,30,0.25) 100%)",
-    accentColor: "rgba(52,211,153,0.7)",
-    glowColor: "rgba(34,180,80,0.25)",
+    // Dark green gradient like screenshot card 2
+    gradient: "linear-gradient(160deg, #0a2010 0%, #051408 60%, #020a04 100%)",
+    tabColor: "#22d3ee",
+          dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(52,211,153,0.25)",
+    borderHover: "rgba(52,211,153,0.45)",
   },
   {
     emoji: "📊",
     title: "Data Analysis & Machine Learning",
     org: "Ace of Data",
     date: "Dec 2025",
-    gradient: "linear-gradient(135deg, rgba(20,120,140,0.45) 0%, rgba(8,55,75,0.25) 100%)",
-    accentColor: "rgba(34,211,238,0.7)",
-    glowColor: "rgba(20,180,200,0.25)",
+    // Dark teal gradient like screenshot card 3
+    gradient: "linear-gradient(160deg, #051820 0%, #030e14 60%, #010608 100%)",
+    tabColor: "#22d3ee",
+          dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(34,211,238,0.25)",
+    borderHover: "rgba(34,211,238,0.45)",
   },
   {
     emoji: "🌍",
     title: "Regen Asia Summit",
     org: "NUS Singapore",
     date: "Jul 2025",
-    gradient: "linear-gradient(135deg, rgba(100,50,160,0.45) 0%, rgba(45,15,95,0.25) 100%)",
-    accentColor: "rgba(167,139,250,0.7)",
-    glowColor: "rgba(140,80,220,0.25)",
+    // Dark purple gradient like screenshot card 4
+    gradient: "linear-gradient(160deg, #180a28 0%, #0e0518 60%, #060208 100%)",
+    tabColor: "#22d3ee",
+          dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(167,139,250,0.25)",
+    borderHover: "rgba(167,139,250,0.45)",
   },
   {
     emoji: "🐍",
     title: "Introduction to Python",
     org: "Technortal",
     date: "May 2025",
-    gradient: "linear-gradient(135deg, rgba(50,60,160,0.45) 0%, rgba(18,25,95,0.25) 100%)",
-    accentColor: "rgba(129,140,248,0.7)",
-    glowColor: "rgba(80,100,220,0.25)",
+    // Dark blue/indigo gradient like screenshot card 5
+    gradient: "linear-gradient(160deg, #080a20 0%, #050614 60%, #020308 100%)",
+    tabColor: "#22d3ee",
+          dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(129,140,248,0.25)",
+    borderHover: "rgba(129,140,248,0.45)",
   },
 ];
 
@@ -81,59 +96,75 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
       onBlur={() => setHovered(false)}
       style={{
         flexShrink: 0,
-        width: "220px",
+        width: "195px",
+        height: "230px",
         borderRadius: "14px",
         overflow: "hidden",
         border: hovered
-          ? "1px solid rgba(34,211,238,0.55)"
-          : "1px solid rgba(255,255,255,0.1)",
-        background: "rgba(255,255,255,0.025)",
+          ? `1px solid ${cert.borderHover}`
+          : "1px solid rgba(255,255,255,0.08)",
+        background: "rgba(12,12,18,0.95)",
         boxShadow: hovered
-          ? "0 0 30px rgba(34,211,238,0.18), 0 0 10px rgba(34,211,238,0.1)"
-          : "none",
-        transform: hovered ? "scale(1.07)" : "scale(1)",
-        transition: "transform 0.3s cubic-bezier(0.23,1,0.32,1), border-color 0.3s, box-shadow 0.3s, opacity 0.65s cubic-bezier(0.23,1,0.32,1)",
-        transitionDelay: `0s, 0s, 0s, ${index * 0.08}s`,
+          ? `0 0 28px ${cert.glowColor}, 0 8px 32px rgba(0,0,0,0.5)`
+          : "0 4px 20px rgba(0,0,0,0.4)",
+        // All cards same tilt angle: even=-5deg, odd=+5deg
+        transform: hovered
+          ? `rotate(0deg) scale(1.05)`
+          : `rotate(${index % 2 === 0 ? -2 : 2}deg)`,
+        transition: "transform 0.35s cubic-bezier(0.23,1,0.32,1), border-color 0.3s ease, box-shadow 0.3s ease, opacity 0.65s cubic-bezier(0.23,1,0.32,1)",
+        transitionDelay: `0s, 0s, 0s, ${index * 0.09}s`,
+        zIndex: hovered ? 10 : 1,
         opacity: inView ? 1 : 0,
         cursor: "pointer",
         userSelect: "none",
         outline: "none",
       }}
-      className="cert-card"
     >
-      {/* Gradient image area with emoji */}
+      {/* ── Image / gradient area ── */}
       <div style={{
-        height: "130px",
+        height: "138px",
         background: cert.gradient,
+        position: "relative",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        fontSize: "3.2rem",
-        position: "relative",
-        borderBottom: `1px solid ${hovered ? "rgba(34,211,238,0.2)" : "rgba(255,255,255,0.06)"}`,
-        transition: "border-color 0.3s",
       }}>
-        {/* Radial glow behind emoji */}
+        {/* Cyan tab at very top center — exactly like screenshot */}
         <div style={{
           position: "absolute",
-          inset: 0,
-          background: `radial-gradient(circle at 50% 60%, ${cert.glowColor} 0%, transparent 65%)`,
-          pointerEvents: "none",
+          top: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "48px",
+          height: "6px",
+          borderRadius: "0 0 4px 4px",
+          background: "rgba(255,255,255,0.7)",
+          opacity: 0.85,
         }} />
-        <span style={{ position: "relative", zIndex: 1, filter: "drop-shadow(0 2px 10px rgba(0,0,0,0.5))" }}>
+
+        {/* Emoji icon */}
+        <span style={{
+          fontSize: "3.4rem",
+          lineHeight: 1,
+          position: "relative",
+          zIndex: 1,
+          filter: "drop-shadow(0 2px 12px rgba(0,0,0,0.6))",
+        }}>
           {cert.emoji}
         </span>
       </div>
 
-      {/* Text area */}
-      <div style={{ padding: "1rem 1.1rem 1.1rem" }}>
+      {/* ── Text area ── */}
+      <div style={{           padding: "0.6rem 0.9rem 0.7rem" }}>
         {/* Title */}
         <div style={{
+          fontFamily: "'JetBrains Mono', monospace",
           fontWeight: 700,
-          fontSize: "0.85rem",
-          lineHeight: 1.35,
-          marginBottom: "0.45rem",
+          fontSize: "0.7rem",
+          lineHeight: 1.3,
+          marginBottom: "0.2rem",
           letterSpacing: "-0.01em",
+          color: "rgba(255,255,255,0.92)",
         }}>
           {cert.title}
         </div>
@@ -141,26 +172,21 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
         {/* Org */}
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.68rem",
-          opacity: 0.45,
-          marginBottom: "0.6rem",
+          fontSize: "0.56rem",
+          color: "rgba(255,255,255,0.35)",
+          marginBottom: "0.3rem",
           lineHeight: 1.4,
         }}>
           {cert.org}
         </div>
 
-        {/* Date badge */}
+        {/* Date — cyan colored like screenshot */}
         <div style={{
-          display: "inline-block",
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.55rem",
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          padding: "0.2rem 0.55rem",
-          border: `1px solid ${cert.accentColor}`,
-          borderRadius: "999px",
-          color: cert.accentColor,
-          background: "rgba(255,255,255,0.03)",
+          fontSize: "0.64rem",
+          fontWeight: 600,
+          color: cert.dateColor,
+          letterSpacing: "0.02em",
         }}>
           {cert.date}
         </div>
@@ -174,7 +200,6 @@ export default function CertificateGallery() {
   const { ref, inView } = useInView(0.1);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Drag-to-scroll
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeft = useRef(0);
@@ -196,8 +221,6 @@ export default function CertificateGallery() {
     isDragging.current = false;
     if (scrollRef.current) scrollRef.current.style.cursor = "grab";
   };
-
-  // Wheel → horizontal scroll
   const onWheel = (e: React.WheelEvent) => {
     if (!scrollRef.current) return;
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
@@ -221,7 +244,15 @@ export default function CertificateGallery() {
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+            <span style={{
+              width: "7px",
+              height: "7px",
+              borderRadius: "50%",
+              background: "#84cc16",
+              flexShrink: 0,
+              display: "inline-block",
+              boxShadow: "0 0 8px rgba(132,204,22,0.6)",
+            }} />
             <span style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: "0.68rem",
@@ -245,7 +276,7 @@ export default function CertificateGallery() {
         </div>
       </div>
 
-      {/* Scroll container with fade hint */}
+      {/* Scroll container */}
       <div style={{ position: "relative" }}>
         <div
           ref={scrollRef}
@@ -256,21 +287,23 @@ export default function CertificateGallery() {
           onWheel={onWheel}
           style={{
             display: "flex",
-            gap: "1.1rem",
+            gap: "0.8rem",
             overflowX: "auto",
+            overflowY: "visible",
             paddingLeft: "8vw",
             paddingRight: "8vw",
-            paddingBottom: "1rem",
+            paddingBottom: "2rem",
+            paddingTop: "1.5rem",
             scrollbarWidth: "none",
             cursor: "grab",
             scrollBehavior: "smooth",
+            alignItems: "center",
           }}
           className="cert-scroll"
         >
           {CERTS.map((cert, i) => (
             <CertCard key={cert.title} cert={cert} index={i} inView={inView} />
           ))}
-          {/* Spacer so last card doesn't sit flush */}
           <div style={{ flexShrink: 0, width: "2vw" }} />
         </div>
 
@@ -289,13 +322,6 @@ export default function CertificateGallery() {
 
       <style>{`
         .cert-scroll::-webkit-scrollbar { display: none; }
-        .light .cert-card {
-          border-color: rgba(0,0,0,0.1) !important;
-          background: rgba(0,0,0,0.03) !important;
-        }
-        .light .cert-card:hover {
-          border-color: rgba(34,211,238,0.45) !important;
-        }
         .light .cert-fade-hint {
           background: linear-gradient(to left, var(--background, #f8f8f8) 0%, transparent 100%) !important;
         }
