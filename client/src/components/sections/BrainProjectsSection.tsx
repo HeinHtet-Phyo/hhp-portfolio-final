@@ -18,7 +18,7 @@
  */
 
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -2021,153 +2021,118 @@ function AmbientParticles() {
 //    bright-metal read while leaving the brain's lighting exactly as it was. If a global lift
 //    is wanted anyway, it's the one `ambientLight` intensity in BrainScene.
 function HolographicPedestal() {
-  // Master size knob — every radius and height below is expressed as (design value × S), so
-  // this one number scales the whole podium coherently. The design brief's literals assume a
-  // unit-scale scene; this scene's brain is a ~0.25-unit object near the origin
-  // (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings them into range.
-  const S = 0.072;
-  const groundY = -0.26; // the plane the podium stands on
-
-  const spinRef = useRef<THREE.Group>(null);
-  const heroRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
-  const innerRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
-  const dotMatRefs = useRef<THREE.MeshStandardMaterial[]>([]);
+  const groupRef = useRef<THREE.Group>(null);
+  const accentMat1Ref = useRef<THREE.MeshStandardMaterial>(null);
+  const accentMat2Ref = useRef<THREE.MeshStandardMaterial>(null);
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    // Safe to spin this group's own Y: it has no prior X/Z tilt, so its local Y and world Y are
-    // the same axis. (Spinning a mesh that has already been tipped flat precesses it around a
-    // horizontal axis instead — that was the cause of an earlier "diagonal streak" artifact.)
-    if (spinRef.current) spinRef.current.rotation.y += 0.003;
-    // Every accent is held under the scene's 0.7 bloom threshold, so nothing on the podium
-    // blooms — these pulse as a faint sheen, not a glow.
-    if (heroRingMatRef.current) heroRingMatRef.current.emissiveIntensity = 0.5 + 0.1 * Math.sin(t * 1.5);
-    if (innerRingMatRef.current) innerRingMatRef.current.emissiveIntensity = 0.4 + 0.1 * Math.sin(t * 1.5);
-    dotMatRefs.current.forEach((m, i) => {
-      if (m) m.emissiveIntensity = 0.55 + 0.2 * Math.sin(t * 2 + i * 0.9);
-    });
+    if (groupRef.current) groupRef.current.rotation.y += 0.002;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 1.2);
+    if (accentMat1Ref.current) accentMat1Ref.current.emissiveIntensity = 1.5 + pulse * 0.5;
+    if (accentMat2Ref.current) accentMat2Ref.current.emissiveIntensity = 1.0 + pulse * 0.4;
   });
 
-  // ── PROFILE ── a straight-walled stack: every cylinder below has radiusTop === radiusBottom,
-  // so no surface slopes. Each tier just steps in to a smaller radius than the one under it.
-  // Values are LOCAL to the group, which is itself already positioned at groundY.
-  const DIVISIONS = 10;   // how many dividers/dots ring the wall
-  const ROUND = 96;       // radial segments for the body — high, so the wall reads as smooth
-  const plinthR = 2.25, plinthH = 0.12;
-  const drumR = 2.2, drumH = 0.26;                // the main upright wall
-  const t2R = 1.75, t2H = 0.16;
-  const t3R = 1.35, t3H = 0.14;
-  const ringWallR = 1.0, ringWallH = 0.1;
+  // Scale factor — the spec uses large units, scale down to fit scene
+  const SC = 0.135;
+  const baseY = -0.28;
 
-  const plinthTop = plinthH;
-  const drumTop = plinthTop + drumH;
-  const t2Top = drumTop + t2H;
-  const t3Top = t2Top + t3H;
-  const wallTop = t3Top + ringWallH;
-
-  // The wall is a smooth cylinder, so the surface radius is simply drumR everywhere — there are
-  // no facet vertices to line up with any more, and dividers/dots just need even spacing. The
-  // helper converts an index into the rotation this component uses to place things radially:
-  // a group turned by -a puts its local +X at (cos a, sin a) in the XZ plane. Dots are offset a
-  // half step from the dividers so they land midway between them.
-  const angleAt = (k: number) => Math.PI / 2 - (k / DIVISIONS) * Math.PI * 2;
-  const proud = 0.006;
-
-  // Shared look for every metal part. The white `emissive` is not decoration: metalness 0.6
-  // means 60% of the surface response is reflection of the surrounding environment, and this
-  // scene has no environment map, so that 60% resolves to pure black no matter how many lights
-  // are added — this is what made earlier builds render near-black. With the podium's own point
-  // lights removed, this emissive floor is the main thing keeping the body readable. It sits
-  // under the bloom threshold (0.7), so the body never glows.
-  const metal = (color: string) => (
-    <meshStandardMaterial color={color} metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
-  );
+  const panels = Array.from({ length: 16 }, (_, i) => {
+    const angle = (i / 16) * Math.PI * 2;
+    const r = 2.35 * SC;
+    const x = Math.cos(angle) * r;
+    const z = Math.sin(angle) * r;
+    return { x, z, angle };
+  });
 
   return (
-    <group position={[0, groundY, 0]}>
-      {/* No podium-local lights, no floor glow, no beam — the body is lit purely by the
-          scene's existing ambient/directional rig plus the emissive floor in `metal()`. */}
-      <group ref={spinRef}>
-        {/* ── PLINTH ── straight-walled foot, a touch wider than the drum so it reads as a base
-            lip rather than a taper. */}
-        <mesh position={[0, (plinthH / 2) * S, 0]}>
-          <cylinderGeometry args={[plinthR * S, plinthR * S, plinthH * S, ROUND]} />
-          {metal("#7e7e7e")}
-        </mesh>
+    <group ref={groupRef} position={[0, baseY, 0]}>
 
-        {/* ── MAIN DRUM ── the upright wall: smooth and circular (high radialSegments), and
-            straight vertical (radiusTop === radiusBottom), so it neither facets nor slopes. */}
-        <mesh position={[0, (plinthTop + drumH / 2) * S, 0]}>
-          <cylinderGeometry args={[drumR * S, drumR * S, drumH * S, ROUND]} />
-          {metal("#8a8a8a")}
-        </mesh>
+      {/* ── LIGHTING ── */}
+      <pointLight position={[2.5 * SC * 8, 1.5 * SC * 8, 3 * SC * 8]} intensity={2.2} distance={12} color="#ffffff" />
+      <pointLight position={[-3 * SC * 8, -0.5 * SC * 8, 2 * SC * 8]} intensity={1.0} distance={12} color="#ffffff" />
 
-        {/* ── VERTICAL DIVIDERS ── evenly spaced around the wall, running its full height,
-            perfectly aligned with Y (no tilt — the wall doesn't slope). Seated at the wall
-            radius, which is now uniform all the way round. */}
-        {Array.from({ length: DIVISIONS }, (_, k) => (
-          <group key={k} rotation={[0, -angleAt(k), 0]}>
-            <mesh position={[(drumR + proud) * S, (plinthTop + drumH / 2) * S, 0]}>
-              <boxGeometry args={[0.03 * S, drumH * S * 0.98, 0.05 * S]} />
-              <meshStandardMaterial color="#6f6f6f" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} />
-            </mesh>
-          </group>
-        ))}
+      {/* ── BASE FOOT RING (bottom) ── */}
+      <mesh position={[0, 0.06 * SC, 0]}>
+        <cylinderGeometry args={[2.6 * SC, 2.7 * SC, 0.12 * SC, 64]} />
+        <meshStandardMaterial color="#1a1d22" metalness={0.8} roughness={0.4} />
+      </mesh>
+      {/* Second inset ring above base */}
+      <mesh position={[0, (0.12 + 0.05) * SC, 0]}>
+        <cylinderGeometry args={[2.5 * SC, 2.55 * SC, 0.10 * SC, 64]} />
+        <meshStandardMaterial color="#202329" metalness={0.8} roughness={0.35} />
+      </mesh>
 
-        {/* ── PANEL DOTS ── one midway between each pair of dividers. */}
-        {Array.from({ length: DIVISIONS }, (_, i) => (
-          <group key={i} rotation={[0, -angleAt(i + 0.5), 0]}>
-            <mesh
-              position={[(drumR + proud) * S, (plinthTop + drumH * 0.62) * S, 0]}
-              rotation={[0, Math.PI / 2, 0]}
-            >
-              <circleGeometry args={[0.06 * S, 20]} />
-              <meshStandardMaterial
-                ref={(m) => { if (m) dotMatRefs.current[i] = m; }}
-                color="#ffffff" emissive="#ffffff" emissiveIntensity={0.55} metalness={0} roughness={1} toneMapped={false}
-              />
-            </mesh>
-          </group>
-        ))}
+      {/* ── ACCENT GLOW LINES (low on body) ── */}
+      {/* Main accent line */}
+      <mesh position={[0, 0.22 * SC, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.4 * SC, 0.018 * SC, 16, 128]} />
+        <meshStandardMaterial ref={accentMat1Ref} color="#ffffff" emissive="#ffffff" emissiveIntensity={1.8} transparent opacity={0.8} metalness={0} roughness={1} toneMapped={false} />
+      </mesh>
+      {/* Bloom halo behind accent line */}
+      <mesh position={[0, 0.22 * SC, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.4 * SC, 0.06 * SC, 8, 128]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.08} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+      {/* Second fainter accent line */}
+      <mesh position={[0, 0.14 * SC, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.5 * SC, 0.012 * SC, 16, 128]} />
+        <meshStandardMaterial ref={accentMat2Ref} color="#ffffff" emissive="#ffffff" emissiveIntensity={1.2} transparent opacity={0.6} metalness={0} roughness={1} toneMapped={false} />
+      </mesh>
 
-        {/* ── SEAM RING ── pale line where the drum meets tier 2. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (drumTop - 0.01) * S, 0]}>
-          <torusGeometry args={[drumR * 0.99 * S, 0.028 * S, 8, 96]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
-        </mesh>
+      {/* ── 16 CHUNKY BEVELLED PANEL SEGMENTS ── */}
+      {panels.map(({ x, z, angle }, i) => (
+        <group key={i} position={[x, (0.22 + 0.16) * SC, z]} rotation={[0, -angle, 0]}>
+          {/* Panel border/frame (darker) */}
+          <mesh>
+            <boxGeometry args={[0.95 * SC, 0.32 * SC, 0.28 * SC]} />
+            <meshStandardMaterial color="#3a3e44" metalness={0.85} roughness={0.3} />
+          </mesh>
+          {/* Panel raised face (lighter) */}
+          <mesh position={[0, 0, 0.025 * SC]}>
+            <boxGeometry args={[0.78 * SC, 0.24 * SC, 0.20 * SC]} />
+            <meshStandardMaterial color="#2a2e34" metalness={0.8} roughness={0.35} />
+          </mesh>
+          {/* Panel inner recessed face */}
+          <mesh position={[0, 0, 0.038 * SC]}>
+            <boxGeometry args={[0.62 * SC, 0.18 * SC, 0.10 * SC]} />
+            <meshStandardMaterial color="#1a1d22" metalness={0.75} roughness={0.45} />
+          </mesh>
+        </group>
+      ))}
 
-        {/* ── TIERS 2 & 3 ── each straight-walled (radiusTop === radiusBottom), each stepping in
-            to a smaller radius, so the stack reads as a wedding cake rather than a cone. */}
-        <mesh position={[0, (drumTop + t2H / 2) * S, 0]}>
-          <cylinderGeometry args={[t2R * S, t2R * S, t2H * S, 64]} />
-          {metal("#bcbcbc")}
-        </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t2Top - 0.01) * S, 0]}>
-          <torusGeometry args={[t2R * S, 0.025 * S, 8, 80]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, (t2Top + t3H / 2) * S, 0]}>
-          <cylinderGeometry args={[t3R * S, t3R * S, t3H * S, 56]} />
-          {metal("#c8c8c8")}
-        </mesh>
+      {/* ── STEPPED RAISED LIP (above panels) ── */}
+      <mesh position={[0, (0.22 + 0.32 + 0.07) * SC, 0]}>
+        <cylinderGeometry args={[2.05 * SC, 2.15 * SC, 0.14 * SC, 64]} />
+        <meshStandardMaterial color="#26292f" metalness={0.85} roughness={0.3} />
+      </mesh>
+      {/* Bright rim highlight torus on top of lip */}
+      <mesh position={[0, (0.22 + 0.32 + 0.14) * SC, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[2.05 * SC, 0.05 * SC, 16, 64]} />
+        <meshStandardMaterial color="#40444a" emissive="#ffffff" emissiveIntensity={0.6} metalness={0.9} roughness={0.15} />
+      </mesh>
 
-        {/* ── TOP RINGS ── hero ring on the tier-3 deck, low ring wall, inner ring. Unchanged. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (t3Top + 0.01) * S, 0]}>
-          <torusGeometry args={[1.3 * S, 0.055 * S, 12, 96]} />
-          <meshStandardMaterial ref={heroRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.5} metalness={0} roughness={1} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, (t3Top + ringWallH / 2) * S, 0]}>
-          <cylinderGeometry args={[ringWallR * S, ringWallR * S, ringWallH * S, 48, 1, true]} />
-          <meshStandardMaterial color="#b0b0b0" metalness={0.6} roughness={0.55} emissive="#ffffff" emissiveIntensity={0.16} side={THREE.DoubleSide} />
-        </mesh>
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, wallTop * S, 0]}>
-          <torusGeometry args={[ringWallR * 0.98 * S, 0.03 * S, 10, 80]} />
-          <meshStandardMaterial ref={innerRingMatRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} metalness={0} roughness={1} toneMapped={false} />
-        </mesh>
-      </group>
+      {/* ── FLAT RECESSED TOP SURFACE ── */}
+      <mesh position={[0, (0.22 + 0.32 + 0.14 + 0.04) * SC, 0]}>
+        <cylinderGeometry args={[1.9 * SC, 1.9 * SC, 0.08 * SC, 64]} />
+        <meshStandardMaterial color="#4a4e54" metalness={0.5} roughness={0.7} />
+      </mesh>
+      {/* Thin dark inset ring around top surface edge */}
+      <mesh position={[0, (0.22 + 0.32 + 0.14 + 0.08) * SC, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[1.9 * SC, 0.025 * SC, 8, 64]} />
+        <meshStandardMaterial color="#1a1d22" metalness={0.9} roughness={0.2} />
+      </mesh>
+
+      {/* ── FLOOR GLOW (very subtle) ── */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]}>
+        <circleGeometry args={[3.5 * SC, 64]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.02} depthWrite={false} blending={THREE.AdditiveBlending} />
+      </mesh>
+
     </group>
   );
 }
+
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
 function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
@@ -2196,7 +2161,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
       <Suspense fallback={null}>
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
-      <HolographicPedestal />
+      {/* No pedestal */}
 
       {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
           network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
