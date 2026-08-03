@@ -1357,7 +1357,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
       </mesh>
       {/* Faint far-side hint of the surface web (draws only where hidden behind written depth). */}
       <mesh geometry={surfTubeGeo} renderOrder={3}>
-        <meshBasicMaterial color="#e6fbff" transparent opacity={0.04} depthWrite={false} depthFunc={THREE.GreaterDepth} />
+        <meshBasicMaterial color="#e6fbff" transparent opacity={0.08} depthWrite={false} depthFunc={THREE.GreaterDepth} />
       </mesh>
       <instancedMesh ref={surfHaloRef} args={[undefined, undefined, surfaceCount]} renderOrder={2}>
         <sphereGeometry args={[0.008, 6, 6]} />
@@ -1376,7 +1376,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
       </mesh>
       <instancedMesh ref={intDotRef} args={[undefined, undefined, interiorCount]} renderOrder={4}>
         <sphereGeometry args={[0.005, 8, 8]} />
-        <meshBasicMaterial color="#dff5fa" transparent opacity={0.28} depthWrite={false} depthTest={false} />
+        <meshBasicMaterial color="#dff5fa" transparent opacity={0.35} depthWrite={false} depthTest={false} />
       </instancedMesh>
     </group>
   );
@@ -1688,7 +1688,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
     });
   }, [brainMeshes]);
 
-  const SPIN_SPEED = 0.25;
+  const SPIN_SPEED = 0.15;
   const Y_OFFSET = -Math.PI / 2; // best-guess starting yaw for a left-lateral view — needs visual confirmation, see note above
 
   useFrame((state) => {
@@ -2019,47 +2019,95 @@ function AmbientParticles() {
 // ─── World-Space Holographic Projection Beam ─────────────────────────────────
 function HolographicBeam() {
   const BEAM_BASE_Y = -0.224;
-  const BEAM_H      = 0.255;
+  const BEAM_H      = 0.23;
   const BEAM_CY     = BEAM_BASE_Y + BEAM_H / 2;
+  const BEAM_R      = 0.088;
 
-  // Realistic volumetric cone texture:
-  // Uses a 2D canvas where X = radial position (0=centre, 1=edge) and Y = height (0=base, 1=top)
-  // Bright centre core fading to transparent edges (radial), AND bright at base fading to top (vertical)
-  // This is applied to a cone so it looks like a real light projector beam
+  // Refs for animation
+  const groupRef    = useRef<THREE.Group>(null);
+  const mat0Ref     = useRef<THREE.MeshBasicMaterial>(null);
+  const mat1Ref     = useRef<THREE.MeshBasicMaterial>(null);
+  const mat2Ref     = useRef<THREE.MeshBasicMaterial>(null);
+  const mat3Ref     = useRef<THREE.MeshBasicMaterial>(null);
+  const discMatRef  = useRef<THREE.MeshBasicMaterial>(null);
+  const particlesRef = useRef<THREE.Points>(null);
+
+  // Hash helper
+  const hash = (n: number) => ((Math.sin(n * 12.9898 + 0.5) * 43758.5453) % 1 + 1) % 1;
+
+  // Animation: flickering + slow rotation
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+
+    // Slow rotation
+    if (groupRef.current) groupRef.current.rotation.y = t * 0.20;
+
+    // Gentle pulse
+    const pulse = 1.0 + 0.12 * Math.sin(t * 2.1);
+    if (mat0Ref.current)    mat0Ref.current.opacity    = 0.08 * pulse;
+    
+    
+    
+    if (discMatRef.current) discMatRef.current.opacity = 0.220 * pulse;
+
+    // Animate rising particles: move each particle upward, reset when it exits top
+    if (particlesRef.current) {
+      const pos = particlesRef.current.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i);
+        const speed = 0.002 + hash(i * 3.7) * 0.002;
+        y += speed * 0.016;
+        // Glitch: rare random teleport
+        const glitchRand = ((Math.sin(i * 127.1 + t * 311.7) * 43758.5453) % 1 + 1) % 1;
+        if (glitchRand < 0.01) {
+          const glitchAngle = hash(i + t * 7.3) * Math.PI * 2;
+          const glitchR = hash(i * 5.1 + t * 0.3) * 0.1;
+          const glitchY = BEAM_BASE_Y + hash(i * 2.9 + t * 0.7) * BEAM_H;
+          pos.setXYZ(i, Math.cos(glitchAngle) * glitchR, glitchY, Math.sin(glitchAngle) * glitchR);
+        } else if (y > BEAM_BASE_Y + BEAM_H + 0.02) {
+          const angle = hash(i + t * 0.1) * Math.PI * 2;
+          const r = hash(i * 2.1 + t * 0.05) * 0.088;
+          pos.setXYZ(i, Math.cos(angle) * r, BEAM_BASE_Y, Math.sin(angle) * r);
+        } else {
+          pos.setY(i, y);
+        }
+      }
+      pos.needsUpdate = true;
+    }
+  });
+
+  // Beam texture (same as lighting1)
   const beamTex = useMemo(() => {
-    const W = 256, H = 256;
+    const W = 512, H = 256;
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d')!;
-
-    // For each row (height level), draw a horizontal gradient: bright centre → transparent edges
-    // The brightness at each height also follows the vertical falloff
-    for (let y = 0; y < H; y++) {
-      // Vertical falloff: 0=top of canvas (cylinder top), H=bottom (cylinder base)
-      // flipY=true so canvas bottom = cylinder base
-      const vFrac = y / H; // 0=top, 1=bottom (base)
-      const vBright = Math.pow(vFrac, 0.45); // steeper falloff — more realistic light scatter
-
-      // Radial gradient for this row: bright centre, transparent edges
-      const rg = ctx.createLinearGradient(0, y, W, y);
-      const alpha = vBright * 0.85;
-      const edgeAlpha = vBright * 0.08;
-      rg.addColorStop(0,    `rgba(255,255,255,${edgeAlpha.toFixed(3)})`);
-      rg.addColorStop(0.25, `rgba(255,255,255,${(alpha * 0.5).toFixed(3)})`);
-      rg.addColorStop(0.5,  `rgba(255,255,255,${alpha.toFixed(3)})`);
-      rg.addColorStop(0.75, `rgba(255,255,255,${(alpha * 0.5).toFixed(3)})`);
-      rg.addColorStop(1,    `rgba(255,255,255,${edgeAlpha.toFixed(3)})`);
-      ctx.fillStyle = rg;
-      ctx.fillRect(0, y, W, 1);
+    const NUM_SHAFTS = 5;
+    const shHash = (n: number) => ((Math.sin(n * 12.9898 + 0.5) * 43758.5453) % 1 + 1) % 1;
+    for (let i = 0; i < NUM_SHAFTS; i++) {
+      const cx = ((i + 0.5) / NUM_SHAFTS) * W;
+      const w  = W / NUM_SHAFTS * (0.30 + shHash(i + 10) * 0.14);
+      const bright = 0.7 + shHash(i + 20) * 0.3;
+      for (let y = 0; y < H; y++) {
+        const vFrac  = y / H;
+        const vAlpha = Math.pow(vFrac, 0.5) * bright;
+        const hg = ctx.createLinearGradient(cx - w, y, cx + w, y);
+        hg.addColorStop(0,   `rgba(255,255,255,0)`);
+        hg.addColorStop(0.3, `rgba(255,255,255,${(vAlpha * 0.5).toFixed(3)})`);
+        hg.addColorStop(0.5, `rgba(255,255,255,${vAlpha.toFixed(3)})`);
+        hg.addColorStop(0.7, `rgba(255,255,255,${(vAlpha * 0.5).toFixed(3)})`);
+        hg.addColorStop(1,   `rgba(255,255,255,0)`);
+        ctx.fillStyle = hg;
+        ctx.fillRect(cx - w, y, w * 2, 1);
+      }
     }
-
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.wrapS = THREE.RepeatWrapping;
     return tex;
   }, []);
 
-  // Radial glow disc for the base
+  // Radial glow disc texture
   const radialTex = useMemo(() => {
     const S = 256;
     const c = document.createElement('canvas');
@@ -2077,40 +2125,74 @@ function HolographicBeam() {
     return tex;
   }, []);
 
+  // Rising particles geometry — 40 small glowing dots
+  const particleGeo = useMemo(() => {
+    const NUM = 100;
+    const positions = new Float32Array(NUM * 3);
+    for (let i = 0; i < NUM; i++) {
+      const angle = hash(i * 1.7) * Math.PI * 2;
+      const heightFrac = hash(i * 3.1);
+      const rAtHeight = 0.088 + heightFrac * (0.1 - 0.088);  // cone radius at this height
+      const r = hash(i * 2.3) * rAtHeight;
+      positions[i * 3 + 0] = Math.cos(angle) * r;
+      positions[i * 3 + 1] = BEAM_BASE_Y + heightFrac * BEAM_H;
+      positions[i * 3 + 2] = Math.sin(angle) * r;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    return geo;
+  }, []);
+
+  // Circular sprite texture for round particles
+  const circTex = useMemo(() => {
+    const S = 64;
+    const c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+    g.addColorStop(0,    'rgba(255,255,255,1)');
+    g.addColorStop(0.4,  'rgba(255,255,255,0.8)');
+    g.addColorStop(0.7,  'rgba(255,255,255,0.3)');
+    g.addColorStop(1,    'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, S, S);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
+
   return (
     <group>
-      {/* Outer cone — widest, softest, most transparent */}
-      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
-        <cylinderGeometry args={[0.22, 0.093, BEAM_H, 128, 1, true]} />
-        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.022}
-          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
-          side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-      {/* Mid cone */}
-      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
-        <cylinderGeometry args={[0.14, 0.065, BEAM_H, 128, 1, true]} />
-        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.035}
-          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
-          side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-      {/* Inner bright core */}
-      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
-        <cylinderGeometry args={[0.065, 0.032, BEAM_H, 64, 1, true]} />
-        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.065}
-          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
-          side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-      {/* Bright centre column — the hot core of the beam */}
-      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
-        <cylinderGeometry args={[0.022, 0.012, BEAM_H, 32, 1, true]} />
-        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.11}
-          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
-          side={THREE.DoubleSide} toneMapped={false} />
-      </mesh>
-      {/* Glow disc at base — the projection source */}
+      {/* Rotating beam group — 5 segments, base 0.09 top 0.12, height 0.2 */}
+      <group ref={groupRef}>
+        <mesh position={[0, BEAM_BASE_Y + 0.2 / 2, 0]} renderOrder={2}>
+          <cylinderGeometry args={[0.12, 0.09, 0.2, 128, 1, true]} />
+          <meshBasicMaterial ref={mat0Ref} map={beamTex} color="#ffffff" transparent opacity={0.0005}
+            blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+            side={THREE.DoubleSide} toneMapped={false} />
+        </mesh>
+      </group>
+
+      {/* Rising particles — outside rotating group so they move independently */}
+      <points ref={particlesRef} geometry={particleGeo} renderOrder={4}>
+        <pointsMaterial
+          color="#ffffff"
+          size={0.008}
+          map={circTex}
+          transparent
+          opacity={0.7}
+          alphaTest={0.01}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          sizeAttenuation
+          toneMapped={false}
+        />
+      </points>
+
+      {/* Glow disc at base */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BEAM_BASE_Y + 0.0005, 0]} renderOrder={2}>
         <circleGeometry args={[0.093, 64]} />
-        <meshBasicMaterial map={radialTex} color="#ffffff" transparent opacity={0.35}
+        <meshBasicMaterial ref={discMatRef} map={radialTex} color="#ffffff" transparent opacity={0.35}
           blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
@@ -2261,7 +2343,7 @@ function HolographicPedestal() {
 
 
   useFrame(({ clock }) => {
-    if (spinRef.current) spinRef.current.rotation.y += 0.002;
+    if (spinRef.current) spinRef.current.rotation.y += 0.001;
     const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 1.3);
     accentRefs.current.forEach((m, i) => { if (m) m.emissiveIntensity = ACCENT_BASE[i] - 0.3 + 0.5 * pulse; });
   });
