@@ -2747,7 +2747,7 @@ function HudCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
 function LeftProjectsPanel({ selected, onSelect }: { selected: Project | null; onSelect: (p: Project | null) => void }) {
   return (
     <div style={{
-      position: "absolute", left: 18, top: "50%", transform: "translateY(-50%)",
+      position: "absolute", left: "8vw", top: "50%", transform: "translateY(-50%)",
       width: "min(220px, 26vw)", zIndex: 10, display: "flex", flexDirection: "column", gap: 14,
     }}>
       {/* Completed projects */}
