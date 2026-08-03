@@ -1282,7 +1282,7 @@ function WireframeBrain({ meshes }: { meshes: THREE.Mesh[] }) {
       <lineBasicMaterial
         color="#ffffff"
         transparent
-        opacity={0.06}
+        opacity={0.035}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
         toneMapped={false}
@@ -1376,7 +1376,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
       </mesh>
       <instancedMesh ref={intDotRef} args={[undefined, undefined, interiorCount]} renderOrder={4}>
         <sphereGeometry args={[0.005, 8, 8]} />
-        <meshBasicMaterial color="#dff5fa" transparent opacity={0.35} depthWrite={false} depthTest={false} />
+        <meshBasicMaterial color="#dff5fa" transparent opacity={0.28} depthWrite={false} depthTest={false} />
       </instancedMesh>
     </group>
   );
@@ -2016,6 +2016,107 @@ function AmbientParticles() {
 //
 // Scene ambientLight is deliberately left alone. It is global and un-maskable, so lowering it
 // to darken this podium would also darken the brain.
+// ─── World-Space Holographic Projection Beam ─────────────────────────────────
+function HolographicBeam() {
+  const BEAM_BASE_Y = -0.224;
+  const BEAM_H      = 0.255;
+  const BEAM_CY     = BEAM_BASE_Y + BEAM_H / 2;
+
+  // Realistic volumetric cone texture:
+  // Uses a 2D canvas where X = radial position (0=centre, 1=edge) and Y = height (0=base, 1=top)
+  // Bright centre core fading to transparent edges (radial), AND bright at base fading to top (vertical)
+  // This is applied to a cone so it looks like a real light projector beam
+  const beamTex = useMemo(() => {
+    const W = 256, H = 256;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d')!;
+
+    // For each row (height level), draw a horizontal gradient: bright centre → transparent edges
+    // The brightness at each height also follows the vertical falloff
+    for (let y = 0; y < H; y++) {
+      // Vertical falloff: 0=top of canvas (cylinder top), H=bottom (cylinder base)
+      // flipY=true so canvas bottom = cylinder base
+      const vFrac = y / H; // 0=top, 1=bottom (base)
+      const vBright = Math.pow(vFrac, 0.45); // steeper falloff — more realistic light scatter
+
+      // Radial gradient for this row: bright centre, transparent edges
+      const rg = ctx.createLinearGradient(0, y, W, y);
+      const alpha = vBright * 0.85;
+      const edgeAlpha = vBright * 0.08;
+      rg.addColorStop(0,    `rgba(255,255,255,${edgeAlpha.toFixed(3)})`);
+      rg.addColorStop(0.25, `rgba(255,255,255,${(alpha * 0.5).toFixed(3)})`);
+      rg.addColorStop(0.5,  `rgba(255,255,255,${alpha.toFixed(3)})`);
+      rg.addColorStop(0.75, `rgba(255,255,255,${(alpha * 0.5).toFixed(3)})`);
+      rg.addColorStop(1,    `rgba(255,255,255,${edgeAlpha.toFixed(3)})`);
+      ctx.fillStyle = rg;
+      ctx.fillRect(0, y, W, 1);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    return tex;
+  }, []);
+
+  // Radial glow disc for the base
+  const radialTex = useMemo(() => {
+    const S = 256;
+    const c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    const ctx = c.getContext('2d')!;
+    const g = ctx.createRadialGradient(S/2, S/2, 0, S/2, S/2, S/2);
+    g.addColorStop(0.0,  'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.7)');
+    g.addColorStop(0.6,  'rgba(255,255,255,0.15)');
+    g.addColorStop(1.0,  'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, S, S);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
+
+  return (
+    <group>
+      {/* Outer cone — widest, softest, most transparent */}
+      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
+        <cylinderGeometry args={[0.22, 0.093, BEAM_H, 128, 1, true]} />
+        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.022}
+          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* Mid cone */}
+      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
+        <cylinderGeometry args={[0.14, 0.065, BEAM_H, 128, 1, true]} />
+        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.035}
+          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* Inner bright core */}
+      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
+        <cylinderGeometry args={[0.065, 0.032, BEAM_H, 64, 1, true]} />
+        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.065}
+          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* Bright centre column — the hot core of the beam */}
+      <mesh position={[0, BEAM_CY, 0]} renderOrder={2}>
+        <cylinderGeometry args={[0.022, 0.012, BEAM_H, 32, 1, true]} />
+        <meshBasicMaterial map={beamTex} color="#ffffff" transparent opacity={0.11}
+          blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          side={THREE.DoubleSide} toneMapped={false} />
+      </mesh>
+      {/* Glow disc at base — the projection source */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BEAM_BASE_Y + 0.0005, 0]} renderOrder={2}>
+        <circleGeometry args={[0.093, 64]} />
+        <meshBasicMaterial map={radialTex} color="#ffffff" transparent opacity={0.35}
+          blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 function HolographicPedestal() {
   // Master size knob — every radius, height, light position and light intensity below is
   // (design value × S). The brief's literals assume a unit-scale scene; this scene's brain is a
@@ -2434,7 +2535,7 @@ function HolographicPedestal() {
           rather than a second solid layer */}
       <mesh position={[0, RING_TOP * S + 0.002 * S, 0]} scale={[1, 0.125, 1]} renderOrder={2}>
         <sphereGeometry args={[DOME_R * 0.73 * S, 40, 18, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshBasicMaterial color="#ffffff" transparent opacity={0.5} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.35} blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.DoubleSide} toneMapped={false} />
       </mesh>
       {/* bright core glow flat at the dome's base — also visually plugs the open equatorial cut
           the two hemispheres above leave, so nothing hollow is visible looking up into them */}
@@ -2479,6 +2580,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
         <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
       </Suspense>
       <HolographicPedestal />
+      <HolographicBeam />
 
       {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
           network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
