@@ -388,10 +388,10 @@ function HotspotDot({ position, index, active, onSelect }: {
           // camera distance — anything closer scales the label UP. This label shows in two very
           // different camera-distance contexts: hovering a dot while idle (camera ~2 world
           // units out, unchanged from before) and a project actually being selected (camera now
-          // stands off only ~0.6 world units, since the reworked CameraController above zooms in
-          // much closer than before) — one static factor blew the label up to several times its
-          // size for the second case, dominating the whole frame.
-          distanceFactor={active ? 0.6 : 1.2}
+          // stands off ~0.18-0.2 world units from the node, since the reworked CameraController
+          // above zooms in much closer than before) — one static factor blew the label up to
+          // several times its size for the second case, dominating the whole frame.
+          distanceFactor={active ? 0.3 : 1.2}
           occlude={false}
         >
           <div style={{
@@ -635,31 +635,24 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 // ─── Camera Controller (zoom in/out on project select) ────────────────────────
 // Idle: pulled well back so the whole brain + pedestal sits comfortably in frame (previously
 // 1.25, which read as "zoomed in too much" — nearly filling the viewport with no breathing
-// room). Selected: instead of a fixed offset guess, this reconstructs the picked hotspot's
-// ACTUAL current world position every frame — same position/scale offset BrainModel applies,
-// and the same spin angle formula it uses (brain keeps spinning even while zoomed in) — then
-// flies the camera out along the ray from the brain's centre through that point and looks
-// straight at it. That works correctly for every hotspot regardless of which side of the
-// (still-turning) brain it's currently on, and because it's a live per-frame reconstruction
-// rather than a one-off snapshot, the camera keeps orbiting to stay locked onto the same spot
-// as the brain continues to turn — and gliding to a different project (via a dot, the list, or
-// prev/next) smoothly swings the camera around to the new one instead of jump-cutting.
+// room). Selected: reconstructs the picked hotspot's ACTUAL current world position every
+// frame — same position/scale offset BrainModel applies, and the same spin angle formula it
+// uses (brain keeps spinning even while zoomed in) — then orbits the camera around the
+// brain's centre at that hotspot's own azimuth and (angle-clamped, see MAX_ELEVATION_ANGLE
+// below) elevation, and looks straight at it. That works correctly for every hotspot
+// regardless of which side of the (still-turning) brain it's currently on, and because it's a
+// live per-frame reconstruction rather than a one-off snapshot, the camera keeps orbiting to
+// stay locked onto the same spot as the brain continues to turn — and gliding to a different
+// project (via a dot, the list, or prev/next) smoothly swings the camera around to the new one
+// instead of jump-cutting.
 const IDLE_CAMERA_Z = 1.95;
 // How far outside each node's own REAL local surface (PROJECT_SURFACE_RADIUS, in local
-// pre-scale units) the camera hangs back once "zoomed in" — a brain is nowhere close to
-// spherical, so a single fixed camera-orbit-radius from the bbox centre put the camera well
-// outside the mesh for one node and nearly inside it for others. Using each node's own
-// raycast-measured surface distance instead means the standoff gap can stay small and
-// uniform for every node.
-// This is in the SAME pre-scale local units as PROJECT_SURFACE_RADIUS (~1.0-1.1 typically) —
-// it gets multiplied by BRAIN_TRANSFORM's 0.20 scale down in CameraController along with the
-// radius, same as everything else here. An earlier value of 0.55 looked tiny written down but
-// only added ~0.11 world units of actual standoff once scaled — the camera ended up hovering
-// barely past the surface, staring straight down at it, which reads as a flat wall filling
-// the frame wherever the local surface isn't sharply domed. 3.0 gives ~0.6 world units of
-// real breathing room from the surface — enough margin even for the couple of lower/back
-// nodes near more complex geometry (folds/brainstem area) that grazed at smaller gaps.
-const ZOOM_GAP_LOCAL = 3.0;
+// pre-scale units) the camera hangs back once "zoomed in", in the SAME pre-scale local units
+// as PROJECT_SURFACE_RADIUS (~1.0-1.1 typically) — gets multiplied by BRAIN_TRANSFORM's 0.20
+// scale down below, same as everything else here. 0.9 -> ~0.18 world units of standoff, i.e.
+// roughly 20-25% of the brain's own ~0.2-0.22 world bounding radius, per the target in the
+// investigation below.
+const ZOOM_GAP_LOCAL = 0.9;
 const LOOK_CENTER = new THREE.Vector3(0, 0.08, 0);
 
 function worldFromLocal(local: [number, number, number], theta: number, out: THREE.Vector3) {
@@ -670,30 +663,67 @@ function worldFromLocal(local: [number, number, number], theta: number, out: THR
   return out.set(px * cosT + pz * sinT, py, -px * sinT + pz * cosT);
 }
 
+// Investigation note (white-blowout report): logging the live camera position + every
+// mesh/light within 0.5 world units of it while zoomed into "MoodTunes AI" (a node near the
+// top of the brain) showed the camera sitting at world (0.0015, 0.8094, -0.0023) with ZERO
+// objects that close — so it was never actually near any emissive glow sphere at all, and no
+// amount of shrinking the standoff DISTANCE could have fixed it. The real bug was direction,
+// not distance: the old code always placed the camera along the straight ray from the brain's
+// centre through the hotspot. For a node near the top, that ray points almost straight up, so
+// standing "back" along it puts the camera nearly directly overhead — at y=0.81 here, versus
+// the pedestal's glow rings/dome sitting at y<0.05 (HolographicPedestal's RING_TOP/DOME_R) —
+// looking almost straight DOWN through the brain at the pedestal's stacked additive-blended
+// glow discs below. Those discs are lit/shaped to glow when viewed from the side, not when
+// seen flat-on from directly above with nothing else in frame to occlude them, which floods
+// the shot white with their combined additive area regardless of exact camera distance.
+// Fix: cap how steep the camera's elevation ANGLE is allowed to get (not a fixed elevation
+// magnitude — see below), so it can never approach from a bird's-eye or worm's-eye angle that
+// points through the pedestal below or empty space above, while still approaching every other,
+// less extreme node from its own natural angle unchanged.
+const MAX_ELEVATION_ANGLE = THREE.MathUtils.degToRad(50);
+
 function CameraController({ selected }: { selected: Project | null }) {
   const { camera } = useThree();
   const targetPos = useRef(new THREE.Vector3(0, 0, IDLE_CAMERA_Z));
   const lookTarget = useRef(new THREE.Vector3().copy(LOOK_CENTER));
   const hotspotWorld = useRef(new THREE.Vector3());
-  const dir = useRef(new THREE.Vector3());
+  const rel = useRef(new THREE.Vector3());
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (selected) {
       const theta = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-      // The real, validated dot position — used for BOTH the approach direction and the
-      // look-at target, so the camera always ends up looking straight at the same point
-      // it's standing off from (mixing in the un-nudged design-guess direction here instead
-      // caused the camera to sit on one side of the brain while aiming at a real hotspot
-      // that had been nudged somewhere else entirely, grazing across the mesh at a bad
-      // angle for a couple of nodes).
+      // The real, validated dot position — used for both the look-at target and (for its
+      // horizontal angle) the camera's approach azimuth, so the camera always ends up
+      // looking straight at the same point it's oriented toward.
       worldFromLocal(PROJECT_HOTSPOTS[selected.id], theta, hotspotWorld.current);
+      rel.current.copy(hotspotWorld.current).sub(LOOK_CENTER);
 
-      dir.current.copy(hotspotWorld.current).sub(LOOK_CENTER);
-      if (dir.current.lengthSq() < 1e-6) dir.current.set(0, 0, 1);
-      dir.current.normalize();
+      const horizR = Math.hypot(rel.current.x, rel.current.z);
+      // A node with almost no horizontal offset of its own (near the top/bottom of the
+      // brain) has no meaningful azimuth to inherit — fall back to the brain's current spin
+      // angle so the camera still approaches from a sensible side-on angle (and keeps
+      // orbiting with the spin) instead of collapsing toward straight up/down.
+      const azimuth = horizR > 1e-4 ? Math.atan2(rel.current.x, rel.current.z) : theta;
+      // Angle above/below the horizontal plane the node itself actually sits at, clamped to
+      // MAX_ELEVATION_ANGLE. This preserves each node's own natural approach angle exactly
+      // whenever it's already under the cap (which is every node except the ones sitting
+      // almost dead-on at the top/bottom) — an earlier version clamped elevation as a fixed
+      // *distance* regardless of the node's own angle, which for a moderately-elevated (but
+      // not extreme) node redirected the camera in a materially different direction than
+      // PROJECT_SURFACE_RADIUS had actually been measured along, standing it too close to
+      // (sometimes inside) the mesh in that new, uncalibrated direction.
+      const naturalElevationAngle = Math.atan2(rel.current.y, Math.max(horizR, 1e-6));
+      const elevationAngle = THREE.MathUtils.clamp(naturalElevationAngle, -MAX_ELEVATION_ANGLE, MAX_ELEVATION_ANGLE);
 
       const standoffWorld = (PROJECT_SURFACE_RADIUS[selected.id] + ZOOM_GAP_LOCAL) * BRAIN_TRANSFORM.scale[0];
-      targetPos.current.copy(LOOK_CENTER).addScaledVector(dir.current, standoffWorld);
+      const elevation = standoffWorld * Math.sin(elevationAngle);
+      const horizStandoff = standoffWorld * Math.cos(elevationAngle);
+
+      targetPos.current.set(
+        LOOK_CENTER.x + horizStandoff * Math.sin(azimuth),
+        LOOK_CENTER.y + elevation,
+        LOOK_CENTER.z + horizStandoff * Math.cos(azimuth)
+      );
       // Look mostly at the real hotspot itself but blended a touch back toward the brain's
       // centre so the shot reads as "zoomed into this region of the brain", not just a
       // close-up of an isolated glowing dot against empty space.
@@ -703,7 +733,15 @@ function CameraController({ selected }: { selected: Project | null }) {
       lookTarget.current.copy(LOOK_CENTER);
     }
 
-    camera.position.lerp(targetPos.current, 0.06);
+    // Frame-rate-independent damping: a fixed per-frame lerp factor (the previous "0.06")
+    // converges at a rate that depends entirely on actual FPS — fine at 60fps, but on a
+    // heavier/slower render (this scene's postprocessing + a screen-recorded remote VM) it
+    // could take many real seconds to actually reach the target, which is what made an
+    // "already fixed" camera position still look wrong: the screenshot was catching it
+    // mid-flight, closer to the brain than its real resting position. This reaches the same
+    // ~98% converged point in a fixed ~0.75s of real time regardless of frame rate.
+    const smoothing = 1 - Math.exp(-5 * delta);
+    camera.position.lerp(targetPos.current, smoothing);
     camera.lookAt(lookTarget.current);
   });
 
