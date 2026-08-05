@@ -18,7 +18,6 @@
  */
 
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
 import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -26,6 +25,7 @@ import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUti
 import { motion, AnimatePresence } from "framer-motion";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
+import gsap from "gsap";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
 if (import.meta.hot) {
@@ -35,75 +35,79 @@ if (import.meta.hot) {
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
-const PROJECTS = [
+// `name` is the archive display form (uppercase, underscores). `active` marks the four
+// documented projects that the readout panel and PREV/NEXT cycle through — NEURAL_05 is
+// listed in the node index but has no readout content yet, so it is inert. `preview` is a
+// screenshot path for the readout's preview frame; null renders the NO_SIGNAL placeholder.
+type Project = {
+  id: number;
+  name: string;
+  desc: string;
+  tech: string[];
+  github: string;
+  demo: string;
+  preview: string | null;
+  active: boolean;
+};
+
+const PROJECTS: Project[] = [
   {
     id: 0,
-    title: "MoodTunes AI",
-    subtitle: "ML · Music Recommender",
-    desc: "LightGBM trained on 114K+ Spotify tracks. F1 score 0.5652 on 5-class mood classification with real-time recommendation API.",
-    tech: ["Python", "LightGBM", "Spotify API", "scikit-learn", "Pandas"],
-    stats: [["0.5652", "F1 Score"], ["114K+", "Tracks"], ["5", "Moods"]] as [string, string][],
+    name: "MOODTUNES_AI",
+    desc: "LightGBM mood classifier trained on 114K+ Spotify tracks. Five-class output at F1 0.5652, served behind a real-time recommendation API.",
+    tech: ["PYTHON", "LIGHTGBM", "SPOTIFY_API", "SCIKIT-LEARN", "PANDAS"],
     github: "https://github.com/HeinHtet-Phyo/moodtunes-ai-group3",
     demo: "#",
-    code: "MOOD_AI_v2.3",
-    fullDesc: "LightGBM trained on 114K+ Spotify tracks. F1 score 0.5652 on 5-class mood classification with real-time recommendation API. Placeholder: extended write-up covering data pipeline, feature engineering, and model selection coming soon.",
+    preview: null,
+    active: true,
   },
   {
     id: 1,
-    title: "IT Career Planner",
-    subtitle: "XGBoost · Career AI",
-    desc: "XGBoost classifier at 99.75% accuracy across 6,000 samples. Maps SFIA framework skills to career paths with gap analysis.",
-    tech: ["Python", "XGBoost", "SFIA", "scikit-learn", "Streamlit"],
-    stats: [["99.75%", "Accuracy"], ["6,000", "Samples"], ["SFIA", "Framework"]] as [string, string][],
+    name: "IT_CAREER_PLANNER",
+    desc: "XGBoost classifier reaching 99.75% accuracy across 6,000 samples. Maps SFIA framework skills onto career paths and reports the gaps.",
+    tech: ["PYTHON", "XGBOOST", "SFIA", "SCIKIT-LEARN", "STREAMLIT"],
     github: "https://github.com/HeinHtet-Phyo/it-career-planner",
     demo: "#",
-    code: "CAREER_XGB_v1.1",
-    fullDesc: "XGBoost classifier at 99.75% accuracy across 6,000 samples. Maps SFIA framework skills to career paths with gap analysis. Placeholder: extended write-up covering the SFIA mapping methodology and gap-analysis scoring coming soon.",
+    preview: null,
+    active: true,
   },
   {
     id: 2,
-    title: "CityPulse",
-    subtitle: "Urban Data Analytics",
-    desc: "Interactive urban analytics platform aggregating transportation, demographic, and infrastructure data into city-level intelligence.",
-    tech: ["Python", "Pandas", "Plotly", "GeoPandas", "Streamlit"],
-    stats: [["City", "Scale"], ["Real-time", "Data"], ["Interactive", "Maps"]] as [string, string][],
+    name: "CITYPULSE",
+    desc: "Urban analytics platform aggregating transport, demographic and infrastructure feeds into a single city-level intelligence view.",
+    tech: ["PYTHON", "PANDAS", "PLOTLY", "GEOPANDAS", "STREAMLIT"],
     github: "https://github.com/HeinHtet-Phyo",
     demo: "#",
-    code: "CITY_PULSE_v0.9",
-    fullDesc: "Interactive urban analytics platform aggregating transportation, demographic, and infrastructure data into city-level intelligence. Placeholder: extended write-up covering data sources and the analytics architecture coming soon.",
+    preview: null,
+    active: true,
   },
   {
     id: 3,
-    title: "PreventPath",
-    subtitle: "Health AI · Prevention",
-    desc: "ML pipeline predicting health risk factors from patient data, generating personalised prevention plans with risk scoring.",
-    tech: ["Python", "scikit-learn", "Flask", "Healthcare ML", "Risk Scoring"],
-    stats: [["AI", "Powered"], ["Personal", "Plans"], ["Risk", "Scoring"]] as [string, string][],
+    name: "PREVENTPATH",
+    desc: "Health-risk prediction pipeline scoring patient records and generating personalised prevention plans from the resulting risk profile.",
+    tech: ["PYTHON", "SCIKIT-LEARN", "FLASK", "HEALTHCARE_ML", "RISK_SCORING"],
     github: "https://github.com/HeinHtet-Phyo",
     demo: "#",
-    code: "PREV_PATH_v1.0",
-    fullDesc: "ML pipeline predicting health risk factors from patient data, generating personalised prevention plans with risk scoring. Placeholder: extended write-up covering the risk-scoring model and clinical validation coming soon.",
+    preview: null,
+    active: true,
   },
   {
     id: 4,
-    title: "PROJECT_05",
-    subtitle: "Classified · In Development",
-    desc: "Details classified — full write-up coming soon.",
-    tech: ["Classified"],
-    stats: [["???", "Status"], ["TBD", "Stack"], ["Soon", "Release"]] as [string, string][],
+    name: "NEURAL_05",
+    desc: "Details pending — write-up to follow.",
+    tech: ["CLASSIFIED"],
     github: "#",
     demo: "#",
-    code: "PROJECT_05",
-    fullDesc: "Details classified — full write-up coming soon.",
+    preview: null,
+    active: false,
   },
 ];
-type Project = (typeof PROJECTS)[0];
 
-// ─── Upcoming Projects (placeholder, classified) ──────────────────────────────
-const UPCOMING_PROJECTS = [
-  { code: "PROJECT_06" },
-  { code: "PROJECT_07" },
-];
+// The four navigable projects. Node index shows all five; only these cycle.
+const ACTIVE_PROJECTS = PROJECTS.filter((p) => p.active);
+
+// ─── Classified nodes (inert index rows) ──────────────────────────────────────
+const CLASSIFIED_NODES = ["NEURAL_BLACKSITE", "PROJECT_OMEGA"];
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const TEAL       = "#ffffff";
@@ -129,6 +133,14 @@ const PROJECT_NODES: { name: string; region: string; pct: [number, number, numbe
 // this array by reference (GoldCircuit, the hotspot render loop, the camera controller) picks
 // up the real, validated positions without needing to be threaded a prop.
 const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [...n.pct]);
+
+// The brain group spins continuously, so a node's WORLD position changes every frame. The
+// camera controller is a sibling of BrainModel and has no other way to reach that transform,
+// so BrainModel publishes the inner (BRAIN_TRANSFORM) group here on mount — same
+// module-level-mutable pattern PROJECT_HOTSPOTS above already uses. Reading matrixWorld off
+// this each frame is what keeps an interior camera locked to its region as the brain turns,
+// rather than drifting off it the moment the tween lands.
+const brainGroupRef: { current: THREE.Group | null } = { current: null };
 
 // Reads the brain mesh's real bounding box, places each PROJECT_NODES entry as a percentage of
 // its actual half-extent, then validates every position with a 6-direction raycast (a point
@@ -204,16 +216,6 @@ function computeProjectPositions(meshes: THREE.Mesh[]): [number, number, number]
   return positions.map((p) => [p.x, p.y, p.z] as [number, number, number]);
 }
 
-// Per-node label offset (in local space, before billboarding) so labels stay legible
-// even if two nodes ever line up close together on screen from some angle.
-const LABEL_OFFSETS: [number, number, number][] = [
-  [0.045,  0.028, 0],
-  [0.045,  0.010, 0],
-  [0.045, -0.010, 0],
-  [0.045, -0.028, 0],
-  [0.045,  0.046, 0],
-];
-
 // ─── Gold circuit connecting the 5 project nodes ─────────────────────────────
 // Complete graph — every node connects straight through the interior to every other node
 // (10 unique pairs from 5 nodes), the intentional cross-brain diagonals forming a spanning
@@ -254,11 +256,13 @@ function GoldCircuit() {
 }
 
 // ─── Hotspot Dot (3D) ─────────────────────────────────────────────────────────
-function HotspotDot({ position, index, active, onSelect }: {
+function HotspotDot({ position, index, active, interactive, onSelect, onHover }: {
   position: [number, number, number];
   index: number;
   active: boolean;
+  interactive: boolean;
   onSelect: () => void;
+  onHover: (name: string | null, x: number, y: number) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glow1Ref = useRef<THREE.Mesh>(null);
@@ -267,11 +271,15 @@ function HotspotDot({ position, index, active, onSelect }: {
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime;
-    const s = active ? 1.6 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
+    const s = active ? 1.6 : hovered ? 1.25 : (1.0 + 0.18 * Math.sin(t * 2.2 + index));
     if (meshRef.current) meshRef.current.scale.setScalar(s);
     if (glow1Ref.current) glow1Ref.current.scale.setScalar(s);
     if (glow2Ref.current) glow2Ref.current.scale.setScalar(s);
   });
+
+  // Clear the cursor/tooltip if this dot unmounts or stops being interactive mid-hover,
+  // otherwise a stale pointer cursor sticks to the page.
+  useEffect(() => () => { document.body.style.cursor = "auto"; }, []);
 
   return (
     <group position={position}>
@@ -303,41 +311,35 @@ function HotspotDot({ position, index, active, onSelect }: {
         <sphereGeometry args={[0.092, 12, 12]} />
         <meshBasicMaterial color="#F5F5FF" transparent opacity={active ? 0.18 : 0.1} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} />
       </mesh>
-      {/* Invisible click target — larger hitbox for usability, also drives hover so the label
-          below only shows for the node actually being pointed at (previously every label was
-          always rendered, which is what caused nearby ones to overlap). */}
+      {/* Invisible click target — larger hitbox for usability. Hover drives the cursor, the
+          1.25x marker bump above, and the cursor-following tooltip rendered as a DOM overlay
+          by the section (not a 3D label, so nothing points at or overlays the mesh). Inert
+          nodes get none of it. */}
       <mesh
-        onClick={(e) => { e.stopPropagation(); onSelect(); }}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
-        onPointerOut={(e) => { e.stopPropagation(); setHovered(false); }}
+        onClick={(e) => { if (!interactive) return; e.stopPropagation(); onSelect(); }}
+        onPointerOver={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          setHovered(true);
+          document.body.style.cursor = "pointer";
+          onHover(PROJECTS[index].name, e.nativeEvent.clientX, e.nativeEvent.clientY);
+        }}
+        onPointerMove={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          onHover(PROJECTS[index].name, e.nativeEvent.clientX, e.nativeEvent.clientY);
+        }}
+        onPointerOut={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          setHovered(false);
+          document.body.style.cursor = "auto";
+          onHover(null, 0, 0);
+        }}
       >
         <sphereGeometry args={[0.057, 8, 8]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
-      {/* HTML label — only rendered when hovered or active, so at most one label is ever
-          visible at a time regardless of how close two nodes are on screen. */}
-      {(hovered || active) && (
-        <Html
-          position={LABEL_OFFSETS[index]}
-          style={{ pointerEvents: "none", userSelect: "none" }}
-          distanceFactor={1.2}
-          occlude={false}
-        >
-          <div style={{
-            background: active ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.6)",
-            border: `1px solid ${active ? "#ffffff" : "rgba(255,255,255,0.3)"}`,
-            borderRadius: 4, padding: "3px 7px",
-            fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-            color: active ? "#ffffff" : "#aaaaaa",
-            whiteSpace: "nowrap",
-            backdropFilter: "blur(4px)",
-            boxShadow: active ? "0 0 10px rgba(255,193,7,0.5)" : "none",
-            transition: "all 0.2s ease",
-          }}>
-            {PROJECTS[index].title}
-          </div>
-        </Html>
-      )}
     </group>
   );
 }
@@ -479,7 +481,10 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
       return;
     }
 
-    const graph = selected ? PROJECT_GRAPHS[selected.id] : PROJECT_GRAPHS[prevIdRef.current ?? 0];
+    // PROJECT_GRAPHS only defines the four documented projects, while there are five brain
+    // hotspots — fall back to the first graph rather than dereferencing undefined if a node
+    // without its own graph is ever selected.
+    const graph = (selected ? PROJECT_GRAPHS[selected.id] : PROJECT_GRAPHS[prevIdRef.current ?? 0]) ?? PROJECT_GRAPHS[0];
     if (selected) prevIdRef.current = selected.id;
     const col = graph.color;
     const alpha = opacityRef.current;
@@ -562,30 +567,255 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 }
 
 // ─── Camera Controller (zoom in/out on project select) ────────────────────────
+// Vertical centre of the rendered brain+pedestal group in world space, and the half-extents
+// that must stay on screen around it. Measured off an actual wide render (bright-pixel
+// bounds, converted back through the projection) rather than derived from the raw mesh
+// bounds — the baked surface points are in the model's local space and the brain group
+// applies its own transform on top, so the local numbers do not describe what the camera
+// sees. Measured: X +/-0.286, Y -0.280..+0.325, i.e. centre +0.022 and half-height 0.303;
+// the values below carry a little air on top of that, X extra because the brain spins and
+// is longer front-to-back than side-to-side.
+// Shared zoom state. The camera controller owns/tweens it, but the bloom pass and the
+// holographic beam both need to read it every frame to fade themselves out as the camera
+// goes inside — and they are siblings of the controller, not children, so a module-level
+// mutable is the only handle they share (same pattern as PROJECT_HOTSPOTS above).
+// depth 0 = default external shot, 1 = fully inside at the active node's interior focus point.
+// travel 0 -> 1 blends the target node from `fromId` to `toId` for project-to-project moves,
+// independent of depth (which stays pinned at 1 throughout that sweep — see section 3).
+const camAnim = { depth: 0, travel: 1 };
+
+const SCENE_CENTRE_Y = 0.02;
+// Bounding-sphere radius of the whole group about that centre. A sphere (rather than the
+// previous separate X/Y half-extents) is what makes the framing safe to ORBIT: its silhouette
+// is the same from every direction, so a distance that fits it head-on also fits it from
+// above, behind or the side. Measured extents were X +/-0.286 and Y -0.280..+0.325 about
+// centre +0.022, i.e. 0.303; 0.31 carries a little air, and the brain's spin already sweeps
+// its long front-to-back axis through X.
+const SCENE_RADIUS = 0.31;
+
+// Camera distances as multiples of the exact-fit distance for that sphere.
+//
+// These two cannot both be what the brief asked for. It wants the focused shot at 55-65% of
+// the default distance AND the silhouette fully in frame with margin. The old default sat at
+// ~1.09x exact-fit — the brain nearly filled the frame already — so 60% of it lands at 0.65x
+// exact-fit, which clips badly. Honouring 60% strictly would force the default out to ~1.7x
+// exact-fit, shrinking the default view by around a third. "Nothing clipped" is the hard
+// constraint and the ratio is "roughly", so the default is pulled back modestly instead and
+// the focused shot sits as close as it can while keeping real margin: a ratio of ~0.81.
+const DEFAULT_MARGIN = 1.30;
+
+// ── Click-to-zoom: shallow interior approach ──
+// The camera moves to a point just inside the brain's outer volume near the selected node —
+// travelling INTO that specific region, not orbiting outside it (an exterior-only orbit was
+// tried in between and explicitly wasn't what was wanted — the region-entry "reaction" is the
+// point). Implemented literally to the given formula this round: straight radial pull-back
+// (no sideways/tangential offset — earlier rounds added one to avoid staring flat at the near
+// interior wall, but the offset here is deliberately much shallower, and bloom/cone are now
+// the primary anti-blowout levers instead — see BLOOM_INSIDE_FRAC / CONE_INSIDE_FRAC below).
+//
+// direction = normalise(nodeWorldPos - brainCentre) identifies the node's region (top, front,
+// back, either lower side, or a blend) — this is per-node by construction, so each of the 5
+// regions produces a visibly distinct camera position (section 4/10; verify via the console
+// logs on click).
+const INTERIOR_INWARD = 0.03; // inward offset, as a fraction of SCENE_RADIUS (reduced from 0.08)
+// Pedestal light cone fades toward this fraction of its default opacity while zoomed — not
+// fully to 0 this round, since the shallower offset means the pedestal is less likely to
+// dominate the frame in the first place. Read by the cone's own material, further down.
+const CONE_INSIDE_FRAC = 0.30;
+// Screen-space left shift applied to the framing while a project is selected, so the brain
+// moves into the space beside the readout column instead of sitting behind it. Fades out as
+// the camera goes inside, where the node is centred instead.
+const PANEL_SHIFT_FRAC = 0.5;
+// Near plane: 0.1 outside (a wide near/far ratio there reintroduces the depth-precision
+// sparkle noted on the Canvas), tightened while inside so nearby folds and the node itself
+// are not clipped. Restored to NEAR_OUTSIDE on BACK.
+const NEAR_OUTSIDE = 0.1;
+const NEAR_INSIDE  = 0.006;
+
+// Exact-fit distance for a bounding sphere, times a margin. Uses sin (not tan): tan fits a
+// flat plane at the centre's depth and under-shoots for a sphere, which bulges toward the
+// camera. Whichever axis is tighter binds.
+function orbitDistance(aspect: number, fov: number, margin: number) {
+  const vHalf = (fov * Math.PI) / 360;
+  const hHalf = Math.atan(Math.tan(vHalf) * Math.max(aspect, 0.01));
+  return (SCENE_RADIUS / Math.min(Math.sin(vHalf), Math.sin(hHalf))) * margin;
+}
+
+// Reused scratch vectors — this runs every frame, so nothing here allocates.
+const _centreV = new THREE.Vector3();
+const _startV  = new THREE.Vector3();
+const _lookV   = new THREE.Vector3();
+const _rightV  = new THREE.Vector3();
+const _fwdV    = new THREE.Vector3();
+const _fromV   = new THREE.Vector3();
+const _toV     = new THREE.Vector3();
+const _nodeV   = new THREE.Vector3();
+const _dirV    = new THREE.Vector3();
+const _focusV  = new THREE.Vector3();
+const _UP      = new THREE.Vector3(0, 1, 0);
+
+// Selected node's WORLD position, read live off the brain group's current transform (see the
+// note above BRAIN_TRANSFORM / PROJECT_HOTSPOTS) — the brain spins continuously, so a fixed
+// snapshot would drift out of sync with the actual node within a couple of seconds. Takes an
+// index into PROJECT_HOTSPOTS directly — nothing here is hardcoded to a node count, so a 5th
+// active project works with no changes (section 7).
+function nodeWorld(index: number, out: THREE.Vector3) {
+  const g = brainGroupRef.current;
+  out.set(...PROJECT_HOTSPOTS[index]);
+  if (g) out.applyMatrix4(g.matrixWorld);
+  return out;
+}
+
 function CameraController({ selected }: { selected: Project | null }) {
-  const { camera } = useThree();
-  const targetZ = useRef(1.25);
-  const targetX = useRef(0);
-  const targetY = useRef(0);
+  const { camera, size } = useThree();
+  const aspect = size.width / Math.max(size.height, 1);
+
+  // Tweened on the shared module object so the bloom pass and beam can read `depth` — they
+  // are siblings of this controller, not children (see the note above `camAnim`). `travel`
+  // blends the target node itself, for a direct node-to-node sweep (section 3) that never
+  // drops `depth` back toward 0 — i.e. never zooms out to default and back in between projects.
+  const anim = camAnim;
+  const loggedRef = useRef(false);
+  const fromId = useRef<number | null>(null);
+  const toId   = useRef<number | null>(null);
+
+  // defaultDistance is read once, here, at mount — not recomputed on every frame or on
+  // resize — so it can never be derived from a camera position that a previous zoom has
+  // already moved, and can't drift across zoom cycles. The trade-off (stated explicitly) is
+  // that framing no longer re-adapts if the window is resized after mount.
+  const defaultDistanceRef = useRef<number | null>(null);
+  if (defaultDistanceRef.current === null) {
+    const fov0 = (camera as THREE.PerspectiveCamera).fov ?? 45;
+    defaultDistanceRef.current = orbitDistance(aspect, fov0, DEFAULT_MARGIN);
+  }
 
   useEffect(() => {
-    if (selected) {
-      const hp = PROJECT_HOTSPOTS[selected.id];
-      targetX.current = hp[0] * 0.4;
-      targetY.current = hp[1] * 0.3;
-      targetZ.current = 0.75;  // zoom in
-    } else {
-      targetX.current = 0;
-      targetY.current = 0;
-      targetZ.current = 1.25;  // zoom out
+    const nextId = selected ? selected.id : null;
+    gsap.killTweensOf(anim);
+
+    if (nextId === null) {
+      // BACK — camera eases back out to the default external view over 1.2s, restoring
+      // bloom/cone/near (all driven by `depth` — see useFrame and the bloom/cone consumers).
+      gsap.to(anim, { depth: 0, duration: 1.2, ease: "power2.inOut" });
+      return;
     }
-  }, [selected]);
+
+    // Log the fully-computed interior target for THIS node on every click (section 4/10) —
+    // independent of the render loop's blend, so it's the same maths a future frame will
+    // converge to, verifiable as visibly distinct per region.
+    nodeWorld(nextId, _toV);
+    _dirV.copy(_toV).sub(_centreV.set(0, SCENE_CENTRE_Y, 0));
+    if (_dirV.lengthSq() > 1e-8) _dirV.normalize(); else _dirV.set(0, 0, 1);
+    _focusV.copy(_toV).addScaledVector(_dirV, -SCENE_RADIUS * INTERIOR_INWARD);
+    // eslint-disable-next-line no-console
+    console.log(
+      `[Brain camera] click -> node ${nextId} targetCameraPosition =`,
+      `(${_focusV.x.toFixed(4)}, ${_focusV.y.toFixed(4)}, ${_focusV.z.toFixed(4)})`,
+      " targetLookAt (node) =", `(${_toV.x.toFixed(4)}, ${_toV.y.toFixed(4)}, ${_toV.z.toFixed(4)})`,
+    );
+
+    if (toId.current === null) {
+      // First selection — fly to the interior point near the node. Both position and lookAt
+      // tween on the same `depth` value (see useFrame), so nothing snaps.
+      fromId.current = nextId;
+      toId.current = nextId;
+      anim.travel = 1;
+      gsap.to(anim, { depth: 1, duration: 1.4, ease: "power2.inOut" });
+      return;
+    }
+
+    if (toId.current === nextId) return;
+
+    // Project-to-project — depth stays at 1 throughout; only `travel` blends the target node,
+    // so the camera travels directly from one interior region to the next rather than exiting
+    // to the default view in between.
+    fromId.current = toId.current;
+    toId.current = nextId;
+    anim.travel = 0;
+    gsap.to(anim, { travel: 1, duration: 1.4, ease: "power2.inOut" });
+    gsap.to(anim, { depth: 1, duration: 0.3, ease: "power2.out" });
+  }, [selected, anim]);
+
+  useEffect(() => () => { gsap.killTweensOf(anim); }, [anim]);
 
   useFrame(() => {
-    camera.position.x = THREE.MathUtils.lerp(camera.position.x, targetX.current, 0.06);
-    camera.position.y = THREE.MathUtils.lerp(camera.position.y, targetY.current, 0.06);
-    camera.position.z = THREE.MathUtils.lerp(camera.position.z, targetZ.current, 0.06);
-    camera.lookAt(0, 0.08, 0);
+    const fov = (camera as THREE.PerspectiveCamera).fov ?? 45;
+    // Everything orbits this one pivot — the centre of the brain+pedestal group, which is
+    // also what SCENE_RADIUS is measured about (the brain's bounding-box centre, not any
+    // individual node). Using the brain mesh's own centre instead would put the pedestal
+    // further from the pivot than the radius accounts for, and it would clip once the
+    // camera swung below the equator.
+    _centreV.set(0, SCENE_CENTRE_Y, 0);
+
+    const { depth, travel } = anim;
+    const defaultDistance = defaultDistanceRef.current!;
+
+    if (!loggedRef.current) {
+      loggedRef.current = true;
+      // eslint-disable-next-line no-console
+      console.log(
+        "[Brain camera] defaultDistance =", defaultDistance.toFixed(4),
+        " interior inward offset =", (SCENE_RADIUS * INTERIOR_INWARD).toFixed(4),
+        " SCENE_RADIUS (bounding-sphere) =", SCENE_RADIUS,
+      );
+    }
+
+    // ── Default external shot: straight on from +Z, looking at the pivot ──
+    _startV.copy(_centreV);
+    _startV.z += defaultDistance;
+    _lookV.copy(_centreV);
+
+    if (depth > 0.0001 && toId.current !== null) {
+      // ── Interior target, recomputed from the CURRENT world transform so it stays locked to
+      //    the region while the brain keeps spinning — blended from `fromId` to `toId` by
+      //    `travel` for a project-to-project sweep. ──
+      nodeWorld(toId.current, _toV);
+      if (fromId.current !== null && travel < 1) {
+        nodeWorld(fromId.current, _fromV);
+        _nodeV.copy(_fromV).lerp(_toV, travel);
+      } else {
+        _nodeV.copy(_toV);
+      }
+
+      // direction identifies the node's region — per-node by construction, so each of the 5
+      // regions produces a visibly distinct camera position (section 4/10).
+      _dirV.copy(_nodeV).sub(_centreV);
+      if (_dirV.lengthSq() < 1e-8) _dirV.set(0, 0, 1);
+      _dirV.normalize();
+
+      // targetCameraPosition = nodeWorldPosition - direction * inwardOffset, as specified —
+      // a shallow straight pull-back (8% of SCENE_RADIUS, down from ~18%).
+      _focusV.copy(_nodeV).addScaledVector(_dirV, -SCENE_RADIUS * INTERIOR_INWARD);
+
+      // Straight lerp from the external shot to the interior focus point — GSAP already
+      // supplies the easing via `depth`.
+      _startV.lerp(_focusV, depth);
+      _lookV.lerp(_nodeV, depth);
+    }
+
+    // While a project is selected, slide the framing left so the brain moves into the space
+    // beside the readout column. Fades out as the camera goes inside, where the node is
+    // centred instead.
+    if (toId.current !== null && selected) {
+      const worldPerPx = (2 * defaultDistance * Math.tan((fov * Math.PI) / 360)) / Math.max(size.height, 1);
+      const shiftPx = size.width * (READOUT_VW / 100) * PANEL_SHIFT_FRAC;
+      const shift = shiftPx * worldPerPx * (1 - depth);
+      _fwdV.copy(_lookV).sub(_startV).normalize();
+      _rightV.crossVectors(_fwdV, _UP).normalize();
+      _startV.addScaledVector(_rightV, shift);
+      _lookV.addScaledVector(_rightV, shift);
+    }
+
+    camera.position.copy(_startV);
+    camera.lookAt(_lookV);
+
+    // Inside the shell the node sits close and folds can be closer still, so the default 0.1
+    // near plane would slice through them. Tightened only while zoomed; restored on BACK.
+    const near = THREE.MathUtils.lerp(NEAR_OUTSIDE, NEAR_INSIDE, depth);
+    if (Math.abs(near - camera.near) > 1e-5) {
+      camera.near = near;
+      (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
   });
 
   return null;
@@ -1543,7 +1773,11 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
+function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
+  selected: Project | null;
+  onHotspotSelect: (p: Project) => void;
+  onHotspotHover: (name: string | null, x: number, y: number) => void;
+}) {
   // Welded copy of the particle brain scan: the original export had zero shared vertices
   // (285,966 verts for 95,322 tris, fully non-indexed), so computeVertexNormals() could
   // only ever produce flat per-triangle normals — there was no vertex-sharing to average
@@ -1711,7 +1945,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
       {/* Spinning brain group */}
       <group ref={groupRef}>
         {/* Fully solid matte surface, real anatomical folds, no facets/wireframe */}
-        <group {...BRAIN_TRANSFORM}>
+        <group {...BRAIN_TRANSFORM} ref={(g) => { brainGroupRef.current = g; }}>
           {brainMeshes.map((mesh, i) => (
             <mesh key={`solid-${i}`} geometry={mesh.geometry} material={brainMat} renderOrder={0} />
           ))}
@@ -1737,7 +1971,9 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
               position={pos}
               index={i}
               active={selected?.id === PROJECTS[i].id}
+              interactive={PROJECTS[i].active}
               onSelect={() => onHotspotSelect(PROJECTS[i])}
+              onHover={onHotspotHover}
             />
           ))}
         </group>
@@ -2030,25 +2266,56 @@ function HolographicBeam() {
   const mat2Ref     = useRef<THREE.MeshBasicMaterial>(null);
   const mat3Ref     = useRef<THREE.MeshBasicMaterial>(null);
   const discMatRef  = useRef<THREE.MeshBasicMaterial>(null);
+  const particleMatRef = useRef<THREE.PointsMaterial>(null);
   const particlesRef = useRef<THREE.Points>(null);
 
   // Hash helper
   const hash = (n: number) => ((Math.sin(n * 12.9898 + 0.5) * 43758.5453) % 1 + 1) % 1;
 
+  const loggedBefore = useRef(false);
+  const loggedDuring = useRef(false);
+
   // Animation: flickering + slow rotation
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
-    // Slow rotation
+    // Slow rotation — kept running even while hidden below, so it doesn't jump on return.
     if (groupRef.current) groupRef.current.rotation.y = t * 0.20;
 
     // Gentle pulse
     const pulse = 1.0 + 0.12 * Math.sin(t * 2.1);
-    if (mat0Ref.current)    mat0Ref.current.opacity    = 0.08 * pulse;
-    
-    
-    
-    if (discMatRef.current) discMatRef.current.opacity = 0.220 * pulse;
+    // Fade the cone toward CONE_INSIDE_FRAC (not fully to 0) as the camera travels inside the
+    // brain — full strength restored on the way back out; the default-state look is untouched
+    // (fade is exactly 1 at depth 0).
+    const fade = 1 - (1 - CONE_INSIDE_FRAC) * camAnim.depth;
+    if (mat0Ref.current)    mat0Ref.current.opacity    = 0.08 * pulse * fade;
+    if (discMatRef.current) discMatRef.current.opacity = 0.220 * pulse * fade;
+    if (particleMatRef.current) particleMatRef.current.opacity = 0.7 * fade;
+
+    // Hard safeguard (section 4): while ANY project is selected, the whole beam is hidden
+    // outright rather than relying on opacity alone — this holds regardless of camera angle,
+    // so the cone can never appear in frame during zoom no matter where the interior camera
+    // ends up. Restored the instant depth returns fully to 0 on BACK.
+    if (groupRef.current) groupRef.current.visible = camAnim.depth <= 0.001;
+
+    // Verification logging (section 3/6).
+    if (!loggedBefore.current && camAnim.depth < 0.01) {
+      loggedBefore.current = true;
+      // eslint-disable-next-line no-console
+      console.log(
+        "[LightCone] opacity BEFORE zoom (depth=0): disc =", discMatRef.current?.opacity.toFixed(4),
+        " visible =", groupRef.current?.visible,
+      );
+    }
+    if (!loggedDuring.current && camAnim.depth > 0.99) {
+      loggedDuring.current = true;
+      // eslint-disable-next-line no-console
+      console.log(
+        "[LightCone] opacity DURING zoom (depth=1): disc =", discMatRef.current?.opacity.toFixed(4),
+        " visible =", groupRef.current?.visible,
+        " (visible must be false per the hard safeguard, regardless of the opacity fade)",
+      );
+    }
 
     // Animate rising particles: move each particle upward, reset when it exits top
     if (particlesRef.current) {
@@ -2176,6 +2443,7 @@ function HolographicBeam() {
       {/* Rising particles — outside rotating group so they move independently */}
       <points ref={particlesRef} geometry={particleGeo} renderOrder={4}>
         <pointsMaterial
+          ref={particleMatRef}
           color="#ffffff"
           size={0.008}
           map={circTex}
@@ -2635,7 +2903,61 @@ function HolographicPedestal() {
 }
 
 // ─── Scene ────────────────────────────────────────────────────────────────────
-function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
+// Default bloom strength, and the share of it kept while fully inside the brain (40%, per the
+// explicit "genuinely drops to 40% of default" requirement). Restored to full on the way out.
+const BLOOM_INTENSITY = 0.3;
+const BLOOM_INSIDE_FRAC = 0.4;
+
+// The actual bug this round: @react-three/postprocessing's <Bloom> ref resolves to the real
+// `BloomEffect` instance from the `postprocessing` library (confirmed by reading its wrapEffect
+// source and the BloomEffect class directly, in node_modules) — but that class does NOT expose
+// `intensity` as a settable instance property. It's stored as a shader uniform, created once in
+// the constructor: `uniforms: new Map([["intensity", new Uniform(intensity)]])`, with no
+// intensity getter/setter anywhere on the class. `b.intensity = x` was therefore silently
+// creating a dead, never-read own-property on the effect instance every frame — a genuine no-op
+// that explains why zooming visibly changed nothing. The shader reads `uniforms.get("intensity")
+// .value`, so that's what has to be written instead.
+type BloomEffectRef = { uniforms: Map<string, { value: number }> };
+
+// Has to be a child of the Canvas to use useFrame, and is rendered as a sibling of the
+// EffectComposer.
+function BloomZoomFade({ bloomRef }: { bloomRef: React.RefObject<BloomEffectRef | null> }) {
+  const loggedBefore = useRef(false);
+  const loggedDuring = useRef(false);
+  useFrame(() => {
+    const b = bloomRef.current;
+    if (!b) return;
+    const uniform = b.uniforms.get("intensity");
+    if (!uniform) return;
+    const target = BLOOM_INTENSITY * (1 - (1 - BLOOM_INSIDE_FRAC) * camAnim.depth);
+    uniform.value = target;
+
+    // Verification logging (section 2/6): "before" is the resting default-state value, logged
+    // once; "during" is logged once depth first reaches fully zoomed, so the two numbers in the
+    // console are directly comparable proof the uniform is actually changing.
+    if (!loggedBefore.current && camAnim.depth < 0.01) {
+      loggedBefore.current = true;
+      // eslint-disable-next-line no-console
+      console.log("[Bloom] intensity BEFORE zoom (depth=0) =", uniform.value.toFixed(4));
+    }
+    if (!loggedDuring.current && camAnim.depth > 0.99) {
+      loggedDuring.current = true;
+      // eslint-disable-next-line no-console
+      console.log(
+        "[Bloom] intensity DURING zoom (depth=1) =", uniform.value.toFixed(4),
+        ` (expected ${(BLOOM_INTENSITY * BLOOM_INSIDE_FRAC).toFixed(4)} = BLOOM_INTENSITY * ${BLOOM_INSIDE_FRAC})`,
+      );
+    }
+  });
+  return null;
+}
+
+function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
+  selected: Project | null;
+  onHotspotSelect: (p: Project) => void;
+  onHotspotHover: (name: string | null, x: number, y: number) => void;
+}) {
+  const bloomRef = useRef<BloomEffectRef | null>(null);
   return (
     <>
       {/* These were tuned back when every material in the scene was unlit (MeshBasicMaterial
@@ -2659,7 +2981,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
 
       <CameraController selected={selected} />
       <Suspense fallback={null}>
-        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
+        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
       </Suspense>
       <HolographicPedestal />
       <HolographicBeam />
@@ -2680,6 +3002,7 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           a transparent canvas (invisible against this site's normal dark background, but
           obvious the moment anything lighter sits behind it — e.g. light mode). The default
           (non-mipmap) blur handles alpha correctly and doesn't have this artifact. */}
+      <BloomZoomFade bloomRef={bloomRef} />
       <EffectComposer>
         {/* Tuned after confirming (by disabling bloom entirely) that the dark oval around the
             pedestal was this pass veiling the DOM starfield: bloom raises canvas alpha with
@@ -2698,10 +3021,17 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
             on a transparent canvas". If the veil returns, this flag is the first thing to turn
             back off. */}
         <Bloom
+          // Callback ref, deliberately not a ref object. React 19 passes `ref` through as an
+          // ordinary prop, and EffectComposer memoises on a JSON.stringify of its children's
+          // props — a ref object whose .current is the mounted effect carries the Three
+          // parent/children cycle straight into that stringify and throws "Converting
+          // circular structure to JSON". JSON.stringify omits function-valued props, so a
+          // callback ref is invisible to it.
+          ref={(e: unknown) => { bloomRef.current = (e as BloomEffectRef | null); }}
           mipmapBlur
           luminanceThreshold={0.9}
           luminanceSmoothing={0.3}
-          intensity={0.3}
+          intensity={BLOOM_INTENSITY}
           radius={0.4}
           blendFunction={BlendFunction.SCREEN}
         />
@@ -2710,346 +3040,583 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
   );
 }
 
-// ─── HUD Corner Brackets ──────────────────────────────────────────────────────
-function HudCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
-  const isLeft  = pos === "tl" || pos === "bl";
-  const isTop   = pos === "tl" || pos === "tr";
-  const size    = 28;
-  const thick   = 2;
-  const style: React.CSSProperties = {
-    position: "absolute",
-    width:  size,
-    height: size,
-    ...(isLeft  ? { left:  16 } : { right:  16 }),
-    ...(isTop   ? { top:   16 } : { bottom: 16 }),
-  };
-  const h: React.CSSProperties = {
-    position: "absolute",
-    background: TEAL,
-    height: thick,
-    width:  size,
-    ...(isTop ? { top: 0 } : { bottom: 0 }),
-    opacity: 0.85,
-  };
-  const v: React.CSSProperties = {
-    position: "absolute",
-    background: TEAL,
-    width:  thick,
-    height: size,
-    ...(isLeft ? { left: 0 } : { right: 0 }),
-    ...(isTop  ? { top: 0 }  : { bottom: 0 }),
-    opacity: 0.85,
-  };
-  return <div style={style}><div style={h} /><div style={v} /></div>;
+// ─── Terminal archive UI tokens ───────────────────────────────────────────────
+const INK         = "#ffffff";
+const INK_BRIGHT  = "#c8cfd6";
+const INK_MID     = "#8b929b";
+const INK_DIM     = "#5a6472";
+const INK_LOCKED  = "#3f4754";
+const ROW_IDLE    = "#6b7280";
+const VOID        = "#020008";
+const MONO        = "'JetBrains Mono', monospace";
+
+const PANEL_BORDER = "rgba(255,255,255,0.18)";
+const PANEL_BG     = "rgba(255,255,255,0.012)";
+const BRACKET_COL  = "rgba(255,255,255,0.45)";
+const RULE_STRONG  = "rgba(255,255,255,0.14)";
+const RULE_SOFT    = "rgba(255,255,255,0.1)";
+
+const PANEL_GAP = 12;
+const LEFT_W    = 260;
+// Readout width as a share of the viewport. The canvas's right edge tracks this exactly, so
+// the brain always has the remaining space to itself and is never covered by the panel.
+const READOUT_VW = 42;
+const SHEET_VH   = 72;   // mobile bottom sheet
+// The site navbar is 83px tall, full width, z-index 100 — above this section.
+const NAV_CLEARANCE = 96;
+// Horizontal page gutter. Matches the hero section's `padding: "80px 8vw 0"` exactly, so the
+// left panel's left edge and the readout's right edge line up with the hero's content edges
+// at every width (8vw is inherently responsive; the hero has no separate padding breakpoint,
+// only a grid-column change at 768px, which does not affect its gutter).
+const EDGE_PAD      = "8vw";
+// Readout column height, vertically centred, so there is clear space above and below it.
+const READOUT_VH    = 78;
+const NARROW_QUERY  = "(max-width: 1023px)";
+const SLIDE_MS      = 320;
+
+function useNarrowLayout() {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia(NARROW_QUERY);
+    const onChange = () => setNarrow(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return narrow;
 }
 
-// ─── Left Panel: Completed + Upcoming Projects ────────────────────────────────
-function LeftProjectsPanel({ selected, onSelect }: { selected: Project | null; onSelect: (p: Project | null) => void }) {
+// ─── Corner bracket accent ────────────────────────────────────────────────────
+function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL }: {
+  pos: "tl" | "tr" | "bl" | "br"; arm: number; inset?: number; color?: string;
+}) {
+  const isLeft = pos === "tl" || pos === "bl";
+  const isTop  = pos === "tl" || pos === "tr";
+  const box: React.CSSProperties = {
+    position: "absolute", width: arm, height: arm, pointerEvents: "none", zIndex: 2,
+    ...(isLeft ? { left: inset } : { right: inset }),
+    ...(isTop  ? { top: inset }  : { bottom: inset }),
+  };
+  const h: React.CSSProperties = {
+    position: "absolute", background: color, height: 1, width: arm,
+    ...(isTop ? { top: 0 } : { bottom: 0 }),
+  };
+  const v: React.CSSProperties = {
+    position: "absolute", background: color, width: 1, height: arm,
+    ...(isLeft ? { left: 0 } : { right: 0 }),
+    ...(isTop  ? { top: 0 }  : { bottom: 0 }),
+  };
+  return <div style={box}><div style={h} /><div style={v} /></div>;
+}
+
+function Panel({ arm, style, children }: {
+  arm: number; style?: React.CSSProperties; children: React.ReactNode;
+}) {
   return (
     <div style={{
-      position: "absolute", left: "8vw", top: "50%", transform: "translateY(-50%)",
-      width: "min(220px, 26vw)", zIndex: 10, display: "flex", flexDirection: "column", gap: 14,
+      position: "relative", boxSizing: "border-box",
+      border: `1px solid ${PANEL_BORDER}`, borderRadius: 4, background: PANEL_BG,
+      ...style,
     }}>
-      {/* Completed projects */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <div style={{ width: 6, height: 6, background: TEAL, borderRadius: "50%", boxShadow: `0 0 6px ${TEAL}` }} />
-          <span style={{ fontSize: 9, color: TEAL, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em" }}>
-            COMPLETED PROJECTS
-          </span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {PROJECTS.map((proj) => {
-            const active = selected?.id === proj.id;
-            return (
-              <button
-                key={proj.id}
-                onClick={() => onSelect(active ? null : proj)}
-                style={{
-                  background: active ? `rgba(255,255,255,0.08)` : "rgba(0,0,0,0.6)",
-                  border: `1px solid ${active ? TEAL + "80" : TEAL + "20"}`,
-                  borderRadius: 4, padding: "8px 10px", cursor: "pointer",
-                  textAlign: "left", backdropFilter: "blur(4px)",
-                  transition: "all 0.2s ease",
-                  boxShadow: active ? `0 0 12px ${TEAL}30` : "none",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                  <div style={{
-                    width: 5, height: 5, borderRadius: "50%",
-                    background: active ? TEAL : TEAL_DIM,
-                    boxShadow: active ? `0 0 8px ${TEAL}` : "none",
-                    flexShrink: 0,
-                  }} />
-                  <span style={{ fontSize: 10, fontWeight: 600, color: active ? TEAL : "#aaaaaa", fontFamily: "'Space Grotesk', sans-serif" }}>
-                    {proj.title}
-                  </span>
-                </div>
-                <div style={{ fontSize: 8, color: `${TEAL_DIM}88`, fontFamily: "JetBrains Mono, monospace", paddingLeft: 11 }}>
-                  {proj.subtitle}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Upcoming projects — dimmed, classified */}
-      <div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-          <div style={{ width: 6, height: 6, background: TEAL_DIM, borderRadius: "50%", opacity: 0.5 }} />
-          <span style={{ fontSize: 9, color: TEAL_DIM, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em", opacity: 0.6 }}>
-            UPCOMING PROJECTS
-          </span>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {UPCOMING_PROJECTS.map((p) => (
-            <div key={p.code} style={{
-              background: "rgba(0,0,0,0.4)",
-              border: "1px dashed rgba(255,255,255,0.12)",
-              borderRadius: 4, padding: "8px 10px",
-              opacity: 0.35, cursor: "not-allowed",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 9 }}>🔒</span>
-                <span style={{ fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: "#aaaaaa", letterSpacing: "0.08em" }}>
-                  {p.code} · CLASSIFIED
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      <CornerBracket pos="tl" arm={arm} />
+      <CornerBracket pos="tr" arm={arm} />
+      <CornerBracket pos="bl" arm={arm} />
+      <CornerBracket pos="br" arm={arm} />
+      {children}
     </div>
   );
 }
 
-// ─── Bottom HUD Data Bar (like photo 1) ───────────────────────────────────────
-function HudBottomBar({ selected }: { selected: Project | null }) {
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 800);
-    return () => clearInterval(id);
-  }, []);
+function RuledLabel({ text, style }: { text: string; style?: React.CSSProperties }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, ...style }}>
+      <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, whiteSpace: "nowrap" }}>
+        {text}
+      </span>
+      <span style={{ flex: 1, height: 1, background: RULE_STRONG }} />
+    </div>
+  );
+}
 
-  const data = selected
-    ? selected.stats.map(([v, k]) => `${k}: ${v}`)
-    : ["MODEL: PARTICLE_BRAIN_v1", "NODES: 4/4", "ROTATION: ACTIVE", "STATUS: ONLINE", `TICK: ${String(tick).padStart(4, "0")}`];
+function FieldLabel({ text }: { text: string }) {
+  return (
+    <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, display: "block" }}>
+      {text}
+    </span>
+  );
+}
 
+// ─── Node index rows ──────────────────────────────────────────────────────────
+function NodeRow({ name, active, onSelect }: { name: string; active: boolean; onSelect?: () => void }) {
+  const [hover, setHover] = useState(false);
+  const inert = !onSelect;
+  const lit = hover && !inert;
+  return (
+    <div
+      onClick={onSelect}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ height: 30, display: "flex", alignItems: "center", gap: 14, cursor: inert ? "default" : "pointer" }}
+    >
+      <span style={{
+        width: 11, height: 11, flexShrink: 0, boxSizing: "border-box",
+        background: active ? INK : "transparent",
+        border: active ? "none" : `1px solid ${lit ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)"}`,
+        transition: "border-color 0.15s ease",
+      }} />
+      <span style={{
+        fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em",
+        color: active ? INK : lit ? INK_BRIGHT : ROW_IDLE,
+        transition: "color 0.15s ease",
+      }}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
+function LockedRow({ name }: { name: string }) {
+  return (
+    <div style={{ height: 30, display: "flex", alignItems: "center", gap: 14, cursor: "default" }}>
+      {/* Padlock drawn into the same 11px slot the checkboxes occupy, so both lists keep the
+          same left rhythm: a shackle arc sitting on a solid body block. */}
+      <span style={{ width: 11, height: 11, flexShrink: 0, position: "relative", display: "block" }}>
+        <span style={{
+          position: "absolute", left: 2.5, top: 0, width: 6, height: 5, boxSizing: "border-box",
+          border: `1px solid ${INK_LOCKED}`, borderBottom: "none",
+          borderTopLeftRadius: 3, borderTopRightRadius: 3,
+        }} />
+        <span style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
+      </span>
+      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK_LOCKED }}>{name}</span>
+    </div>
+  );
+}
+
+// ─── Left panel — node index ──────────────────────────────────────────────────
+function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
+  selectedId: number | null; onSelect: (id: number) => void; arm: number; style?: React.CSSProperties;
+}) {
+  return (
+    <Panel arm={arm} style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
+          SYS_03 // NEURAL_ARCHIVE
+        </span>
+        <span style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
+      </div>
+      <div style={{ height: 1, background: RULE_STRONG, marginTop: 14 }} />
+
+      <RuledLabel text={`ACTIVE NODES [${ACTIVE_PROJECTS.length}/${PROJECTS.length}]`} style={{ marginTop: 20 }} />
+      <div style={{ marginTop: 4 }}>
+        {PROJECTS.map((p) => (
+          <NodeRow
+            key={p.id}
+            name={p.name}
+            active={p.id === selectedId}
+            onSelect={p.active ? () => onSelect(p.id) : undefined}
+          />
+        ))}
+      </div>
+
+      <RuledLabel text={`CLASSIFIED NODES [${CLASSIFIED_NODES.length}]`} style={{ marginTop: 22 }} />
+      <div style={{ marginTop: 4 }}>
+        {CLASSIFIED_NODES.map((n) => <LockedRow key={n} name={n} />)}
+      </div>
+    </Panel>
+  );
+}
+
+// ─── Mobile node chips (horizontal scroller above the brain) ──────────────────
+function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSelect: (id: number) => void }) {
   return (
     <div style={{
-      position: "absolute", bottom: 0, left: 0, right: 0, height: 36, zIndex: 10,
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      padding: "0 20px",
-      background: "linear-gradient(to top, rgba(0,0,0,0.95), transparent)",
-      borderTop: `1px solid ${TEAL}18`,
-      pointerEvents: "none",
+      display: "flex", gap: 8, overflowX: "auto", padding: "0 16px 2px",
+      WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
     }}>
-      {data.map((item, i) => (
-        <span key={i} style={{
-          fontSize: 8, fontFamily: "JetBrains Mono, monospace",
-          color: i === 0 ? `${TEAL}cc` : `${TEAL_DIM}55`,
-          letterSpacing: "0.12em",
+      {PROJECTS.filter((p) => p.active).map((p) => {
+        const on = p.id === selectedId;
+        return (
+          <button
+            key={p.id}
+            onClick={() => onSelect(p.id)}
+            style={{
+              flexShrink: 0, cursor: "pointer",
+              background: on ? INK : "transparent",
+              color: on ? VOID : ROW_IDLE,
+              border: `1px solid ${on ? INK : "rgba(255,255,255,0.22)"}`,
+              borderRadius: 3, padding: "8px 14px",
+              fontFamily: MONO, fontSize: 10, letterSpacing: "0.12em", whiteSpace: "nowrap",
+            }}
+          >
+            {p.name}
+          </button>
+        );
+      })}
+      {CLASSIFIED_NODES.map((n) => (
+        <span key={n} style={{
+          flexShrink: 0, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3,
+          padding: "8px 14px", fontFamily: MONO, fontSize: 10, letterSpacing: "0.12em",
+          color: INK_LOCKED, whiteSpace: "nowrap",
         }}>
-          {item}
+          {n}
         </span>
       ))}
     </div>
   );
 }
 
-// ─── Project Detail Panel (right side) ────────────────────────────────────────
-function RightDetailPanel({ project, onClose, onPrev, onNext }: {
-  project: Project; onClose: () => void; onPrev: () => void; onNext: () => void;
+// ─── Readout pieces ───────────────────────────────────────────────────────────
+const PROGRESS_SEGMENTS = 34;
+
+function SegmentedProgress({ pct }: { pct: number }) {
+  const filled = Math.round((pct / 100) * PROGRESS_SEGMENTS);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{
+        flex: 1, minWidth: 0, height: 18, boxSizing: "border-box",
+        border: "1px solid rgba(255,255,255,0.25)", borderRadius: 2,
+        display: "flex", alignItems: "center", gap: 2, padding: "0 3px",
+      }}>
+        {/* Segments flex to fill the track — at a fixed 3px they only reach part-way across
+            the panel, so a "full" bar would never actually look full. */}
+        {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => (
+          <span key={i} style={{
+            flex: "1 1 0", minWidth: 0, height: 10,
+            background: i < filled ? INK : "rgba(255,255,255,0.1)",
+          }} />
+        ))}
+      </div>
+      <span style={{ fontFamily: MONO, fontSize: 10, color: INK_MID, whiteSpace: "nowrap" }}>{pct}%</span>
+    </div>
+  );
+}
+
+// Shrinks the title so a long name never wraps. 0.62em is JetBrains Mono's advance width
+// plus the 0.02em tracking.
+function titleSize(name: string, max: number, avail: number) {
+  return Math.max(14, Math.min(max, Math.floor(avail / (name.length * 0.62))));
+}
+
+function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number; maxHeight: number }) {
+  return (
+    // Height-driven rather than width-driven, so capping the height shrinks the block while
+    // aspect-ratio keeps it at 16:9 (a width-driven box would just get squashed instead).
+    <div style={{
+      position: "relative", height: maxHeight, width: "auto", maxWidth: "100%",
+      marginInline: "auto", aspectRatio: "16 / 9",
+      border: `1px solid ${PANEL_BORDER}`, borderRadius: 3, overflow: "hidden",
+      background: "rgba(255,255,255,0.04)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {src
+        ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        : <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
+      <CornerBracket pos="tl" arm={arm} inset={4} />
+      <CornerBracket pos="tr" arm={arm} inset={4} />
+      <CornerBracket pos="bl" arm={arm} inset={4} />
+      <CornerBracket pos="br" arm={arm} inset={4} />
+    </div>
+  );
+}
+
+// Shared bracket-button treatment. `compact` is the smaller BACK variant.
+function BracketButton({ href, label, onClick, compact }: {
+  href?: string; label: string; onClick?: () => void; compact?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [hover, setHover] = useState(false);
+  const style: React.CSSProperties = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    boxSizing: "border-box", cursor: "pointer",
+    height: compact ? 34 : 52,
+    width: compact ? "fit-content" : "100%",
+    padding: compact ? "0 16px" : undefined,
+    border: "1px solid rgba(255,255,255,0.3)", borderRadius: 3,
+    background: hover ? INK : "transparent",
+    color: hover ? VOID : INK,
+    fontFamily: MONO, fontSize: compact ? 10 : 12, letterSpacing: "0.14em",
+    textDecoration: "none", transition: "background 0.15s ease, color 0.15s ease",
+  };
+  const handlers = {
+    onMouseEnter: () => setHover(true),
+    onMouseLeave: () => setHover(false),
+  };
+  return href
+    ? <a href={href} target="_blank" rel="noreferrer" style={style} {...handlers}>{label}</a>
+    : <button onClick={onClick} style={style} {...handlers}>{label}</button>;
+}
+
+function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: "transparent", border: "none", padding: 0, cursor: "pointer",
+        fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em",
+        color: hover ? INK : INK_MID, transition: "color 0.15s ease",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+// ─── Right panel — project readout ────────────────────────────────────────────
+function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, narrow }: {
+  project: Project; position: number; total: number;
+  onPrev: () => void; onNext: () => void; onBack: () => void;
+  arm: number; narrow: boolean;
+}) {
+  const pct = Math.round(((position + 1) / total) * 100);
+  const pad = narrow ? 24 : 48;
+  // Width the title has to fit inside: the panel minus its border and padding. The desktop
+  // panel is READOUT_VW of the viewport, so this is resolved from the live viewport width.
+  const [avail, setAvail] = useState(360);
+  useEffect(() => {
+    const measure = () => {
+      const w = narrow ? window.innerWidth : (window.innerWidth * READOUT_VW) / 100;
+      setAvail(Math.max(160, w - pad * 2 - 2));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [narrow, pad]);
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 24 }}
-      transition={{ duration: 0.3 }}
+      initial={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      animate={narrow ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+      exit={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      transition={{ duration: SLIDE_MS / 1000, ease: "easeOut" }}
       style={{
-        position: "absolute", right: 18, top: 90, bottom: 46,
-        width: "min(340px, 32vw)", zIndex: 20,
-        background: "rgba(0,0,0,0.88)",
-        border: `1px solid ${TEAL}40`,
-        borderRadius: 8, padding: "18px 20px",
-        backdropFilter: "blur(12px)",
-        boxShadow: `0 0 30px ${TEAL}20`,
-        overflowY: "auto",
+        position: "absolute", zIndex: 20,
+        ...(narrow
+          ? { left: 0, right: 0, bottom: 0, height: `${SHEET_VH}vh` }
+          : { top: "50%", right: EDGE_PAD, y: "-50%", height: `${READOUT_VH}vh`, width: `${READOUT_VW}vw` }),
       }}
     >
-      {/* Back button */}
-      <button onClick={onClose} style={{
-        background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
-        color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "4px 10px",
-        fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
-        marginBottom: 14,
-      }}>← BACK</button>
+      <Panel
+        arm={arm}
+        style={{
+          height: "100%", width: "100%",
+          padding: pad,
+          display: "flex", flexDirection: "column", overflow: "hidden",
+          background: "rgba(2,0,8,0.72)", backdropFilter: "blur(6px)",
+        }}
+      >
+        <div style={{ marginBottom: 24, flexShrink: 0 }}>
+          <BracketButton label="[ BACK ]" onClick={onBack} compact />
+        </div>
 
-      {/* Label */}
-      <div style={{ fontSize: 8, fontFamily: "JetBrains Mono, monospace", color: `${TEAL}80`, letterSpacing: "0.2em", marginBottom: 4 }}>
-        PROJECT · 2026
-      </div>
+        {/* Content cross-fades on its own (140ms out, 140ms in) while the camera keeps
+            travelling, so the text swaps mid-sweep rather than at the start of it. */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={project.id}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.14 }}
+            className="readout-body"
+            style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
+          >
+            <SegmentedProgress pct={pct} />
 
-      {/* Title */}
-      <div style={{ fontSize: 20, fontWeight: 700, color: TEAL, fontFamily: "'Space Grotesk', sans-serif", marginBottom: 2 }}>
-        {project.title}
-      </div>
-      <div style={{ fontSize: 10, color: `${TEAL_DIM}99`, fontFamily: "JetBrains Mono, monospace", marginBottom: 14 }}>
-        {project.subtitle}
-      </div>
+            <h3 style={{
+              margin: "20px 0 0", fontFamily: MONO, fontWeight: 700,
+              fontSize: titleSize(project.name, narrow ? 26 : 44, avail),
+              color: INK, letterSpacing: "0.02em", lineHeight: 1.1, whiteSpace: "nowrap",
+            }}>
+              {project.name}
+            </h3>
 
-      {/* Description + Read More */}
-      <p style={{ fontSize: 11, color: `${TEAL_DIM}aa`, fontFamily: "'Space Grotesk', sans-serif", lineHeight: 1.6, marginBottom: 4 }}>
-        {expanded ? project.fullDesc : project.desc}
-      </p>
-      <button onClick={() => setExpanded((e) => !e)} style={{
-        background: "transparent", border: "none", padding: 0, marginBottom: 14,
-        fontSize: 9, fontFamily: "JetBrains Mono, monospace", color: TEAL,
-        cursor: "pointer", letterSpacing: "0.1em",
-      }}>
-        {expanded ? "READ LESS ▲" : "READ MORE ▼"}
-      </button>
+            <div style={{ marginTop: 22 }}>
+              <FieldLabel text="PREVIEW //" />
+              <div style={{ marginTop: 10 }}>
+                <PreviewFrame src={project.preview} arm={narrow ? 8 : 12} maxHeight={narrow ? 170 : 150} />
+              </div>
+            </div>
 
-      {/* Tech stack */}
-      <div style={{ fontSize: 8, color: `${TEAL_DIM}70`, fontFamily: "JetBrains Mono, monospace", letterSpacing: "0.15em", marginBottom: 6 }}>
-        TECH STACK
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 16 }}>
-        {project.tech.map((t) => (
-          <span key={t} style={{
-            fontSize: 8, padding: "3px 7px", borderRadius: 3,
-            background: `rgba(255,255,255,0.06)`, border: `1px solid rgba(255,255,255,0.15)`,
-            color: `rgba(200,200,200,0.8)`, fontFamily: "JetBrains Mono, monospace",
-          }}>{t}</span>
-        ))}
-      </div>
+            <div style={{ marginTop: 22 }}>
+              <FieldLabel text="DESCRIPTION:" />
+              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: INK_MID, lineHeight: 1.75 }}>
+                {project.desc}
+              </p>
+            </div>
 
-      {/* Live demo + GitHub buttons */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-        <a href={project.demo} target="_blank" rel="noreferrer" style={{
-          flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: "#000000", textDecoration: "none",
-          borderRadius: 4, padding: "8px 10px",
-          background: TEAL,
-          transition: "all 0.2s ease",
-        }}>
-          LIVE DEMO
-        </a>
-        <a href={project.github} target="_blank" rel="noreferrer" style={{
-          flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace",
-          color: TEAL, textDecoration: "none",
-          border: `1px solid rgba(255,255,255,0.25)`, borderRadius: 4, padding: "8px 10px",
-          background: `rgba(255,255,255,0.05)`,
-          transition: "all 0.2s ease",
-        }}>
-          GITHUB
-        </a>
-      </div>
+            <div style={{ marginTop: 22 }}>
+              <FieldLabel text="TECH_STACK:" />
+              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: INK_MID, lineHeight: 1.75 }}>
+                {project.tech.join(", ")}
+              </p>
+            </div>
 
-      {/* Prev / Next navigation */}
-      <div style={{ display: "flex", justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.12)", paddingTop: 12 }}>
-        <button onClick={onPrev} style={{
-          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
-          color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "6px 12px",
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
-        }}>← PREV</button>
-        <button onClick={onNext} style={{
-          background: "transparent", border: `1px solid rgba(255,255,255,0.2)`,
-          color: `rgba(200,200,200,0.8)`, borderRadius: 4, padding: "6px 12px",
-          fontSize: 9, fontFamily: "JetBrains Mono, monospace", cursor: "pointer",
-        }}>NEXT →</button>
-      </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 22 }}>
+              <BracketButton href={project.demo} label="[ LAUNCH DEMO ]" />
+              <BracketButton href={project.github} label="[ VIEW SOURCE ]" />
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        <div style={{ paddingTop: 20, flexShrink: 0 }}>
+          <div style={{ height: 1, background: RULE_SOFT }} />
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <NavLink label="‹ PREV" onClick={onPrev} />
+            <NavLink label="NEXT ›" onClick={onNext} />
+          </div>
+        </div>
+      </Panel>
+    </motion.div>
+  );
+}
+
+// ─── Cursor-following node tooltip ────────────────────────────────────────────
+function NodeTooltip({ name, x, y }: { name: string; x: number; y: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.12 }}
+      style={{
+        position: "fixed", left: x + 16, top: y + 16, zIndex: 60, pointerEvents: "none",
+        background: "transparent", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2,
+        padding: "6px 12px",
+        fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
+        color: INK, whiteSpace: "nowrap",
+      }}
+    >
+      <CornerBracket pos="tl" arm={8} inset={-1} color="rgba(255,255,255,0.5)" />
+      <CornerBracket pos="br" arm={8} inset={-1} color="rgba(255,255,255,0.5)" />
+      {name}
     </motion.div>
   );
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProjectsSection() {
-  const [selected, setSelected] = useState<Project | null>(null);
+  const narrow = useNarrowLayout();
+  // null = default state: no readout panel, camera at the external shot.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [tip, setTip] = useState<{ name: string; x: number; y: number } | null>(null);
 
-  const handleClose = useCallback(() => setSelected(null), []);
-  const handlePrev = useCallback(() => {
-    setSelected((s) => s ? PROJECTS[(s.id - 1 + PROJECTS.length) % PROJECTS.length] : s);
+  const project = selectedId === null ? null : PROJECTS[selectedId];
+  const position = selectedId === null ? -1 : ACTIVE_PROJECTS.findIndex((p) => p.id === selectedId);
+
+  const step = useCallback((delta: number) => {
+    setSelectedId((cur) => {
+      if (cur === null) return cur;
+      const i = ACTIVE_PROJECTS.findIndex((p) => p.id === cur);
+      if (i < 0) return cur;
+      const n = ACTIVE_PROJECTS.length;
+      return ACTIVE_PROJECTS[(i + delta + n) % n].id;
+    });
   }, []);
-  const handleNext = useCallback(() => {
-    setSelected((s) => s ? PROJECTS[(s.id + 1) % PROJECTS.length] : s);
+  const prev = useCallback(() => step(-1), [step]);
+  const next = useCallback(() => step(1), [step]);
+  const back = useCallback(() => { setSelectedId(null); setTip(null); }, []);
+
+  const handleHotspot = useCallback((p: Project) => setSelectedId(p.id), []);
+  const handleHover = useCallback((name: string | null, x: number, y: number) => {
+    setTip(name ? { name, x, y } : null);
   }, []);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") back();
+      if (e.key === "ArrowLeft") prev();
+      if (e.key === "ArrowRight") next();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handleClose]);
+  }, [prev, next, back]);
+
+  const arm = narrow ? 12 : 18;
+  const open = project !== null;
 
   return (
     <section id="projects" style={{
-      height: "100vh", background: BG, position: "relative", overflow: "hidden",
+      // Transparent, not the palette's #020008, so the page starfield still reads through
+      // the near-transparent panels and behind the free-floating brain.
+      background: BG, position: "relative",
+      height: "100vh", overflow: "hidden",
     }}>
-      {/* Background: inherits unified dark space starfield from the page */}
+      {/* The readout body scrolls when its content exceeds the shortened panel, but the
+          scrollbar itself stays hidden — a visible one cuts across the panel border and its
+          corner brackets. Needs a real stylesheet rule: ::-webkit-scrollbar cannot be
+          expressed in an inline style object. */}
+      <style>{`
+        .readout-body { scrollbar-width: none; -ms-overflow-style: none; }
+        .readout-body::-webkit-scrollbar { display: none; }
+      `}</style>
 
-      {/* Header — portfolio-standard section label */}
+      {/* Brain — no frame, no border, no brackets: it floats directly on the starfield.
+          The right edge tracks the readout width so the brain always owns the space the
+          panel does not, and is never covered by it. Transitioned over the same 320ms the
+          panel slide uses. */}
       <div style={{
-        position: "absolute", top: 28, left: "8vw",
-        zIndex: 10, pointerEvents: "none",
-        display: "flex", alignItems: "center", gap: "0.6rem",
+        position: "absolute",
+        top: 0,
+        // Mobile keeps its full height and lets the sheet slide OVER it. Shrinking to the
+        // strip above a 72vh sheet leaves the brain about 88px tall, which is not worth
+        // rendering; the sheet is translucent, and the camera is inside the brain by then,
+        // so the strip that stays visible still reads. Desktop instead gives the panel its
+        // own column via `right`, so the brain is never covered there.
+        // Full-width layer sitting BEHIND both panels, so the brain is centred on the
+        // viewport rather than on the gap beside the floating left panel. Shifting it out
+        // from under the readout is done by panning the camera (see PANEL_SHIFT_FRAC), not
+        // by resizing this element — resizing would re-centre the brain on a moving box and
+        // fight the fly-in.
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1,
       }}>
-        {/* Lime dot */}
-        <span style={{
-          width: "7px", height: "7px", borderRadius: "50%",
-          background: "#84cc16", flexShrink: 0, display: "inline-block",
-        }} />
-        {/* Label */}
-        <span style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "0.68rem",
-          letterSpacing: "0.22em",
-          textTransform: "uppercase",
-          opacity: 0.55,
-          color: "#ffffff",
-        }}>
-          03 — Projects
-        </span>
+        <Canvas
+          // near is driven per-frame by CameraController: 0.1 outside, 0.004 once the camera
+          // is inside the brain, where the default would slice through the surrounding mesh.
+          camera={{ position: [0, 0, 1.25], fov: 45, near: 0.1, far: 20 }}
+          gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
+          style={{ background: "transparent", position: "absolute", inset: 0 }}
+        >
+          <BrainScene selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
+        </Canvas>
       </div>
 
-      {/* 3D Canvas — transparent bg so the site starfield shows through */}
-      <Canvas
-        // near/far were 0.01/100 — a 10,000:1 ratio. Depth-buffer precision is distributed
-        // hyperbolically, so almost the entire buffer was being spent on the first fraction of
-        // a unit and the region that actually holds the brain (~0.5–1.5 units out) was left
-        // with very few distinct depth values. That is what let the fold lines and the shell
-        // resolve differently from frame to frame as the camera moved — the sparkle. The
-        // camera only ever travels between z 0.75 and 1.25 and the whole scene fits inside a
-        // couple of units, so 0.1/20 clips nothing and buys back roughly 50x the precision.
-        camera={{ position: [0, 0, 1.25], fov: 45, near: 0.1, far: 20 }}
-        gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
-        style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
-      >
-        <BrainScene selected={selected} onHotspotSelect={setSelected} />
-      </Canvas>
+      {/* Left: node index — desktop column, vertically centred and only as tall as its
+          content; mobile a horizontal chip scroller above the brain. */}
+      {narrow ? (
+        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: 0, right: 0, zIndex: 10 }}>
+          <NodeChipRow selectedId={selectedId} onSelect={setSelectedId} />
+        </div>
+      ) : (
+        <div style={{
+          position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
+          width: LEFT_W, zIndex: 10,
+        }}>
+          <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={arm} />
+        </div>
+      )}
 
-      {/* Left panel: completed + upcoming projects */}
-      <LeftProjectsPanel selected={selected} onSelect={setSelected} />
-
-      {/* Bottom data bar */}
-      <HudBottomBar selected={selected} />
-
-      {/* Detail panel on project select (right side) */}
+      {/* Right: readout — absent entirely until a project is selected */}
       <AnimatePresence>
-        {selected && (
-          <RightDetailPanel
-            key={selected.id}
-            project={selected}
-            onClose={handleClose}
-            onPrev={handlePrev}
-            onNext={handleNext}
+        {project && (
+          <ReadoutPanel
+            key="readout"
+            project={project}
+            position={position}
+            total={ACTIVE_PROJECTS.length}
+            onPrev={prev} onNext={next} onBack={back}
+            arm={arm} narrow={narrow}
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {tip && <NodeTooltip key="tip" name={tip.name} x={tip.x} y={tip.y} />}
       </AnimatePresence>
     </section>
   );
