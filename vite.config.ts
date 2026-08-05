@@ -251,6 +251,7 @@ export default defineConfig({
       ".manus-asia.computer",
       ".manuscomputer.ai",
       ".manusvm.computer",
+      ".trycloudflare.com", // covers any *.trycloudflare.com quick-tunnel hostname, incl. new ones after a tunnel restart
       "localhost",
       "127.0.0.1",
     ],
