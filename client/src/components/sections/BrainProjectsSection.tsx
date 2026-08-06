@@ -720,7 +720,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       fromId.current = nextId;
       toId.current = nextId;
       anim.travel = 1;
-      gsap.to(anim, { depth: 1, duration: 1.4, ease: "power2.inOut" });
+      gsap.to(anim, { depth: 0.37, duration: 1.4, ease: "power2.inOut" });
       return;
     }
 
@@ -733,7 +733,7 @@ function CameraController({ selected }: { selected: Project | null }) {
     toId.current = nextId;
     anim.travel = 0;
     gsap.to(anim, { travel: 1, duration: 1.4, ease: "power2.inOut" });
-    gsap.to(anim, { depth: 1, duration: 0.3, ease: "power2.out" });
+    gsap.to(anim, { depth: 0.37, duration: 0.3, ease: "power2.out" });
   }, [selected, anim]);
 
   useEffect(() => () => { gsap.killTweensOf(anim); }, [anim]);
