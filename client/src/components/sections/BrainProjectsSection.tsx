@@ -19,13 +19,14 @@
 
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { Suspense, useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { Suspense, useRef, useState, useEffect, useMemo, useCallback, type MutableRefObject, type RefObject, type Ref } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { motion, AnimatePresence } from "framer-motion";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
-import { BlendFunction } from "postprocessing";
+import { BlendFunction, type BloomEffect } from "postprocessing";
+import gsap from "gsap";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
 if (import.meta.hot) {
@@ -129,11 +130,6 @@ const PROJECT_NODES: { name: string; region: string; pct: [number, number, numbe
 // this array by reference (GoldCircuit, the hotspot render loop, the camera controller) picks
 // up the real, validated positions without needing to be threaded a prop.
 const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [...n.pct]);
-// How far the mesh's real outer surface sits from the bbox centre along each node's own
-// direction, in the same pre-scale local units as PROJECT_HOTSPOTS — populated alongside it
-// once the real geometry is loaded. Placeholder guess is harmless (only used for the one
-// frame before the real value lands, same as PROJECT_HOTSPOTS above).
-const PROJECT_SURFACE_RADIUS: number[] = PROJECT_NODES.map(() => 1.2);
 
 // Shared with CameraController so it can independently reconstruct each hotspot's CURRENT
 // world-space position (the brain keeps spinning even while a project is selected) using the
@@ -157,7 +153,7 @@ const Y_OFFSET = -Math.PI / 2; // best-guess starting yaw for a left-lateral vie
 // times. Finally enforces a minimum pairwise separation of 35% of the mesh's longest axis,
 // pushing any too-close pair apart along their connecting vector. Logs the real bbox and a
 // PASS/FAIL line per node to the console.
-function computeProjectPositions(meshes: THREE.Mesh[]): { position: [number, number, number]; surfaceRadius: number }[] {
+function computeProjectPositions(meshes: THREE.Mesh[]): [number, number, number][] {
   const box = new THREE.Box3();
   meshes.forEach((m) => {
     if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
@@ -220,52 +216,7 @@ function computeProjectPositions(meshes: THREE.Mesh[]): { position: [number, num
     }
   }
 
-  // For each finalized node, also find how far the mesh's actual outer surface sits from the
-  // bbox centre along that specific node's own direction — this is NOT the same as the node's
-  // own distance from centre (which the 5-nudge loop above can shrink a lot for a node whose
-  // guessed pct landed well outside the real mesh), and it varies a lot by direction since a
-  // brain is nowhere close to spherical. Needed so the camera controller can stand off a
-  // consistent small gap from the REAL local surface at each node instead of guessing one
-  // global "brain radius" that's wrong for most directions.
-  //
-  // Cast from far OUTSIDE back inward (same technique NEURAL_SURFACE_POINTS below uses, for
-  // the same reason) rather than from the centre outward — this brain has a deep central
-  // fissure between hemispheres, so a ray fired from dead-centre misses the mesh entirely in
-  // several directions (nothing to hit before it exits the far side of the bbox), which would
-  // silently fall back to the node's own tiny post-nudge distance and reintroduce the exact
-  // "camera ends up inside the mesh" bug this is meant to fix.
-  const OUTSIDE_DIST = longestAxis * 2;
-  const surfaceRadii = positions.map((p, i) => {
-    // Direction comes from the node's ORIGINAL design pct, not the final nudged position —
-    // a node whose guess needed heavy nudging can end up with p sitting extremely close to
-    // centre, at which point p.sub(center) is a near-zero vector whose normalized direction
-    // is numerically unstable (tiny floating-point differences swing it anywhere), which
-    // occasionally pointed straight down the central fissure and missed the mesh too. The
-    // un-nudged pct reliably points toward the intended anatomical region regardless of how
-    // far the validated position ended up being nudged inward.
-    const dir = new THREE.Vector3(...PROJECT_NODES[i].pct);
-    if (dir.lengthSq() < 1e-8) return longestAxis * 0.4;
-    dir.normalize();
-    const farPoint = center.clone().addScaledVector(dir, OUTSIDE_DIST);
-    raycaster.set(farPoint, dir.clone().negate());
-    raycaster.far = OUTSIDE_DIST * 1.5; // must clear the farPoint→centre travel distance, unlike the shorter isInside() far above
-    const hits = raycaster.intersectObjects(meshes, false);
-    // First hit on this inward-fired ray is where it enters the hull. That's usually the outer
-    // surface, but for a lower/back node this can instead be a small nearby appendage (e.g.
-    // near the brainstem) that the ray grazes before ever reaching the main lobe — measured
-    // for CityPulse specifically: raycast gave 0.103, while the node's OWN validated position
-    // (already proven to be a legitimate on-surface point by the isInside() check above) sits
-    // at 1.098 from centre. Taking the larger of the two means an accurate raycast is used
-    // when it finds the real hull, and a degenerate near-miss is overridden by the position's
-    // own already-validated distance instead of standing the camera off by almost nothing.
-    const raycastRadius = hits.length > 0 ? center.distanceTo(hits[0].point) : 0;
-    return Math.max(raycastRadius, p.distanceTo(center));
-  });
-
-  return positions.map((p, i) => ({
-    position: [p.x, p.y, p.z] as [number, number, number],
-    surfaceRadius: surfaceRadii[i],
-  }));
+  return positions.map((p) => [p.x, p.y, p.z] as [number, number, number]);
 }
 
 // Per-node label offset (in local space, before billboarding) so labels stay legible
@@ -633,116 +584,119 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 }
 
 // ─── Camera Controller (zoom in/out on project select) ────────────────────────
-// Idle: pulled well back so the whole brain + pedestal sits comfortably in frame (previously
-// 1.25, which read as "zoomed in too much" — nearly filling the viewport with no breathing
-// room). Selected: reconstructs the picked hotspot's ACTUAL current world position every
-// frame — same position/scale offset BrainModel applies, and the same spin angle formula it
-// uses (brain keeps spinning even while zoomed in) — then orbits the camera around the
-// brain's centre at that hotspot's own azimuth and (angle-clamped, see MAX_ELEVATION_ANGLE
-// below) elevation, and looks straight at it. That works correctly for every hotspot
-// regardless of which side of the (still-turning) brain it's currently on, and because it's a
-// live per-frame reconstruction rather than a one-off snapshot, the camera keeps orbiting to
-// stay locked onto the same spot as the brain continues to turn — and gliding to a different
-// project (via a dot, the list, or prev/next) smoothly swings the camera around to the new one
-// instead of jump-cutting.
+// The camera never ORBITS around the brain. It sits on one fixed viewing axis — the same axis
+// the idle shot uses — and a selection only ever dollies it IN along that axis and re-aims it
+// at the chosen node. An earlier version swung the camera around to each node's own side,
+// which read as the whole brain sweeping across the screen; this keeps the viewer planted and
+// simply pushes in on whichever region is selected. The brain keeps spinning on its own axis
+// throughout, so the node drifts — the aim tracks its live world position each frame (gently
+// smoothed) to keep that region framed, which only ever tilts the view a few degrees rather
+// than travelling around the model.
 const IDLE_CAMERA_Z = 1.95;
-// How far outside each node's own REAL local surface (PROJECT_SURFACE_RADIUS, in local
-// pre-scale units) the camera hangs back once "zoomed in", in the SAME pre-scale local units
-// as PROJECT_SURFACE_RADIUS (~1.0-1.1 typically) — gets multiplied by BRAIN_TRANSFORM's 0.20
-// scale down below, same as everything else here. 0.9 -> ~0.18 world units of standoff, i.e.
-// roughly 20-25% of the brain's own ~0.2-0.22 world bounding radius, per the target in the
-// investigation below.
-const ZOOM_GAP_LOCAL = 0.9;
 const LOOK_CENTER = new THREE.Vector3(0, 0.08, 0);
+// Derived from the idle framing itself so "distance = DEFAULT_DISTANCE" reproduces the idle
+// shot exactly, and every other distance is a plain multiple of it.
+const IDLE_OFFSET = new THREE.Vector3(0, -LOOK_CENTER.y, IDLE_CAMERA_Z);
+const DEFAULT_DISTANCE = IDLE_OFFSET.length();
+const VIEW_AXIS = IDLE_OFFSET.clone().normalize();
+const ZOOM_DISTANCE = DEFAULT_DISTANCE * 0.5;      // close-up on the selected region
+const PULLBACK_DISTANCE = DEFAULT_DISTANCE * 0.9;  // brief context beat when switching projects
 
-function worldFromLocal(local: [number, number, number], theta: number, out: THREE.Vector3) {
-  const cosT = Math.cos(theta), sinT = Math.sin(theta);
-  const px = BRAIN_TRANSFORM.position[0] + BRAIN_TRANSFORM.scale[0] * local[0];
-  const py = BRAIN_TRANSFORM.position[1] + BRAIN_TRANSFORM.scale[1] * local[1];
-  const pz = BRAIN_TRANSFORM.position[2] + BRAIN_TRANSFORM.scale[2] * local[2];
-  return out.set(px * cosT + pz * sinT, py, -px * sinT + pz * cosT);
-}
+const ZOOM_IN_DURATION = 1.0;
+const SWITCH_DURATION = 1.6;
+const BACK_DURATION = 1.3;
+const PANEL_FADE = 0.14;
+const BLOOM_BASE_INTENSITY = 0.3;
+const ZOOM_BLOOM_SCALE = 0.6; // bloom is dialled back while close in, restored on BACK
 
-// Investigation note (white-blowout report): logging the live camera position + every
-// mesh/light within 0.5 world units of it while zoomed into "MoodTunes AI" (a node near the
-// top of the brain) showed the camera sitting at world (0.0015, 0.8094, -0.0023) with ZERO
-// objects that close — so it was never actually near any emissive glow sphere at all, and no
-// amount of shrinking the standoff DISTANCE could have fixed it. The real bug was direction,
-// not distance: the old code always placed the camera along the straight ray from the brain's
-// centre through the hotspot. For a node near the top, that ray points almost straight up, so
-// standing "back" along it puts the camera nearly directly overhead — at y=0.81 here, versus
-// the pedestal's glow rings/dome sitting at y<0.05 (HolographicPedestal's RING_TOP/DOME_R) —
-// looking almost straight DOWN through the brain at the pedestal's stacked additive-blended
-// glow discs below. Those discs are lit/shaped to glow when viewed from the side, not when
-// seen flat-on from directly above with nothing else in frame to occlude them, which floods
-// the shot white with their combined additive area regardless of exact camera distance.
-// Fix: cap how steep the camera's elevation ANGLE is allowed to get (not a fixed elevation
-// magnitude — see below), so it can never approach from a bird's-eye or worm's-eye angle that
-// points through the pedestal below or empty space above, while still approaching every other,
-// less extreme node from its own natural angle unchanged.
-const MAX_ELEVATION_ANGLE = THREE.MathUtils.degToRad(50);
+// Aim smoothing. Written as a per-second rate rather than a fixed per-frame lerp factor so it
+// behaves identically at any frame rate; the rate below matches a 0.05/frame lerp at 60fps.
+const AIM_LAMBDA = -60 * Math.log(1 - 0.05);
 
-function CameraController({ selected }: { selected: Project | null }) {
+// Keeping the pedestal, its glow and the light cone out of frame. Everything pedestal-side
+// tops out at the holographic beam's crown (HolographicBeam: BEAM_BASE_Y + BEAM_H ~ 0.006);
+// the frame's bottom edge sits half the vertical FOV below the aim point, so aiming any lower
+// than that would pull the pedestal's stacked additive glow into shot. Low nodes therefore get
+// their aim nudged up — capped at AIM_Y_MAX so it's a slight tilt that still frames brain, not
+// a swing up into empty space above it.
+const CAMERA_FOV = 45;
+const PEDESTAL_TOP_Y = 0.01;
+const PEDESTAL_MARGIN = 0.02;
+const AIM_Y_MAX = LOOK_CENTER.y + 0.12;
+
+// The node markers' own glow shells (HotspotDot's outermost additive sphere, r=0.092 in local
+// units, scaled by BRAIN_TRANSFORM and by the 1.6x it grows to while active). The camera is
+// held at least 3x that clear of the node so it can never end up inside the glow — at the
+// distances above it's nowhere near, but the clamp keeps that true if the constants change.
+const NODE_GLOW_WORLD_RADIUS = 0.092 * BRAIN_TRANSFORM.scale[0] * 1.6;
+const MIN_NODE_CLEARANCE = NODE_GLOW_WORLD_RADIUS * 3;
+
+// Scalars the GSAP timelines in ProjectsSection animate, read back here (and by the Bloom
+// pass) every frame. Keeping them in one plain object lets a single timeline drive the camera
+// dolly, the bloom falloff and the panel cross-fade in lockstep.
+type CamAnim = { distance: number; bloomScale: number; logFor: number | null };
+
+function CameraController({ selected, camAnim, brainInnerRef }: {
+  selected: Project | null;
+  camAnim: MutableRefObject<CamAnim>;
+  brainInnerRef: RefObject<THREE.Group | null>;
+}) {
   const { camera } = useThree();
-  const targetPos = useRef(new THREE.Vector3(0, 0, IDLE_CAMERA_Z));
-  const lookTarget = useRef(new THREE.Vector3().copy(LOOK_CENTER));
-  const hotspotWorld = useRef(new THREE.Vector3());
-  const rel = useRef(new THREE.Vector3());
+  const nodeWorld = useRef(new THREE.Vector3());
+  const aimTarget = useRef(new THREE.Vector3().copy(LOOK_CENTER));
+  const aimSmoothed = useRef(new THREE.Vector3().copy(LOOK_CENTER));
 
-  useFrame((state, delta) => {
-    if (selected) {
-      const theta = Y_OFFSET + state.clock.elapsedTime * SPIN_SPEED;
-      // The real, validated dot position — used for both the look-at target and (for its
-      // horizontal angle) the camera's approach azimuth, so the camera always ends up
-      // looking straight at the same point it's oriented toward.
-      worldFromLocal(PROJECT_HOTSPOTS[selected.id], theta, hotspotWorld.current);
-      rel.current.copy(hotspotWorld.current).sub(LOOK_CENTER);
+  useFrame((_state, delta) => {
+    const anim = camAnim.current;
 
-      const horizR = Math.hypot(rel.current.x, rel.current.z);
-      // A node with almost no horizontal offset of its own (near the top/bottom of the
-      // brain) has no meaningful azimuth to inherit — fall back to the brain's current spin
-      // angle so the camera still approaches from a sensible side-on angle (and keeps
-      // orbiting with the spin) instead of collapsing toward straight up/down.
-      const azimuth = horizR > 1e-4 ? Math.atan2(rel.current.x, rel.current.z) : theta;
-      // Angle above/below the horizontal plane the node itself actually sits at, clamped to
-      // MAX_ELEVATION_ANGLE. This preserves each node's own natural approach angle exactly
-      // whenever it's already under the cap (which is every node except the ones sitting
-      // almost dead-on at the top/bottom) — an earlier version clamped elevation as a fixed
-      // *distance* regardless of the node's own angle, which for a moderately-elevated (but
-      // not extreme) node redirected the camera in a materially different direction than
-      // PROJECT_SURFACE_RADIUS had actually been measured along, standing it too close to
-      // (sometimes inside) the mesh in that new, uncalibrated direction.
-      const naturalElevationAngle = Math.atan2(rel.current.y, Math.max(horizR, 1e-6));
-      const elevationAngle = THREE.MathUtils.clamp(naturalElevationAngle, -MAX_ELEVATION_ANGLE, MAX_ELEVATION_ANGLE);
+    if (selected && brainInnerRef.current) {
+      // Live world position of the selected node, taken from the brain group's own world
+      // matrix (with its current spin applied) rather than recomputed from the transform, so
+      // it can't drift out of step with where the dot is actually drawn.
+      brainInnerRef.current.updateWorldMatrix(true, false);
+      nodeWorld.current
+        .fromArray(PROJECT_HOTSPOTS[selected.id])
+        .applyMatrix4(brainInnerRef.current.matrixWorld);
 
-      const standoffWorld = (PROJECT_SURFACE_RADIUS[selected.id] + ZOOM_GAP_LOCAL) * BRAIN_TRANSFORM.scale[0];
-      const elevation = standoffWorld * Math.sin(elevationAngle);
-      const horizStandoff = standoffWorld * Math.cos(elevationAngle);
-
-      targetPos.current.set(
-        LOOK_CENTER.x + horizStandoff * Math.sin(azimuth),
-        LOOK_CENTER.y + elevation,
-        LOOK_CENTER.z + horizStandoff * Math.cos(azimuth)
+      const halfFrameHeight = Math.tan(THREE.MathUtils.degToRad(CAMERA_FOV / 2)) * anim.distance;
+      const pedestalClearY = Math.min(PEDESTAL_TOP_Y + halfFrameHeight + PEDESTAL_MARGIN, AIM_Y_MAX);
+      aimTarget.current.set(
+        nodeWorld.current.x,
+        Math.max(nodeWorld.current.y, pedestalClearY),
+        nodeWorld.current.z
       );
-      // Look mostly at the real hotspot itself but blended a touch back toward the brain's
-      // centre so the shot reads as "zoomed into this region of the brain", not just a
-      // close-up of an isolated glowing dot against empty space.
-      lookTarget.current.copy(hotspotWorld.current).lerp(LOOK_CENTER, 0.2);
     } else {
-      targetPos.current.set(0, 0, IDLE_CAMERA_Z);
-      lookTarget.current.copy(LOOK_CENTER);
+      aimTarget.current.copy(LOOK_CENTER);
     }
 
-    // Frame-rate-independent damping: a fixed per-frame lerp factor (the previous "0.06")
-    // converges at a rate that depends entirely on actual FPS — fine at 60fps, but on a
-    // heavier/slower render (this scene's postprocessing + a screen-recorded remote VM) it
-    // could take many real seconds to actually reach the target, which is what made an
-    // "already fixed" camera position still look wrong: the screenshot was catching it
-    // mid-flight, closer to the brain than its real resting position. This reaches the same
-    // ~98% converged point in a fixed ~0.75s of real time regardless of frame rate.
-    const smoothing = 1 - Math.exp(-5 * delta);
-    camera.position.lerp(targetPos.current, smoothing);
-    camera.lookAt(lookTarget.current);
+    aimSmoothed.current.lerp(aimTarget.current, 1 - Math.exp(-AIM_LAMBDA * delta));
+
+    // Pure dolly along the fixed viewing axis — no orbital component at all.
+    camera.position.copy(LOOK_CENTER).addScaledVector(VIEW_AXIS, anim.distance);
+    if (selected) {
+      const clearance = camera.position.distanceTo(nodeWorld.current);
+      if (clearance < MIN_NODE_CLEARANCE) {
+        camera.position.addScaledVector(VIEW_AXIS, MIN_NODE_CLEARANCE - clearance);
+      }
+    }
+    camera.lookAt(aimSmoothed.current);
+
+    if (anim.logFor !== null) {
+      const id = anim.logFor;
+      anim.logFor = null;
+      if (import.meta.env.DEV) {
+        const distFromCentre = camera.position.distanceTo(LOOK_CENTER);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[CameraZoom] ${PROJECTS[id].title}\n` +
+          `  cameraPos=(${camera.position.x.toFixed(4)}, ${camera.position.y.toFixed(4)}, ${camera.position.z.toFixed(4)})\n` +
+          `  lookAt=(${aimSmoothed.current.x.toFixed(4)}, ${aimSmoothed.current.y.toFixed(4)}, ${aimSmoothed.current.z.toFixed(4)})  ` +
+          `nodeWorld=(${nodeWorld.current.x.toFixed(4)}, ${nodeWorld.current.y.toFixed(4)}, ${nodeWorld.current.z.toFixed(4)})\n` +
+          `  distFromCentre=${distFromCentre.toFixed(4)} (${(distFromCentre / DEFAULT_DISTANCE).toFixed(2)}x default ${DEFAULT_DISTANCE.toFixed(4)})  ` +
+          `distToNode=${camera.position.distanceTo(nodeWorld.current).toFixed(4)}  minClearance=${MIN_NODE_CLEARANCE.toFixed(4)}`
+        );
+      }
+    }
   });
 
   return null;
@@ -1700,7 +1654,14 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
+function BrainModel({ selected, onHotspotSelect, brainInnerRef }: {
+  selected: Project | null;
+  onHotspotSelect: (p: Project) => void;
+  // Ref to the BRAIN_TRANSFORM group — hotspot local positions live in this group's space,
+  // so CameraController can apply its world matrix to get a node's live world position while
+  // the outer spin group keeps turning.
+  brainInnerRef: RefObject<THREE.Group | null>;
+}) {
   // Welded copy of the particle brain scan: the original export had zero shared vertices
   // (285,966 verts for 95,322 tris, fully non-indexed), so computeVertexNormals() could
   // only ever produce flat per-triangle normals — there was no vertex-sharing to average
@@ -1838,11 +1799,10 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
   // in the return statement, so they see the real validated positions on the very first frame,
   // not one render behind.
   useMemo(() => {
-    computeProjectPositions(brainMeshes).forEach(({ position, surfaceRadius }, i) => {
-      PROJECT_HOTSPOTS[i][0] = position[0];
-      PROJECT_HOTSPOTS[i][1] = position[1];
-      PROJECT_HOTSPOTS[i][2] = position[2];
-      PROJECT_SURFACE_RADIUS[i] = surfaceRadius;
+    computeProjectPositions(brainMeshes).forEach((pos, i) => {
+      PROJECT_HOTSPOTS[i][0] = pos[0];
+      PROJECT_HOTSPOTS[i][1] = pos[1];
+      PROJECT_HOTSPOTS[i][2] = pos[2];
     });
   }, [brainMeshes]);
 
@@ -1856,7 +1816,7 @@ function BrainModel({ selected, onHotspotSelect }: { selected: Project | null; o
       {/* Spinning brain group */}
       <group ref={groupRef}>
         {/* Fully solid matte surface, real anatomical folds, no facets/wireframe */}
-        <group {...BRAIN_TRANSFORM}>
+        <group ref={brainInnerRef} {...BRAIN_TRANSFORM}>
           {brainMeshes.map((mesh, i) => (
             <mesh key={`solid-${i}`} geometry={mesh.geometry} material={brainMat} renderOrder={0} />
           ))}
@@ -2779,8 +2739,33 @@ function HolographicPedestal() {
   );
 }
 
+// Applies camAnim.bloomScale to the Bloom pass every frame without re-rendering React —
+// GSAP writes the scalar, this reads it. Keeps intensity at BLOOM_BASE_INTENSITY * scale
+// (1.0 idle, ZOOM_BLOOM_SCALE while zoomed in).
+function BloomIntensityDriver({
+  bloomRef,
+  camAnim,
+}: {
+  bloomRef: RefObject<BloomEffect | null>;
+  camAnim: MutableRefObject<CamAnim>;
+}) {
+  useFrame(() => {
+    if (bloomRef.current) {
+      bloomRef.current.intensity = BLOOM_BASE_INTENSITY * camAnim.current.bloomScale;
+    }
+  });
+  return null;
+}
+
 // ─── Scene ────────────────────────────────────────────────────────────────────
-function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; onHotspotSelect: (p: Project) => void }) {
+function BrainScene({ selected, onHotspotSelect, camAnim, brainInnerRef }: {
+  selected: Project | null;
+  onHotspotSelect: (p: Project) => void;
+  camAnim: MutableRefObject<CamAnim>;
+  brainInnerRef: RefObject<THREE.Group | null>;
+}) {
+  const bloomRef = useRef<BloomEffect>(null);
+
   return (
     <>
       {/* These were tuned back when every material in the scene was unlit (MeshBasicMaterial
@@ -2802,9 +2787,9 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
           hotspot the way the earlier white-brain point light did. */}
       {/* Point light removed — was causing bright centre */}
 
-      <CameraController selected={selected} />
+      <CameraController selected={selected} camAnim={camAnim} brainInnerRef={brainInnerRef} />
       <Suspense fallback={null}>
-        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} />
+        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} brainInnerRef={brainInnerRef} />
       </Suspense>
       <HolographicPedestal />
       <HolographicBeam />
@@ -2843,14 +2828,16 @@ function BrainScene({ selected, onHotspotSelect }: { selected: Project | null; o
             on a transparent canvas". If the veil returns, this flag is the first thing to turn
             back off. */}
         <Bloom
+          ref={bloomRef}
           mipmapBlur
           luminanceThreshold={0.9}
           luminanceSmoothing={0.3}
-          intensity={0.3}
+          intensity={BLOOM_BASE_INTENSITY}
           radius={0.4}
           blendFunction={BlendFunction.SCREEN}
         />
       </EffectComposer>
+      <BloomIntensityDriver bloomRef={bloomRef} camAnim={camAnim} />
     </>
   );
 }
@@ -3004,13 +2991,16 @@ function HudBottomBar({ selected }: { selected: Project | null }) {
 }
 
 // ─── Project Detail Panel (right side) ────────────────────────────────────────
-function RightDetailPanel({ project, onClose, onPrev, onNext }: {
+function RightDetailPanel({ project, onClose, onPrev, onNext, panelRef }: {
   project: Project; onClose: () => void; onPrev: () => void; onNext: () => void;
+  // Optional host for the GSAP opacity cross-fade during project-to-project switches.
+  panelRef?: RefObject<HTMLDivElement | null>;
 }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <motion.div
+      ref={panelRef as Ref<HTMLDivElement> | undefined}
       initial={{ opacity: 0, x: 24 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 24 }}
@@ -3117,20 +3107,140 @@ function RightDetailPanel({ project, onClose, onPrev, onNext }: {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProjectsSection() {
   const [selected, setSelected] = useState<Project | null>(null);
+  const camAnim = useRef<CamAnim>({ distance: DEFAULT_DISTANCE, bloomScale: 1, logFor: null });
+  const brainInnerRef = useRef<THREE.Group | null>(null);
+  const panelWrapRef = useRef<HTMLDivElement | null>(null);
+  const tlRef = useRef<gsap.core.Timeline | null>(null);
+  // Keep a live copy of selected for GSAP callbacks that close over stale state.
+  const selectedRef = useRef<Project | null>(null);
+  selectedRef.current = selected;
 
-  const handleClose = useCallback(() => setSelected(null), []);
+  const killTimeline = useCallback(() => {
+    if (tlRef.current) {
+      tlRef.current.kill();
+      tlRef.current = null;
+    }
+  }, []);
+
+  // Dolly in from idle (or wherever we currently are) to ZOOM_DISTANCE, aiming at `project`.
+  // No orbit — distance is the only camera scalar GSAP drives; aim is handled every frame.
+  const zoomInTo = useCallback((project: Project) => {
+    killTimeline();
+    setSelected(project);
+    if (panelWrapRef.current) gsap.set(panelWrapRef.current, { opacity: 1 });
+    const tl = gsap.timeline({
+      onComplete: () => {
+        camAnim.current.logFor = project.id;
+        tlRef.current = null;
+      },
+    });
+    tl.to(camAnim.current, {
+      distance: ZOOM_DISTANCE,
+      bloomScale: ZOOM_BLOOM_SCALE,
+      duration: ZOOM_IN_DURATION,
+      ease: "power2.inOut",
+    }, 0);
+    tlRef.current = tl;
+  }, [killTimeline]);
+
+  // Ease back out to the full default view, restore bloom, then clear selection.
+  const zoomOut = useCallback(() => {
+    killTimeline();
+    const tl = gsap.timeline({
+      onComplete: () => {
+        setSelected(null);
+        if (panelWrapRef.current) gsap.set(panelWrapRef.current, { opacity: 1 });
+        tlRef.current = null;
+      },
+    });
+    if (panelWrapRef.current) {
+      tl.to(panelWrapRef.current, { opacity: 0, duration: PANEL_FADE, ease: "power2.in" }, 0);
+    }
+    tl.to(camAnim.current, {
+      distance: DEFAULT_DISTANCE,
+      bloomScale: 1,
+      duration: BACK_DURATION,
+      ease: "power2.inOut",
+    }, 0);
+    tlRef.current = tl;
+  }, [killTimeline]);
+
+  // Project-to-project: brief pull-back for context, re-aim (automatic via selected change),
+  // then push back in. Panel cross-fades at the midpoint. Still no orbital swing — only
+  // distance moves, and only along the fixed viewing axis.
+  const switchTo = useCallback((project: Project) => {
+    killTimeline();
+    const mid = SWITCH_DURATION / 2;
+    const tl = gsap.timeline({
+      onComplete: () => {
+        camAnim.current.logFor = project.id;
+        tlRef.current = null;
+      },
+    });
+    tl.to(camAnim.current, {
+      distance: PULLBACK_DISTANCE,
+      duration: mid,
+      ease: "power2.inOut",
+    }, 0);
+    if (panelWrapRef.current) {
+      tl.to(panelWrapRef.current, {
+        opacity: 0,
+        duration: PANEL_FADE,
+        ease: "power2.in",
+      }, mid - PANEL_FADE);
+    }
+    tl.add(() => {
+      setSelected(project);
+      if (panelWrapRef.current) gsap.set(panelWrapRef.current, { opacity: 0 });
+    }, mid);
+    if (panelWrapRef.current) {
+      tl.to(panelWrapRef.current, {
+        opacity: 1,
+        duration: PANEL_FADE,
+        ease: "power2.out",
+      }, mid);
+    }
+    tl.to(camAnim.current, {
+      distance: ZOOM_DISTANCE,
+      bloomScale: ZOOM_BLOOM_SCALE,
+      duration: mid,
+      ease: "power2.inOut",
+    }, mid);
+    tlRef.current = tl;
+  }, [killTimeline]);
+
+  const handleSelect = useCallback((project: Project | null) => {
+    if (project === null) {
+      if (selectedRef.current) zoomOut();
+      return;
+    }
+    if (selectedRef.current?.id === project.id) {
+      zoomOut();
+      return;
+    }
+    if (selectedRef.current) switchTo(project);
+    else zoomInTo(project);
+  }, [zoomInTo, zoomOut, switchTo]);
+
+  const handleClose = useCallback(() => handleSelect(null), [handleSelect]);
   const handlePrev = useCallback(() => {
-    setSelected((s) => s ? PROJECTS[(s.id - 1 + PROJECTS.length) % PROJECTS.length] : s);
-  }, []);
+    const s = selectedRef.current;
+    if (!s) return;
+    handleSelect(PROJECTS[(s.id - 1 + PROJECTS.length) % PROJECTS.length]);
+  }, [handleSelect]);
   const handleNext = useCallback(() => {
-    setSelected((s) => s ? PROJECTS[(s.id + 1) % PROJECTS.length] : s);
-  }, []);
+    const s = selectedRef.current;
+    if (!s) return;
+    handleSelect(PROJECTS[(s.id + 1) % PROJECTS.length]);
+  }, [handleSelect]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") handleClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [handleClose]);
+
+  useEffect(() => () => { killTimeline(); }, [killTimeline]);
 
   return (
     <section id="projects" style={{
@@ -3169,23 +3279,30 @@ export default function ProjectsSection() {
         // a unit and the region that actually holds the brain (~0.5–1.5 units out) was left
         // with very few distinct depth values. That is what let the fold lines and the shell
         // resolve differently from frame to frame as the camera moved — the sparkle. The
-        // camera only ever travels between roughly z 0.5 (zoomed into a project) and the idle
-        // distance below, and the whole scene fits inside a couple of units, so 0.1/20 clips
-        // nothing and buys back roughly 50x the precision.
-        camera={{ position: [0, 0, IDLE_CAMERA_Z], fov: 45, near: 0.1, far: 20 }}
+        // camera only ever travels along the fixed viewing axis between ZOOM_DISTANCE and
+        // DEFAULT_DISTANCE, and the whole scene fits inside a couple of units, so 0.1/20
+        // clips nothing and buys back roughly 50x the precision.
+        camera={{ position: [0, 0, IDLE_CAMERA_Z], fov: CAMERA_FOV, near: 0.1, far: 20 }}
         gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
         style={{ background: "transparent", position: "absolute", inset: 0, zIndex: 1 }}
       >
-        <BrainScene selected={selected} onHotspotSelect={setSelected} />
+        <BrainScene
+          selected={selected}
+          onHotspotSelect={handleSelect}
+          camAnim={camAnim}
+          brainInnerRef={brainInnerRef}
+        />
       </Canvas>
 
       {/* Left panel: completed + upcoming projects */}
-      <LeftProjectsPanel selected={selected} onSelect={setSelected} />
+      <LeftProjectsPanel selected={selected} onSelect={handleSelect} />
 
       {/* Bottom data bar */}
       <HudBottomBar selected={selected} />
 
-      {/* Detail panel on project select (right side) */}
+      {/* Detail panel on project select (right side). Opacity is driven by GSAP during
+          project-to-project transitions (140ms out / 140ms in at the pull-back midpoint);
+          AnimatePresence still handles mount/unmount. */}
       <AnimatePresence>
         {selected && (
           <RightDetailPanel
@@ -3194,6 +3311,7 @@ export default function ProjectsSection() {
             onClose={handleClose}
             onPrev={handlePrev}
             onNext={handleNext}
+            panelRef={panelWrapRef}
           />
         )}
       </AnimatePresence>
