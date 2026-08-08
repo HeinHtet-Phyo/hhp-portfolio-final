@@ -2764,7 +2764,7 @@ function BrainScene({ selected, onHotspotSelect, camAnim, brainInnerRef }: {
   camAnim: MutableRefObject<CamAnim>;
   brainInnerRef: RefObject<THREE.Group | null>;
 }) {
-  const bloomRef = useRef<BloomEffect>(null);
+  const bloomRef = useRef<BloomEffect | null>(null);
 
   return (
     <>
