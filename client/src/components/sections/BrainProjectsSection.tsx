@@ -142,17 +142,26 @@ const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [.
 // rather than drifting off it the moment the tween lands.
 const brainGroupRef: { current: THREE.Group | null } = { current: null };
 
-// Brain idle rotation, shared so the camera controller can freeze it. BrainModel owns the
-// integration and writes `angle` onto the group every frame; the controller only flips `paused`.
-//
-// It is paused for as long as a project is open. The camera aims at the node's LIVE world
-// position sampled at the click, and that position is only meaningful while the brain holds
-// still — left spinning, the node drifts a full turn every 42s and the camera would land on
-// whatever happened to have rotated into its path. Freezing also makes the five views hold
-// their distinctness: with the brain turning, a fixed camera sweeps through every brain-frame
-// azimuth anyway, so azimuth stops separating the shots and only elevation survives.
-const brainSpin = { angle: -Math.PI / 2, paused: false };
+// Brain idle rotation. BrainModel owns the integration and writes the angle onto the group every
+// frame. It runs UNCONDITIONALLY at one speed in every state — default, mid-tween and zoomed.
+// Nothing may gate, slow or constrain it on the selection.
+// `speedScale` multiplies the idle rate: 1 in the default view, BRAIN_SPIN_SLOW_FRAC while a
+// project is open. The camera controller tweens it; BrainModel just reads it.
+const brainSpin = { angle: -Math.PI / 2, speedScale: 1 };
 const BRAIN_SPIN_SPEED = 0.15;
+// Fraction of the idle rate the brain turns at while zoomed in. At 0.25 the apparent rate drops
+// from 8.6 deg/s to 2.1, so a full revolution takes about 168s instead of 42s — the brain still
+// clearly turns, but calmly rather than sweeping past.
+//
+// There is exactly ONE writer to this group's rotation.y (the useFrame in BrainModel). The other
+// rotation.y writes in this file belong to HolographicBeam and HolographicPedestal, which own
+// their own refs and their own groups — nothing else touches the brain.
+const BRAIN_SPIN_SLOW_FRAC = 0.25;
+// Ease between the two rates. Because the angle is INTEGRATED from the scaled rate, ramping the
+// scale changes only the velocity — the angle itself stays continuous, so there is no jump in
+// either direction, just a smooth slow-down and speed-up.
+const BRAIN_SPIN_RAMP_S = 0.5;
+
 
 // Reads the brain mesh's real bounding box, places each PROJECT_NODES entry as a percentage of
 // its actual half-extent, then validates every position with a 6-direction raycast (a point
@@ -596,29 +605,31 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 // It exists because `depth` alone can no longer answer "is a project open?": a project-to-project
 // switch deliberately drives depth through 0 at the hand-off, and anything keyed to `depth === 0`
 // would flicker back to its default-state look for those few frames mid-transition.
-// az/el are the live orbital angle in the brain's frame; radiusFrac is the live orbit radius as
-// a fraction of defaultDistance. az is deliberately UNBOUNDED — it accumulates rather than
-// wrapping at +/-180, which is what lets a swing take the short way round (see shortestAz).
-const camAnim = { depth: 0, engaged: 0, az: 0, el: 0, radiusFrac: 1 };
-
-// Shortest signed rotation from `from` to `to`, in degrees, in (-180, 180]. Added to the live
-// az rather than assigned, so a swing from +160 to -110 goes 90 degrees forward through 180
-// instead of 270 degrees back through zero.
-function shortestAz(from: number, to: number) {
-  return from + (((to - from + 180) % 360 + 360) % 360 - 180);
-}
+// The camera's position is rebuilt each frame from a direction and a radius about brainCentre.
+// `radius` is tweened outright; `t` runs 0 -> 1 slerping the direction from _dirFrom to _dirTo.
+// The two are INDEPENDENT, which is what lets a project-to-project switch move the radius while
+// the direction is held fixed and then hard-cut — see the switch branch in the selection effect.
+//
+// `bottom` is 1 while a lower-region project is framed; the pedestal glow and the bloom pass
+// both read it to fade themselves back. `ready` is 0 until the defaults are seeded.
+const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0 };
 
 // ── Transition timings ──
-// Project-to-project is a single timeline in two legs: pull back out to the default distance,
-// then dive into the next region. The hand-off between them happens exactly at depth 0, which is
-// the one point where the camera's direction does not depend on which node is targeted (see the
-// lerp in useFrame) — so the target can be swapped there with no discontinuity at all.
-const SWITCH_S    = 1.8;   // project-to-project orbit, whole swing
-const ZOOM_IN_S   = 1.4;   // first selection, straight from the default view
-const BACK_S      = 1.3;   // BACK, all the way out to default
+// There is no orbital leg any more: switching projects shifts the aim from one node to the next
+// and nudges the camera's small lateral offset across, which reads as changing focus rather than
+// circling the brain's exterior.
+const MOVE_S = 4.0;   // first zoom-in from the default view, and BACK
+
+// Project-to-project is ONE continuous move: slerp the direction, lerp the distance, single
+// duration, single ease. The cut that was here before removed the sweep by removing the motion
+// altogether, which is not the same as making the motion calm — this makes it calm instead.
+// sine.inOut peaks at only pi/2 (1.57x) of the average rate, against 2x for power1 and 3x for
+// power2, so there is markedly less acceleration at the midpoint and no whip at either end.
+const SWITCH_S = 4.6;
+
 // Readout content cross-fade (140ms out + 140ms in) sits centred on the zoom-out leg's midpoint,
 // so the text swaps at the top of the arc rather than at the instant of the click.
-const CONTENT_FADE_S  = 0.14;
+const CONTENT_FADE_S  = 0.20;
 const CONTENT_DELAY_S = SWITCH_S / 2 - CONTENT_FADE_S;
 
 const SCENE_CENTRE_Y = 0.02;
@@ -648,8 +659,8 @@ const DEFAULT_MARGIN = 1.30;
 // (the white blowout). Both are fixed by the same change: keep lookAt pinned to the centre and
 // express "zoom into that region" purely as an ORBIT + DOLLY about that centre —
 //
-//   orbitDirection       = normalise(node LIVE world position - brainCentre), sampled on click
-//   targetCameraPosition = brainCentre + orbitDirection * (defaultDistance * ZOOM_RADIUS_FACTOR)
+//   targetCameraPosition = brainCentre + viewAxis * (defaultDistance * ZOOM_DISTANCE_FACTOR)
+//   targetLookAt         = the node's LIVE world position, bounded and smoothed
 //   targetLookAt         = brainCentre        (fixed, every state)
 //
 // The brain therefore projects to the centre of the viewport in BOTH states; only the approach
@@ -692,41 +703,47 @@ const DEFAULT_MARGIN = 1.30;
 // angle frames whichever region happened to rotate into it. Deriving from the live position
 // makes the camera follow the node wherever it currently is, for all five, with nothing to tune.
 //
-// Camera elevation is clamped to this. The topmost node sits at elevation ~87 degrees, near
-// enough to straight-up that the view direction is almost parallel to the camera's up vector,
-// where roll becomes ill-conditioned and small azimuth changes swing the image round. 80 keeps
-// the overhead shot steep while leaving the orientation well-behaved.
-const ELEVATION_LIMIT = 80;
+// ─── Zoom framing — TUNE HERE ────────────────────────────────────────────────
+// Camera distance from brainCentre while a project is open, as a fraction of defaultDistance.
+// The camera sits on the line from brainCentre out through the node, so each project gives a
+// genuinely different angle, and lookAt stays on brainCentre so the brain cannot slide.
+const ZOOM_DISTANCE_FACTOR = 0.75;
 
-// ─── Orbit radius — TUNE HERE ────────────────────────────────────────────────
-// Radius the camera parks at while a project is open, as a fraction of defaultDistance.
+// ─── Bottom-region projects: look UP from underneath — TUNE HERE ─────────────
+// The three nodes with a negative y in PROJECT_NODES: CityPulse "back, lower" (2), PreventPath
+// "left, lower" (3), PROJECT_05 "lower right" (4). Their own directions give elevations of only
+// 10.2/12.0/12.0 degrees, which views those regions almost edge-on. These get an ABSOLUTE
+// elevation instead — the azimuth still comes from the node, so the shot is still from that
+// node's side, but the camera drops well below the brain and looks up at it.
 //
-// Sized so the WHOLE brain stays in frame with real space around it, rather than filling or
-// overflowing it. The frustum maths, with the bounding sphere SCENE_RADIUS = 0.31 and fov 45:
+// History: -30 shared read as straight underneath, then -12 shared, then a -6/-18 split whose
+// back angle was still too steep. The brain's underside is at world y = -0.153, so -6deg keeps
+// the camera just above it and -14deg just below. Camera y relates to elevation as
+// y = SCENE_CENTRE_Y + radius * sin(elevation), i.e. 0.02 + 0.7898 * sin(el). The pedestal stays
+// partly in frame at both angles (measured), so the dimming stays.
+// Elevation is per project now. Which one is "the back" comes from PROJECT_NODES, not from a
+// measured world azimuth: the brain spins, so a node's world azimuth sweeps the full circle every
+// 42s and "closest to 180 degrees" is whoever happens to be there at that instant. The pct column
+// is fixed — CityPulse z=-1.80 is the back, PreventPath x=-1.40 the left, PROJECT_05 x=+1.40 the
+// right — so the assignment below is stable whenever you click.
 //
-//   defaultDistance   = SCENE_RADIUS / sin(bindingHalfAngle) * DEFAULT_MARGIN
-//   at radius f*dd:     sin(silhouetteHalfAngle) = SCENE_RADIUS / (f * dd)
-//   frame fill         = tan(silhouetteHalfAngle) / tan(bindingHalfAngle)
-//   margin             = 1 - fill,  measured against the frustum half-angle
-//
-// For any LANDSCAPE viewport the vertical axis binds (fov is fixed, so bindingHalfAngle is
-// always 22.5 degrees) and the result is aspect-independent:
-//
-//   f = 0.72  ->  margin -8.2%   bounding sphere exceeds the frustum; brain cropped
-//   f = 0.85  ->  margin 10.9%   <- current: whole brain in frame with space all round
-//   f = 0.8865 -> margin 15.0%   threshold if a 15% margin is wanted
-//   f = 0.90  ->  margin 16.4%
-//
-// At 0.85 the margin is positive on both axes, so the whole bounding sphere — and therefore the
-// whole mesh, which sits inside it — is inside the frustum. Confirmed empirically below.
-const ZOOM_RADIUS_FACTOR = 0.85;
-// Midpoint of a project-to-project swing eases out to exactly the default distance, then settles
-// back to ZOOM_RADIUS_FACTOR at the new angle: 0.85 -> 1.0 -> 0.85.
-const MID_RADIUS_FRAC  = 1.0;
+// The back node sits lower than the two flanks, but only moderately: -18 read as too steep a
+// bottom view, so it came back up to -14 (camera y -0.171, against -0.224 at -18).
+const BOTTOM_REGION_ELEV_DEG: Record<number, number> = {
+  2: -14,   // CityPulse   — back  (pct z = -1.80)
+  3:  -6,   // PreventPath — left  (pct x = -1.40)
+  4:  -6,   // PROJECT_05  — right (pct x = +1.40)
+};
+// Pedestal accent glow and bloom both fade to this fraction while a bottom project is framed,
+// and restore on BACK or on switching to a non-bottom project.
+const BOTTOM_DIM_FRAC = 0.4;
+
+// Node glow reach, for the clearance figure logged on each selection.
+const NODE_GLOW_RADIUS = 0.092 * 1.6;
 // Pedestal light cone fades toward this fraction of its default opacity while zoomed.
 const CONE_INSIDE_FRAC = 0.30;
 // Near plane stays at its default in both states now — the camera never enters the mesh
-// (closest approach is ZOOM_RADIUS_FACTOR * defaultDistance, well outside SCENE_RADIUS), and a wide
+// (closest approach stays at 3.69x the node glow radius, well outside SCENE_RADIUS), and a wide
 // near/far ratio reintroduces the depth-precision sparkle noted on the Canvas.
 const NEAR_OUTSIDE = 0.1;
 
@@ -742,33 +759,33 @@ function orbitDistance(aspect: number, fov: number, margin: number) {
 // Reused scratch vectors — this runs every frame, so nothing here allocates.
 const _centreV = new THREE.Vector3();
 const _startV  = new THREE.Vector3();
-const _lookV   = new THREE.Vector3();
 const _toV     = new THREE.Vector3();
 // Target orbital direction. MUST stay a distinct object from _dirV: the frame blends _dirV from
 // the default direction toward this one, and if the two aliased, the blend would read its own
 // half-written result and the camera would never leave the default view. That exact aliasing is
 // what made all five projects render the identical shot.
-const _viewV   = new THREE.Vector3();
+
 const _dirV    = new THREE.Vector3();
 // The default (unselected) viewing direction: straight on from +Z.
 const _DEFAULT_DIR = new THREE.Vector3(0, 0, 1);
+// Endpoints of the current move, as unit directions from brainCentre.
+const _dirFrom = new THREE.Vector3(0, 0, 1);
+const _dirTo   = new THREE.Vector3(0, 0, 1);
+// Target direction while a move is being set up; kept separate from _dirV, which the re-base
+// step overwrites with the live direction.
+const _dirV2   = new THREE.Vector3();
 
-// (azimuth, elevation) -> a unit direction in WORLD space.
-//
-// Deliberately NOT rotated by the brain group's quaternion. Doing that pinned the angle to the
-// anatomy, which meant the camera orbited in lockstep with the idle spin — the brain then held
-// perfectly still on screen for as long as a project was open. The spin was always running; it
-// simply could not be seen, because the observer was turning with it. Leaving the direction in
-// world space parks the camera at a fixed point while the brain keeps turning underneath it, so
-// the idle rotation reads exactly as it does in the default view.
-//
-// `out` must not alias any vector the caller is still reading.
-function orbitDir(azDeg: number, elDeg: number, out: THREE.Vector3) {
-  const az = THREE.MathUtils.degToRad(azDeg);
-  const el = THREE.MathUtils.degToRad(elDeg);
-  const ce = Math.cos(el);
-  out.set(Math.sin(az) * ce, Math.sin(el), Math.cos(az) * ce);
-  return out;
+// Shortest-arc interpolation between two unit directions. Independent lerping of x/y/z takes the
+// chord instead, which both cuts in toward the brain and races through the angle at the midpoint.
+function slerpDir(a: THREE.Vector3, b: THREE.Vector3, t: number, out: THREE.Vector3) {
+  const dot = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+  const omega = Math.acos(dot);
+  const sinOmega = Math.sin(omega);
+  if (sinOmega < 1e-6) return out.copy(t < 0.5 ? a : b);
+  return out
+    .copy(a).multiplyScalar(Math.sin((1 - t) * omega) / sinOmega)
+    .addScaledVector(b, Math.sin(t * omega) / sinOmega)
+    .normalize();
 }
 
 // A node's CURRENT world position: its local position under PROJECT_HOTSPOTS pushed through the
@@ -780,14 +797,6 @@ function nodeWorld(index: number, out: THREE.Vector3) {
   out.set(...PROJECT_HOTSPOTS[index]);
   if (g) out.applyMatrix4(g.matrixWorld);
   return out;
-}
-
-// World direction -> the (azimuth, elevation) the camera tweens in. Inverse of orbitDir, so a
-// direction sampled off a node round-trips exactly. Elevation is clamped (see ELEVATION_LIMIT).
-function dirToAngles(dir: THREE.Vector3) {
-  const az = THREE.MathUtils.radToDeg(Math.atan2(dir.x, dir.z));
-  const elRaw = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(dir.y, -1, 1)));
-  return { az, el: THREE.MathUtils.clamp(elRaw, -ELEVATION_LIMIT, ELEVATION_LIMIT), elRaw };
 }
 
 function CameraController({ selected }: { selected: Project | null }) {
@@ -813,6 +822,15 @@ function CameraController({ selected }: { selected: Project | null }) {
     defaultDistanceRef.current = orbitDistance(aspect, fov0, DEFAULT_MARGIN);
   }
 
+  // Re-base the move on wherever the camera actually is: evaluate the in-flight slerp at its
+  // current t and make that the new start. This is what guarantees a switch continues from the
+  // live position rather than snapping toward any stored or default one.
+  const rebaseFromCurrent = () => {
+    slerpDir(_dirFrom, _dirTo, anim.t, _dirV);
+    _dirFrom.copy(_dirV);
+    anim.t = 0;
+  };
+
   useEffect(() => {
     const nextId = selected ? selected.id : null;
     // Kill the running timeline, not just its tweens: a timeline also carries the mid-transition
@@ -821,69 +839,104 @@ function CameraController({ selected }: { selected: Project | null }) {
     tlRef.current?.kill();
     gsap.killTweensOf(anim);
 
+    const defaultDistance = defaultDistanceRef.current!;
+    _centreV.set(0, SCENE_CENTRE_Y, 0);
+
     if (nextId === null) {
-      // BACK — resume the idle rotation immediately, then ease all the way out to the default
-      // view. `engaged` is only cleared once the camera has actually landed, so the light cone
-      // stays hidden for the whole journey and reappears exactly at the default view.
-      brainSpin.paused = false;
+      // BACK — arc back to the default direction, radius easing out to full, pedestal glow and
+      // bloom restoring to their normal strength on the way. The idle rotation eases back up to
+      // full speed over BRAIN_SPIN_RAMP_S; it never stopped, it was only running slower.
+      gsap.killTweensOf(brainSpin);
+      gsap.to(brainSpin, { speedScale: 1, duration: BRAIN_SPIN_RAMP_S, ease: "power2.inOut" });
+      rebaseFromCurrent();
+      _dirTo.copy(_DEFAULT_DIR);
       tlRef.current = gsap.timeline()
-        .to(anim, { depth: 0, radiusFrac: 1, duration: BACK_S, ease: "power2.inOut" })
-        .add(() => { toId.current = null; anim.engaged = 0; });
+        .to(anim, {
+          depth: 0, t: 1, bottom: 0, radius: defaultDistance,
+          duration: MOVE_S, ease: "power2.inOut",
+        })
+        .add(() => { anim.engaged = 0; });
       return;
     }
 
     anim.engaged = 1;
-    // Freeze the brain BEFORE sampling. From here the node's world position is stationary, so
-    // the target computed below stays valid for the whole tween instead of drifting out from
-    // under it — Option A. The brain group's matrixWorld already holds the last rendered yaw,
-    // which is the yaw it now holds, so the sample and the freeze agree.
-    brainSpin.paused = true;
 
-    // ── The node's LIVE world position, with the brain's current rotation applied ──
+    // Ease the idle rotation down to its zoomed rate. Tweened rather than assigned, so the
+    // slow-down is gradual and the brain keeps turning throughout.
+    gsap.killTweensOf(brainSpin);
+    gsap.to(brainSpin, {
+      speedScale: BRAIN_SPIN_SLOW_FRAC, duration: BRAIN_SPIN_RAMP_S, ease: "power2.inOut",
+    });
+
+    // The node's CURRENT world position, with the brain's live rotation applied, then straight
+    // out along that direction to the zoom radius. Sampled once, here: the brain keeps turning
+    // afterwards and the camera deliberately does not follow it, so this is a fixed destination.
     nodeWorld(nextId, _toV);
-    _centreV.set(0, SCENE_CENTRE_Y, 0);
-    _dirV.copy(_toV).sub(_centreV);
-    if (_dirV.lengthSq() < 1e-8) _dirV.copy(_DEFAULT_DIR);
-    _dirV.normalize();
-    const view = dirToAngles(_dirV);
+    _dirV2.copy(_toV).sub(_centreV);
+    if (_dirV2.lengthSq() < 1e-8) _dirV2.copy(_DEFAULT_DIR);
+    _dirV2.normalize();
 
-    // Settled camera position, straight from that direction.
-    _startV.copy(_centreV).addScaledVector(_dirV, defaultDistanceRef.current! * ZOOM_RADIUS_FACTOR);
+    // Bottom-region projects: replace the elevation outright with the from-below angle, keeping
+    // the node's own azimuth. Every other project keeps its direction exactly as the node sets it.
+    const bottomElev = BOTTOM_REGION_ELEV_DEG[nextId];
+    const isBottom = bottomElev !== undefined;
+    if (isBottom) {
+      const az = Math.atan2(_dirV2.x, _dirV2.z);
+      const el = THREE.MathUtils.degToRad(bottomElev);
+      const ce = Math.cos(el);
+      _dirV2.set(Math.sin(az) * ce, Math.sin(el), Math.cos(az) * ce).normalize();
+    }
+    _startV.copy(_centreV).addScaledVector(_dirV2, defaultDistance * ZOOM_DISTANCE_FACTOR);
+
     // eslint-disable-next-line no-console
     console.log(
       `[Brain camera] ${selected!.name} (id ${nextId})`,
       `\n    node world position = (${_toV.x.toFixed(4)}, ${_toV.y.toFixed(4)}, ${_toV.z.toFixed(4)})`,
-      `\n    direction           = (${_dirV.x.toFixed(4)}, ${_dirV.y.toFixed(4)}, ${_dirV.z.toFixed(4)})`,
-      `  azimuth=${view.az.toFixed(1)} elevation=${view.elRaw.toFixed(1)}${view.el !== view.elRaw ? ` (clamped to ${view.el})` : ""}`,
+      `\n    direction           = (${_dirV2.x.toFixed(4)}, ${_dirV2.y.toFixed(4)}, ${_dirV2.z.toFixed(4)})`,
+      isBottom ? `  [bottom region: elevation forced to ${bottomElev}deg, glow+bloom to ${BOTTOM_DIM_FRAC * 100}%]` : "",
       `\n    camera position     = (${_startV.x.toFixed(4)}, ${_startV.y.toFixed(4)}, ${_startV.z.toFixed(4)})`,
-      `  radius=${(defaultDistanceRef.current! * ZOOM_RADIUS_FACTOR).toFixed(4)}`,
-      `\n    lookAt (brainCentre, fixed) = (${_centreV.x.toFixed(4)}, ${_centreV.y.toFixed(4)}, ${_centreV.z.toFixed(4)})`,
+      ` distance=${(defaultDistance * ZOOM_DISTANCE_FACTOR).toFixed(4)} (${ZOOM_DISTANCE_FACTOR} x default)`,
+      `\n    lookAt = brainCentre (${_centreV.x.toFixed(4)}, ${_centreV.y.toFixed(4)}, ${_centreV.z.toFixed(4)}) — fixed in every state`,
+      `\n    camera-to-node ${_startV.distanceTo(_toV).toFixed(4)} = ${(_startV.distanceTo(_toV) / NODE_GLOW_RADIUS).toFixed(2)}x glow radius`,
     );
 
-    // Straight dive in. Taken from the default view, when re-selecting the node already framed,
-    // or when catching a BACK mid-flight. Snapping az/el here is safe precisely when depth is at
-    // or near 0, because the direction is then _DEFAULT_DIR regardless of what az/el hold.
-    if (toId.current === null || toId.current === nextId || anim.depth <= 0.01) {
-      toId.current = nextId;
-      anim.az = shortestAz(anim.az, view.az);
-      anim.el = view.el;
+    const fromDefault = toId.current === null || anim.depth <= 0.01;
+    toId.current = nextId;
+    const zoomRadius = defaultDistance * ZOOM_DISTANCE_FACTOR;
+
+    if (fromDefault) {
+      // First click from the default view — the one move that IS interpolated. There is no
+      // previous project to cut away from, and easing in from the wide shot reads as arriving
+      // rather than orbiting.
+      rebaseFromCurrent();
+      _dirTo.copy(_dirV2);
       tlRef.current = gsap.timeline()
-        .to(anim, { depth: 1, radiusFrac: ZOOM_RADIUS_FACTOR, duration: ZOOM_IN_S, ease: "power2.inOut" });
+        .to(anim, {
+          depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
+          duration: MOVE_S, ease: "power2.inOut",
+        });
       return;
     }
 
-    // Project-to-project — ORBIT around the brain from the current angle to the next project's,
-    // with the radius easing out to MID_RADIUS_FRAC at the halfway point and back in by the end.
-    // depth stays pinned at 1 for the whole swing: the camera never returns to the default view,
-    // it travels around the brain, so the beam stays hidden and the bloom holds its inside value.
-    toId.current = nextId;
+    // Project-to-project — ONE continuous arc. rebaseFromCurrent pins the start to wherever the
+    // camera actually is (so an interrupted move carries on from the live position rather than
+    // jumping), then a single tween slerps the direction across and lerps the radius. Both
+    // endpoints sit at the zoom radius, so the distance holds steady and the path never bulges
+    // out toward the default wide view — it is a direct arc between the two framings.
+    rebaseFromCurrent();
+    _dirTo.copy(_dirV2);
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[Brain camera] switch: ${THREE.MathUtils.radToDeg(_dirFrom.angleTo(_dirTo)).toFixed(1)}deg arc`,
+      `over ${SWITCH_S}s, sine.inOut, radius held at ${zoomRadius.toFixed(4)}`,
+    );
+
     tlRef.current = gsap.timeline()
       .to(anim, {
-        az: shortestAz(anim.az, view.az), el: view.el, depth: 1,
-        duration: SWITCH_S, ease: "power2.inOut",
-      }, 0)
-      .to(anim, { radiusFrac: MID_RADIUS_FRAC, duration: SWITCH_S / 2, ease: "power2.inOut" }, 0)
-      .to(anim, { radiusFrac: ZOOM_RADIUS_FACTOR, duration: SWITCH_S / 2, ease: "power2.inOut" }, SWITCH_S / 2);
+        depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
+        duration: SWITCH_S, ease: "sine.inOut",
+      });
   }, [selected, anim]);
 
   useEffect(() => () => { tlRef.current?.kill(); gsap.killTweensOf(anim); }, [anim]);
@@ -896,7 +949,6 @@ function CameraController({ selected }: { selected: Project | null }) {
     // camera swung below the equator.
     _centreV.set(0, SCENE_CENTRE_Y, 0);
 
-    const { depth } = anim;
     const defaultDistance = defaultDistanceRef.current!;
 
     if (!loggedRef.current) {
@@ -904,38 +956,36 @@ function CameraController({ selected }: { selected: Project | null }) {
       // eslint-disable-next-line no-console
       console.log(
         "[Brain camera] defaultDistance =", defaultDistance.toFixed(4),
-        " zoomedDistance =", (defaultDistance * ZOOM_RADIUS_FACTOR).toFixed(4),
+        " zoomedDistance =", (defaultDistance * ZOOM_DISTANCE_FACTOR).toFixed(4),
         " SCENE_RADIUS (bounding-sphere) =", SCENE_RADIUS,
       );
     }
 
-    // Direction the camera sits along, measured from the pivot. Defaults to straight-on +Z and
-    // eases toward the targeted node's own direction as `depth` goes 0 -> 1. Read live off the
-    // brain's current transform each frame, so it tracks the continuous idle spin. This is the
-    // whole of the per-node differentiation: nothing is hardcoded per project, so the top node
-    // is approached from above, the back node from behind, and a 5th node works untouched.
-    // Target direction for the live orbital angle. World-fixed, so the brain's idle spin runs
-    // underneath it and stays visible while zoomed. Written into _viewV, NOT _dirV — see the
-    // note on _viewV.
-    orbitDir(anim.az, anim.el, _viewV);
-    _dirV.copy(_DEFAULT_DIR).lerp(_viewV, depth);
-    if (_dirV.lengthSq() < 1e-8) _dirV.copy(_DEFAULT_DIR);
-    _dirV.normalize();
+    // Seed the default camera position once, at the first frame, now that defaultDistance is
+    // known. Everything after this is tween-driven.
+    if (!anim.ready) {
+      anim.ready = 1;
+      _dirFrom.copy(_DEFAULT_DIR);
+      _dirTo.copy(_DEFAULT_DIR);
+      anim.radius = defaultDistance;
+      anim.t = 1;
+    }
 
-    // Pure dolly: only the distance along that direction changes with depth. No lateral
-    // pan of any kind is applied — not a constant one, and nothing keyed to whether the
-    // readout is open. Camera and target are both derived solely from `_centreV`, so the
-    // pivot projects to the exact centre of the full-width canvas in EVERY state, and the
-    // brain's centre X cannot move when a project opens or closes. The panels overlay the
-    // canvas on higher z-indices instead of displacing the scene.
-    // Radius comes straight off the tweened fraction — 1 at the default view, ZOOM_RADIUS_FACTOR
-    // parked on a project, bulging to MID_RADIUS_FRAC halfway through a swing between two.
-    const dist = defaultDistance * anim.radiusFrac;
-    _startV.copy(_centreV).addScaledVector(_dirV, dist);
-    _lookV.copy(_centreV);
-
+    // ── Position: shortest arc at a constant radius ──
+    // Direction comes from the slerp, radius from its own tween. Between two projects the two
+    // endpoints are set to the SAME vector, so the slerp is a constant and only the radius moves
+    // — that is the zoom-out / cut / zoom-in, with no angular path to see.
+    slerpDir(_dirFrom, _dirTo, anim.t, _dirV);
+    _startV.copy(_centreV).addScaledVector(_dirV, anim.radius);
     camera.position.copy(_startV);
-    camera.lookAt(_lookV);
+
+    // ── Aim: brainCentre, ALWAYS ──
+    // Never the node, and never tracked. The lookAt point is what lands at the centre of the
+    // screen, so pinning it here is precisely what stops the brain sliding: selecting a project
+    // can change how large the brain is and which side faces the lens, never where its centre
+    // sits. Anything that moved this — tracking the node, an aim floor, a lateral bias — put the
+    // brain back on the move, so there is deliberately nothing of that kind left.
+    camera.lookAt(_centreV);
 
     if (camera.near !== NEAR_OUTSIDE) {
       camera.near = NEAR_OUTSIDE;
@@ -2047,14 +2097,12 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
     });
   }, [brainMeshes]);
 
-  // Idle rotation. INTEGRATED from delta rather than derived from clock.elapsedTime, because the
-  // camera controller freezes it while a project is open (see brainSpin). Reading absolute
-  // elapsed time would keep the clock running through the pause and snap the brain forward the
-  // moment it resumed; accumulating means a pause simply holds the angle where it stands.
-  // delta is clamped so a backgrounded tab returning after several seconds doesn't jump.
+  // Idle rotation. Always running, never paused and never range-limited — `speedScale` only
+  // changes HOW FAST, never whether. delta is clamped so a backgrounded tab returning after
+  // several seconds resumes smoothly instead of jumping a large arc in one frame.
   useFrame((_, delta) => {
     if (!groupRef.current) return;
-    if (!brainSpin.paused) brainSpin.angle += Math.min(delta, 0.1) * BRAIN_SPIN_SPEED;
+    brainSpin.angle += Math.min(delta, 0.1) * BRAIN_SPIN_SPEED * brainSpin.speedScale;
     groupRef.current.rotation.y = brainSpin.angle;
   });
 
@@ -2745,7 +2793,15 @@ function HolographicPedestal() {
   useFrame(({ clock }) => {
     if (spinRef.current) spinRef.current.rotation.y += 0.001;
     const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * 1.3);
-    accentRefs.current.forEach((m, i) => { if (m) m.emissiveIntensity = ACCENT_BASE[i] - 0.3 + 0.5 * pulse; });
+    // Fade the accent glow back while a bottom-region project is framed. Those shots put the
+    // camera underneath the brain, so the platform is unavoidably in frame and at full strength
+    // it blows the lower half out. `bottom` is tweened 0 <-> 1 alongside the camera move, so this
+    // dims and restores in step with it rather than popping. Geometry is untouched — only how
+    // hard the accents emit.
+    const glowDim = 1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom;
+    accentRefs.current.forEach((m, i) => {
+      if (m) m.emissiveIntensity = (ACCENT_BASE[i] - 0.3 + 0.5 * pulse) * glowDim;
+    });
   });
 
   // metalness/roughness vary per part: the deck is deliberately rougher and less metallic so it
@@ -3061,7 +3117,12 @@ function BloomZoomFade({ bloomRef }: { bloomRef: React.RefObject<BloomEffectRef 
     if (!b) return;
     const uniform = b.uniforms.get("intensity");
     if (!uniform) return;
-    const target = BLOOM_INTENSITY * (1 - (1 - BLOOM_INSIDE_FRAC) * camAnim.depth);
+    // Bottom-region shots take the bloom down to BOTTOM_DIM_FRAC on top of the usual zoomed
+    // reduction, for the same reason the pedestal glow does — the platform is in frame there and
+    // its bloom is what washes the shot out.
+    const target = BLOOM_INTENSITY
+      * (1 - (1 - BLOOM_INSIDE_FRAC) * camAnim.depth)
+      * (1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom);
     uniform.value = target;
 
     // Verification logging (section 2/6): "before" is the resting default-state value, logged
