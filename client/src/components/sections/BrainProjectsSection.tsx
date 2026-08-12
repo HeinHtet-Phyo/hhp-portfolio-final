@@ -147,6 +147,11 @@ const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [.
 // this each frame is what keeps an interior camera locked to its region as the brain turns,
 // rather than drifting off it the moment the tween lands.
 const brainGroupRef: { current: THREE.Group | null } = { current: null };
+// Outer scene group (brain + pedestal + beam) — separate from brainGroupRef
+// above, which is the inner idle-spin group nested inside BrainModel. Written
+// every frame from camAnim.groupY, in the SAME useFrame tick that sets the
+// camera's position, so the two can never be one frame apart.
+const sceneGroupRef: { current: THREE.Group | null } = { current: null };
 
 // Hover tooltip anchoring. The label is a DOM overlay but must sit on the NODE, not the cursor,
 // so its screen position is recomputed each frame by projecting the node's live world position
@@ -660,7 +665,15 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 //
 // `bottom` is 1 while a lower-region project is framed; the pedestal glow and the bloom pass
 // both read it to fade themselves back. `ready` is 0 until the defaults are seeded.
-const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0 };
+// Vertical position of the brain + pedestal + beam group — ONE value, used in
+// every state. Selecting a project must only dolly the camera in; the group
+// itself does not move. Still tweened through camAnim.groupY (in the same
+// gsap calls as radius/depth) rather than a bare constant on the JSX, so a
+// future re-introduction of a per-state offset only has to change the target
+// values passed to those tweens, not rebuild the sync mechanism.
+const GROUP_Y = -0.02;
+
+const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0, groupY: GROUP_Y };
 
 // One body colour for light mode, shared by the brain shell and the pedestal so
 // the two always match. Changing this moves both together.
@@ -732,7 +745,7 @@ const SWITCH_SLOW_FACTOR = 0.6;
 // drifts in over the other five. Switch to sine.inOut if the arrival wants easing at both ends.
 // Only the timing changes here — direction, radius and ZOOM_DISTANCE_FACTOR are untouched, so
 // every shot ends in exactly the same place it did before.
-const ZOOM_DURATION_S = 6;
+const ZOOM_DURATION_S = 6.3;
 const ZOOM_EASE       = "power2.out";
 
 // Readout content cross-fade (140ms out + 140ms in) sits centred on the zoom-out leg's midpoint,
@@ -761,7 +774,7 @@ const SCENE_RADIUS = 0.31;
 // PROJECT_05, elevation -6deg) projected the pedestal to 101.8% of canvas height, cutting it
 // at the bottom edge. The zoomed radius is defaultDistance * ZOOM_DISTANCE_FACTOR, so this
 // pulls the focused shots back too and leaves ZOOM_DISTANCE_FACTOR (0.75) untouched.
-const DEFAULT_MARGIN = 1.31;
+const DEFAULT_MARGIN = 1.335;
 
 // ── Click-to-zoom: dolly in on the node's side, brain stays centred ──
 // lookAt is ALWAYS the brain centre — never the node. Pointing the lens at the node is what
@@ -818,7 +831,7 @@ const DEFAULT_MARGIN = 1.31;
 // Camera distance from brainCentre while a project is open, as a fraction of defaultDistance.
 // The camera sits on the line from brainCentre out through the node, so each project gives a
 // genuinely different angle, and lookAt stays on brainCentre so the brain cannot slide.
-const ZOOM_DISTANCE_FACTOR = 0.75;
+const ZOOM_DISTANCE_FACTOR = 0.825;
 
 // ─── Bottom-region projects: look UP from underneath — TUNE HERE ─────────────
 // The three nodes with a negative y in PROJECT_NODES: CityPulse "back, lower" (2), PreventPath
@@ -870,6 +883,7 @@ const NODE_GLOW_RADIUS = 0.092 * 1.6;
 //
 // which puts brainCentre at NDC x = -2*frac, i.e. `frac` of the frame width left of centre.
 const ZOOM_LEFT_SHIFT_FRAC = 0.05;
+
 // Near plane stays at its default in both states now — the camera never enters the mesh
 // (closest approach stays at 3.69x the node glow radius, well outside SCENE_RADIUS), and a wide
 // near/far ratio reintroduces the depth-precision sparkle noted on the Canvas.
@@ -1011,7 +1025,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       console.log(`[Brain camera] BACK: ${back.deg.toFixed(1)}deg arc -> ${ZOOM_DURATION_S.toFixed(2)}s`);
       tlRef.current = gsap.timeline()
         .to(anim, {
-          depth: 0, t: 1, bottom: 0, radius: defaultDistance,
+          depth: 0, t: 1, bottom: 0, radius: defaultDistance, groupY: GROUP_Y,
           duration: ZOOM_DURATION_S, ease: ZOOM_EASE,
         })
         .add(() => { anim.engaged = 0; });
@@ -1082,7 +1096,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       console.log(`[Brain camera] first zoom-in: ${first.deg.toFixed(1)}deg arc -> ${ZOOM_DURATION_S.toFixed(2)}s`);
       tlRef.current = gsap.timeline()
         .to(anim, {
-          depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
+          depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius, groupY: GROUP_Y,
           duration: ZOOM_DURATION_S, ease: ZOOM_EASE,
         });
       return;
@@ -1111,7 +1125,7 @@ function CameraController({ selected }: { selected: Project | null }) {
 
     tlRef.current = gsap.timeline()
       .to(anim, {
-        depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
+        depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius, groupY: GROUP_Y,
         duration: switchDuration, ease: ZOOM_EASE,
       })
       // eslint-disable-next-line no-console
@@ -1160,6 +1174,10 @@ function CameraController({ selected }: { selected: Project | null }) {
     blendDir(_dirFrom, _dirTo, anim.t, _dirV);
     _startV.copy(_centreV).addScaledVector(_dirV, anim.radius);
     camera.position.copy(_startV);
+    // Same frame, same tween, same value the camera radius came from above —
+    // this is what keeps the group and the camera moving in lockstep rather
+    // than one settling before the other.
+    if (sceneGroupRef.current) sceneGroupRef.current.position.y = anim.groupY;
 
     // ── Aim: brainCentre, plus a fixed left shift while zoomed ──
     // Still never the node and never tracked — the target is brainCentre in every state, which is
@@ -3414,11 +3432,15 @@ function BrainScene({ selected, onHotspotSelect, onHotspotHover, light }: {
       {/* Point light removed — was causing bright centre */}
 
       <CameraController selected={selected} />
-      <Suspense fallback={null}>
-        <BrainModel light={light} selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
-      </Suspense>
-      <HolographicPedestal light={light} />
-      <HolographicBeam light={light} />
+      {/* Static lift, not the earlier hover-driven SceneDrop mechanism — same
+          Y in every state, so it only reframes the shot, never animates. */}
+      <group ref={(g) => { sceneGroupRef.current = g; }} position={[0, camAnim.groupY, 0]}>
+        <Suspense fallback={null}>
+          <BrainModel light={light} selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
+        </Suspense>
+        <HolographicPedestal light={light} />
+        <HolographicBeam light={light} />
+      </group>
 
       {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
           network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
@@ -4342,7 +4364,7 @@ export default function ProjectsSection() {
           Desktop only: on narrow the NodeChipRow already occupies exactly this
           slot (top: NAV_CLEARANCE), and rendering both would overlap them. */}
       {!narrow && (
-        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: EDGE_PAD, zIndex: 10, marginBottom: "205px" }}>
+        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
             <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
             <span className="brain-section-label" style={{
