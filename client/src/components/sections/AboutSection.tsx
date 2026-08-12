@@ -39,7 +39,7 @@ export default function AboutSection() {
       ref={sectionRef}
       style={{
         minHeight: "100vh",
-        padding: "6rem 8vw",
+        padding: "96px 8vw",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
@@ -53,7 +53,7 @@ export default function AboutSection() {
           opacity: inView ? 1 : 0,
           transform: inView ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
-          marginBottom: "3rem",
+          marginBottom: "4.25rem",
           display: "flex",
           alignItems: "center",
           gap: "0.6rem",
@@ -81,7 +81,7 @@ export default function AboutSection() {
             flexShrink: 0,
           }}
         >
-          01 — About
+          01 — About Me
         </span>
 
       </div>

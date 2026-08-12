@@ -1,78 +1,69 @@
-// FooterSection — strict black-and-white theme
-// Social icons row, HEIN wordmark, copyright, Made with London
-// Monochrome outline icons, soft white glow on hover
+// FooterSection — three-column bar: name (left), social icons (centre),
+// copyright (right).
 
 import { useState } from "react";
 
-// ── Social Icons ──────────────────────────────────────────────────────────────
-function FacebookIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>
-    </svg>
-  );
-}
-function LinkedInIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/>
-      <rect x="2" y="9" width="4" height="12"/>
-      <circle cx="4" cy="4" r="2"/>
-    </svg>
-  );
-}
-function InstagramIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"/>
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
-      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/>
-    </svg>
-  );
-}
+// ── Icons ─────────────────────────────────────────────────────────────────────
+// 20px line-art, inheriting `currentColor` so the link controls the colour.
 function GitHubIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>
-    </svg>
-  );
-}
-function MailIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="4" width="20" height="16" rx="2"/>
-      <path d="M2 7l10 7 10-7"/>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
     </svg>
   );
 }
 
-function SocialBtn({ href, children, label }: { href: string; children: React.ReactNode; label: string }) {
-  const [hovered, setHovered] = useState(false);
+function LinkedInIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
+      <rect x="2" y="9" width="4" height="12" />
+      <circle cx="4" cy="4" r="2" />
+    </svg>
+  );
+}
+
+function MailIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" />
+      <path d="M2 7l10 7 10-7" />
+    </svg>
+  );
+}
+
+const SOCIALS = [
+  { label: "GitHub", href: "https://github.com/HeinHtet-Phyo", Icon: GitHubIcon },
+  { label: "LinkedIn", href: "https://linkedin.com/in/hein-htet-phyo", Icon: LinkedInIcon },
+  { label: "Email", href: "mailto:heinhtetphyo56@gmail.com", Icon: MailIcon },
+];
+
+function SocialLink({ href, label, children }: {
+  href: string; label: string; children: React.ReactNode;
+}) {
+  const [active, setActive] = useState(false);
+  const isMail = href.startsWith("mailto:");
   return (
     <a
       href={href}
-      target={href.startsWith("mailto") ? "_self" : "_blank"}
-      rel="noopener noreferrer"
       aria-label={label}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      // mailto: must stay in the same tab — a new tab would open and
+      // immediately blank once the mail client takes over.
+      target={isMail ? "_self" : "_blank"}
+      rel={isMail ? undefined : "noopener noreferrer"}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      // Focus mirrors hover so keyboard users get the same affordance.
+      onFocus={() => setActive(true)}
+      onBlur={() => setActive(false)}
       style={{
-        width: "40px",
-        height: "40px",
-        borderRadius: "50%",
-        border: hovered ? "1px solid rgba(255,255,255,0.45)" : "1px solid rgba(255,255,255,0.15)",
-        background: hovered ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.03)",
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
-        justifyContent: "center",
-        color: hovered ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.5)",
-        boxShadow: hovered ? "0 0 14px rgba(255,255,255,0.1)" : "none",
-        transition: "border-color 0.22s ease, background 0.22s ease, color 0.22s ease, box-shadow 0.22s ease, transform 0.15s ease",
-        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+        color: active ? "#ffffff" : "rgba(255,255,255,0.5)",
+        transition: "color 0.2s ease",
         textDecoration: "none",
-        flexShrink: 0,
       }}
-      className="footer-social-btn"
+      className="footer-social-link"
     >
       {children}
     </a>
@@ -86,86 +77,82 @@ export default function FooterSection() {
       style={{
         position: "relative",
         zIndex: 1,
-        borderTop: "1px solid rgba(255,255,255,0.07)",
-        padding: "2.5rem 8vw",
-        display: "flex",
-        flexDirection: "column",
+        // Transparent rather than an opaque #020008 fill: the starfield is
+        // painted behind the page, and a solid background would cover it. The
+        // page is already this black, so it reads the same.
+        background: "transparent",
+        borderTop: "1px solid rgba(255,255,255,0.1)",
+        // 8vw matches ContactSection above (and Hero/Education), so the footer's
+        // content edges line up with the rest of the page rather than sitting on
+        // their own margin.
+        padding: "38px 8vw",
+        // Floor, not a fixed height: the row is 28px + content + 28px, so this
+        // only takes effect if the content is shorter than 24px. Keeps the bar
+        // from collapsing while still growing when the columns stack on mobile.
+        minHeight: "80px",
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr 1fr",
         alignItems: "center",
-        gap: "1.5rem",
+        gap: "1rem",
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: "13px",
       }}
       className="footer-section"
     >
-      {/* Social icons row */}
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-        <SocialBtn href="https://facebook.com/" label="Facebook">
-          <FacebookIcon />
-        </SocialBtn>
-        <SocialBtn href="https://linkedin.com/in/hein-htet-phyo" label="LinkedIn">
-          <LinkedInIcon />
-        </SocialBtn>
-        <SocialBtn href="https://instagram.com/" label="Instagram">
-          <InstagramIcon />
-        </SocialBtn>
-        <SocialBtn href="https://github.com/HeinHtet-Phyo" label="GitHub">
-          <GitHubIcon />
-        </SocialBtn>
-        <SocialBtn href="mailto:heinhtetphyo56@gmail.com" label="Email">
-          <MailIcon />
-        </SocialBtn>
+      {/* ── Left: name ── */}
+      <div className="footer-name" style={{ justifySelf: "start", color: "#ffffff", fontWeight: 600 }}>
+        Hein Htet Phyo
       </div>
 
-      {/* Wordmark */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "1.1rem",
-        fontWeight: 700,
-        letterSpacing: "0.35em",
-        textTransform: "uppercase",
-        opacity: 0.18,
-      }}>
-        HEIN
-      </div>
+      {/* ── Centre: social icons ── */}
+      <nav
+        aria-label="Social links"
+        style={{ justifySelf: "center", display: "flex", alignItems: "center", gap: "24px" }}
+      >
+        {SOCIALS.map(({ label, href, Icon }) => (
+          <SocialLink key={label} href={href} label={label}>
+            <Icon />
+          </SocialLink>
+        ))}
+      </nav>
 
-      {/* Copyright */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.68rem",
-        letterSpacing: "0.06em",
-        opacity: 0.35,
-        textAlign: "center",
+      {/* ── Right: copyright ── */}
+      <div className="footer-copyright" style={{
+        justifySelf: "end",
+        textAlign: "right",
+        color: "rgba(255,255,255,0.4)",
+        fontSize: "12px",
       }}>
         © 2026 Hein Htet Phyo. All rights reserved.
       </div>
 
-      {/* Made with */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: "0.65rem",
-        opacity: 0.25,
-        display: "flex",
-        alignItems: "center",
-        gap: "0.35rem",
-        letterSpacing: "0.04em",
-      }}>
-        Made with
-        <span style={{ opacity: 0.7, fontSize: "0.75rem" }}>♥</span>
-        in London, UK
-      </div>
-
       <style>{`
         .light .footer-section {
-          border-top-color: rgba(0,0,0,0.08) !important;
+          border-top-color: rgba(0,0,0,0.1) !important;
         }
-        .light .footer-social-btn {
-          border-color: rgba(0,0,0,0.15) !important;
-          background: rgba(0,0,0,0.03) !important;
-          color: rgba(0,0,0,0.45) !important;
-        }
-        .light .footer-social-btn:hover {
-          border-color: rgba(0,0,0,0.35) !important;
-          background: rgba(0,0,0,0.07) !important;
-          color: rgba(0,0,0,0.85) !important;
-          box-shadow: 0 0 14px rgba(0,0,0,0.07) !important;
+        /* Explicit classes, not positional selectors. "> div:last-child" never
+           matched: the <style> element below is the footer's actual last child,
+           so no div satisfies :last-child and the copyright kept its dark-mode
+           colour in light mode. */
+        .light .footer-name      { color: #000000 !important; }
+        .light .footer-copyright { color: #000000 !important; }
+        .light .footer-social-link { color: rgba(0,0,0,0.6) !important; }
+        .light .footer-social-link:hover,
+        .light .footer-social-link:focus-visible { color: #000000 !important; }
+
+        /* Single row by design; below 720px three columns cannot fit at 13px,
+           so they stack rather than overflow the viewport. */
+        @media (max-width: 720px) {
+          .footer-section {
+            grid-template-columns: 1fr !important;
+            justify-items: center !important;
+            gap: 1rem !important;
+            padding: 24px !important;
+          }
+          .footer-section > * {
+            justify-self: center !important;
+            text-align: center !important;
+          }
         }
       `}</style>
     </footer>

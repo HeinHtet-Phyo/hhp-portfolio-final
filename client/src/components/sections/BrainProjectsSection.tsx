@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import gsap from "gsap";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
 if (import.meta.hot) {
@@ -661,6 +662,13 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 // both read it to fade themselves back. `ready` is 0 until the defaults are seeded.
 const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0 };
 
+// One body colour for light mode, shared by the brain shell and the pedestal so
+// the two always match. Changing this moves both together.
+const LIGHT_BODY_COL = "#8a8f96";
+// Emissive tone for the pedestal's lit accents in light mode. Pure white blows
+// out against a pale page; a mid grey keeps the rim readable as a highlight.
+const LIGHT_EMISSIVE = "#333333";
+
 // ── Transition timings ──
 // There is no orbital leg any more: switching projects shifts the aim from one node to the next
 // and nudges the camera's small lateral offset across, which reads as changing focus rather than
@@ -753,7 +761,7 @@ const SCENE_RADIUS = 0.31;
 // PROJECT_05, elevation -6deg) projected the pedestal to 101.8% of canvas height, cutting it
 // at the bottom edge. The zoomed radius is defaultDistance * ZOOM_DISTANCE_FACTOR, so this
 // pulls the focused shots back too and leaves ZOOM_DISTANCE_FACTOR (0.75) untouched.
-const DEFAULT_MARGIN = 1.50;
+const DEFAULT_MARGIN = 1.31;
 
 // ── Click-to-zoom: dolly in on the node's side, brain stays centred ──
 // lookAt is ALWAYS the brain centre — never the node. Pointing the lens at the node is what
@@ -1931,7 +1939,7 @@ function WireframeBrain({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
+function NeuralDots({ meshes, light }: { meshes: THREE.Mesh[]; light: boolean }) {
   const surfDotRef = useRef<THREE.InstancedMesh>(null);
   const surfHaloRef = useRef<THREE.InstancedMesh>(null);
   const intDotRef = useRef<THREE.InstancedMesh>(null);
@@ -2005,7 +2013,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
       </instancedMesh>
       <instancedMesh ref={surfDotRef} args={[undefined, undefined, surfaceCount]} renderOrder={2}>
         <sphereGeometry args={[0.0058, 8, 8]} />
-        <meshBasicMaterial color="#f2feff" transparent opacity={0.78} depthWrite={false} depthTest />
+        <meshBasicMaterial color="#f2feff" transparent opacity={light ? 0.6 : 0.78} depthWrite={false} depthTest />
       </instancedMesh>
 
       {/* INTERIOR layer — subtle depth hints at ~40-50% of the surface layer's weight.
@@ -2183,10 +2191,11 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
+function BrainModel({ selected, onHotspotSelect, onHotspotHover, light }: {
   selected: Project | null;
   onHotspotSelect: (p: Project) => void;
   onHotspotHover: (index: number | null) => void;
+  light: boolean;
 }) {
   // Welded copy of the particle brain scan: the original export had zero shared vertices
   // (285,966 verts for 95,322 tris, fully non-indexed), so computeVertexNormals() could
@@ -2270,7 +2279,10 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
     // Fully opaque = blocks all far-side lines = consistent color at all angles.
     // MeshStandardMaterial responds to scene lights so brain folds are visible.
     const mat = new THREE.MeshStandardMaterial({
-      color: "#303030",
+      // #303030 reads as a near-black silhouette against a light page. A mid
+      // grey keeps the same matte shading and fold detail while separating the
+      // mass from the background.
+      color: light ? LIGHT_BODY_COL : "#303030",
       roughness: 0.42,
       metalness: 0.0,
       transparent: false,
@@ -2280,7 +2292,7 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
     mat.vertexColors = false;
     mat.map = null;
     return mat;
-  }, []);
+  }, [light]);
 
   // Backface-outline rim technique: a slightly enlarged copy of the same geometry,
   // rendered BackSide-only, so only the sliver right at the silhouette edge shows (the
@@ -2289,13 +2301,15 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
   // mesh's (imperfect, seam-heavy) normals at all, so it can't reproduce the "crack" bug.
   // Kept as a clean fallback outline underneath the new per-pixel fresnel glow.
   const rimMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#ffffff",
+    // A white silhouette halo is invisible on a light background and blooms
+    // out; grey gives the outline something to read against.
+    color: light ? "#4a4f57" : "#ffffff",
     transparent: true,
     opacity: 0.35,
     side: THREE.BackSide,
     depthWrite: false,
     toneMapped: false, // full brightness so bloom picks up the silhouette as a soft halo
-  }), []);
+  }), [light]);
 
   // Collect brain meshes. This asset nests its mesh several levels deep with baked
   // parent scale/translate (e.g. a 400x node under a 0.01x node) — bake each mesh's full
@@ -2371,7 +2385,7 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
               it needs to share this exact same coordinate space/scale to land on the surface
               correctly. Added on top of the existing brain material + fresnel rim, neither of
               which is modified here. */}
-          <NeuralDots meshes={brainMeshes} />
+          <NeuralDots meshes={brainMeshes} light={light} />
           {/* Gold circuit linking all 5 project nodes through the interior. */}
           <GoldCircuit />
           {/* The 5 project markers — gold glowing focal points scattered across the brain's
@@ -2664,7 +2678,7 @@ function AmbientParticles() {
 // Scene ambientLight is deliberately left alone. It is global and un-maskable, so lowering it
 // to darken this podium would also darken the brain.
 // ─── World-Space Holographic Projection Beam ─────────────────────────────────
-function HolographicBeam() {
+function HolographicBeam({ light }: { light: boolean }) {
   const BEAM_BASE_Y = -0.224;
   const BEAM_H      = 0.23;
   const BEAM_CY     = BEAM_BASE_Y + BEAM_H / 2;
@@ -2699,9 +2713,9 @@ function HolographicBeam() {
     // end up across the lens; the camera now stays well outside (see ZOOM_DISTANCE_FACTOR), so
     // the beam is simply part of the scene in the default view and in every project's view.
     const pulse = 1.0 + 0.12 * Math.sin(t * 2.1);
-    if (mat0Ref.current)    mat0Ref.current.opacity    = 0.08 * pulse;
-    if (discMatRef.current) discMatRef.current.opacity = 0.220 * pulse;
-    if (particleMatRef.current) particleMatRef.current.opacity = 0.7;
+    if (mat0Ref.current)    mat0Ref.current.opacity    = light ? 0.35 * pulse : 0.08 * pulse;
+    if (discMatRef.current) discMatRef.current.opacity = light ? 0.10 * pulse : 0.220 * pulse;
+    if (particleMatRef.current) particleMatRef.current.opacity = light ? 0.4 : 0.7;
 
     // Animate rising particles: move each particle upward, reset when it exits top
     if (particlesRef.current) {
@@ -2824,8 +2838,11 @@ function HolographicBeam() {
       <group ref={groupRef}>
         <mesh position={[0, BEAM_BASE_Y + 0.2 / 2, 0]} renderOrder={2}>
           <cylinderGeometry args={[0.12, 0.09, 0.2, 128, 1, true]} />
-          <meshBasicMaterial ref={mat0Ref} map={beamTex} color="#ffffff" transparent opacity={0.0005}
-            blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          {/* Additive blending ADDS to what is behind it, so a dark colour over a
+              pale page contributes almost nothing — the beam would simply vanish.
+              Normal blending is what lets a dark, low-opacity column read here. */}
+          <meshBasicMaterial ref={mat0Ref} map={beamTex} color={light ? "#000000" : "#ffffff"} transparent opacity={0.0005}
+            blending={light ? THREE.NormalBlending : THREE.AdditiveBlending} depthWrite={false} depthTest={false}
             side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
       </group>
@@ -2836,13 +2853,13 @@ function HolographicBeam() {
             as a chunky mass rather than a fine mist. */}
         <pointsMaterial
           ref={particleMatRef}
-          color="#ffffff"
+          color={light ? "#222222" : "#ffffff"}
           size={0.0064}
           map={circTex}
           transparent
           opacity={0.7}
           alphaTest={0.01}
-          blending={THREE.AdditiveBlending}
+          blending={light ? THREE.NormalBlending : THREE.AdditiveBlending}
           depthWrite={false}
           sizeAttenuation
           toneMapped={false}
@@ -2852,14 +2869,14 @@ function HolographicBeam() {
       {/* Glow disc at base */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BEAM_BASE_Y + 0.0005, 0]} renderOrder={2}>
         <circleGeometry args={[0.093, 64]} />
-        <meshBasicMaterial ref={discMatRef} map={radialTex} color="#ffffff" transparent opacity={0.35}
-          blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial ref={discMatRef} map={radialTex} color={light ? "#333333" : "#ffffff"} transparent opacity={0.35}
+          blending={light ? THREE.NormalBlending : THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
 }
 
-function HolographicPedestal() {
+function HolographicPedestal({ light }: { light: boolean }) {
   // Master size knob — every radius, height, light position and light intensity below is
   // (design value × S). The brief's literals assume a unit-scale scene; this scene's brain is a
   // ~0.25-unit object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings
@@ -3017,7 +3034,9 @@ function HolographicPedestal() {
     // it blows the lower half out. `bottom` is tweened 0 <-> 1 alongside the camera move, so this
     // dims and restores in step with it rather than popping. Geometry is untouched — only how
     // hard the accents emit.
-    const glowDim = 1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom;
+    // Halve the accent emission in light mode: at full strength the neon rings
+    // blow out against a pale background. Geometry and bloom settings untouched.
+    const glowDim = (1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom) * (light ? 0.3 : 1);
     accentRefs.current.forEach((m, i) => {
       if (m) m.emissiveIntensity = (ACCENT_BASE[i] - 0.3 + 0.5 * pulse) * glowDim;
     });
@@ -3031,7 +3050,7 @@ function HolographicPedestal() {
   // constant lift on top. Only the top rim keeps a strong reflection (passed explicitly) so the
   // silhouette still catches its highlight.
   const metal = (color: string, metalness = 0.8, roughness = 0.4, e = 0.006, envI = 0.3) => (
-    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} emissive="#ffffff" emissiveIntensity={e} envMap={envMap} envMapIntensity={envI} />
+    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={e} envMap={envMap} envMapIntensity={envI} />
   );
 
   return (
@@ -3060,7 +3079,7 @@ function HolographicPedestal() {
             recessed grooves rather than pale slots. */}
         <mesh position={[0, PANEL_CY * S, 0]}>
           <cylinderGeometry args={[2.28 * S, 2.28 * S, PANEL_H * S, 128]} />
-          {metal("#000000", 0.65, 0.4, 0.006)}
+          {metal(light ? LIGHT_BODY_COL : "#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
         {/* ══ 16 CHUNKY BEVELLED PANELS ══
@@ -3079,19 +3098,19 @@ function HolographicPedestal() {
                 {/* chamfered border plate */}
                 <mesh>
                   <boxGeometry args={[0.28 * S, PANEL_H * S, 0.95 * S]} />
-                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+                  {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
                 {/* raised face, proud of the border */}
                 <mesh position={[0.05 * S, 0, 0]}>
                   <boxGeometry args={[0.2 * S, PANEL_H * 0.78 * S, 0.78 * S]} />
-                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+                  {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
               </group>
               {/* recessed vertical groove, half a step round */}
               <group rotation={[0, -STEP / 2, 0]}>
                 <mesh position={[2.3 * S, PANEL_CY * S, 0]}>
                   <boxGeometry args={[0.2 * S, PANEL_H * S, 0.1 * S]} />
-                  {metal("#000000", 0.6, 0.45, 0.004)}
+                  {metal(light ? LIGHT_BODY_COL : "#000000", 0.6, 0.45, 0.004)}
                 </mesh>
               </group>
             </group>
@@ -3101,29 +3120,29 @@ function HolographicPedestal() {
         {/* ══ STEPPED RAISED LIP ══ with a lighter rim torus to catch the key light. */}
         <mesh position={[0, (BAND_TOP + LIP_H / 2) * S, 0]}>
           <cylinderGeometry args={[2.05 * S, 2.15 * S, LIP_H * S, 128]} />
-          {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+          {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, LIP_TOP * S, 0]}>
           <torusGeometry args={[2.05 * S, 0.05 * S, 20, 192]} />
-          {metal("#333333", 0.85, 0.18, 0.04, 1.1)}
+          {metal(light ? LIGHT_BODY_COL : "#333333", 0.85, 0.18, 0.04, 1.1)}
         </mesh>
         {/* true emissive rim line on the same edge — visible from every angle, unlike the
             reflective torus above which only catches a highlight when a light lines up with it */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (LIP_TOP + 0.001) * S, 0]}>
           <torusGeometry args={[2.05 * S, 0.014 * S, 12, 192]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
+          <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
         </mesh>
 
         {/* ══ FLAT RECESSED TOP DECK ══ rougher and less metallic than the lip, so it reads as
             textured concrete-metal rather than polished steel. */}
         <mesh position={[0, (DECK_TOP - DECK_H / 2) * S, 0]}>
           <cylinderGeometry args={[1.9 * S, 1.9 * S, DECK_H * S, 128]} />
-          {metal("#141416", 0.6, 0.45, 0.02)}
+          {metal(light ? LIGHT_BODY_COL : "#141416", 0.6, 0.45, 0.02)}
         </mesh>
         {/* thin dark inset ring separating the deck from the lip */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, DECK_TOP * S, 0]}>
           <torusGeometry args={[1.93 * S, 0.025 * S, 12, 192]} />
-          {metal("#000000", 0.65, 0.4, 0.006)}
+          {metal(light ? LIGHT_BODY_COL : "#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
         {/* ══ TOP RIM GLOW — bright neon spec ══ tube 0.035, emissiveIntensity 4, bloom tube
@@ -3136,11 +3155,11 @@ function HolographicPedestal() {
             The flat torus sits on top as the crisp top edge of that wall. */}
         <mesh position={[0, (DECK_TOP + 0.012 + 0.03) * S, 0]}>
           <cylinderGeometry args={[1.9 * 0.9 * S, 1.9 * 0.9 * S, 0.06 * S, 128, 1, true]} />
-          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]}>
           <torusGeometry args={[1.9 * 0.9 * S, 0.035 * S, 12, 256]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} toneMapped={false} />
+          <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]} renderOrder={1}>
           <torusGeometry args={[1.9 * 0.9 * S, 0.15 * S, 12, 192]} />
@@ -3211,7 +3230,7 @@ function HolographicPedestal() {
             <group key={i} rotation={[0, -(a + STEP / 2), 0]}>
               <mesh position={[2.31 * S, PANEL_CY * S, 0]}>
                 <boxGeometry args={[0.012 * S, PANEL_H * 0.92 * S, 0.02 * S]} />
-                <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.7} toneMapped={false} />
+                <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.7} toneMapped={false} />
               </mesh>
             </group>
           );
@@ -3364,10 +3383,13 @@ function BloomZoomFade({ bloomRef }: { bloomRef: React.RefObject<BloomEffectRef 
   return null;
 }
 
-function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
+function BrainScene({ selected, onHotspotSelect, onHotspotHover, light }: {
   selected: Project | null;
   onHotspotSelect: (p: Project) => void;
   onHotspotHover: (index: number | null) => void;
+  // React context does not cross into the R3F reconciler, so the theme is
+  // threaded in as a prop from the section rather than read via useTheme here.
+  light: boolean;
 }) {
   const bloomRef = useRef<BloomEffectRef | null>(null);
   return (
@@ -3393,10 +3415,10 @@ function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
 
       <CameraController selected={selected} />
       <Suspense fallback={null}>
-        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
+        <BrainModel light={light} selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
       </Suspense>
-      <HolographicPedestal />
-      <HolographicBeam />
+      <HolographicPedestal light={light} />
+      <HolographicBeam light={light} />
 
       {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
           network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
@@ -3581,14 +3603,14 @@ function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL }: {
     ...(isLeft ? { left: 0 } : { right: 0 }),
     ...(isTop  ? { top: 0 }  : { bottom: 0 }),
   };
-  return <div style={box}><div style={h} /><div style={v} /></div>;
+  return <div style={box}><div className="brain-bracket-arm" style={h} /><div className="brain-bracket-arm" style={v} /></div>;
 }
 
-function Panel({ arm, style, children }: {
-  arm: number; style?: React.CSSProperties; children: React.ReactNode;
+function Panel({ arm, style, children, className }: {
+  arm: number; style?: React.CSSProperties; children: React.ReactNode; className?: string;
 }) {
   return (
-    <div style={{
+    <div className={`brain-panel${className ? ` ${className}` : ""}`} style={{
       position: "relative", boxSizing: "border-box",
       border: `1px solid ${PANEL_BORDER}`, borderRadius: 4, background: PANEL_BG,
       ...style,
@@ -3605,17 +3627,17 @@ function Panel({ arm, style, children }: {
 function RuledLabel({ text, style }: { text: string; style?: React.CSSProperties }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, ...style }}>
-      <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, whiteSpace: "nowrap" }}>
+      <span className="brain-ruled-label" style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, whiteSpace: "nowrap" }}>
         {text}
       </span>
-      <span style={{ flex: 1, height: 1, background: RULE_STRONG }} />
+      <span className="brain-rule" style={{ flex: 1, height: 1, background: RULE_STRONG }} />
     </div>
   );
 }
 
 function FieldLabel({ text }: { text: string }) {
   return (
-    <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, display: "block" }}>
+    <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, display: "block" }}>
       {text}
     </span>
   );
@@ -3633,13 +3655,13 @@ function NodeRow({ name, active, onSelect }: { name: string; active: boolean; on
       onMouseLeave={() => setHover(false)}
       style={{ height: 30, display: "flex", alignItems: "center", gap: 14, cursor: inert ? "default" : "pointer" }}
     >
-      <span style={{
+      <span className="brain-checkbox" style={{
         width: 11, height: 11, flexShrink: 0, boxSizing: "border-box",
-        background: active ? INK : "transparent",
+        background: active ? "var(--brain-ink)" : "transparent",
         border: active ? "none" : `1px solid ${lit ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)"}`,
         transition: "border-color 0.15s ease",
       }} />
-      <span style={{
+      <span className="brain-text" style={{
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em",
         color: active ? INK : lit ? INK_BRIGHT : ROW_IDLE,
         transition: "color 0.15s ease",
@@ -3656,14 +3678,14 @@ function LockedRow({ name }: { name: string }) {
       {/* Padlock drawn into the same 11px slot the checkboxes occupy, so both lists keep the
           same left rhythm: a shackle arc sitting on a solid body block. */}
       <span style={{ width: 11, height: 11, flexShrink: 0, position: "relative", display: "block" }}>
-        <span style={{
+        <span className="brain-lock-arc" style={{
           position: "absolute", left: 2.5, top: 0, width: 6, height: 5, boxSizing: "border-box",
           border: `1px solid ${INK_LOCKED}`, borderBottom: "none",
           borderTopLeftRadius: 3, borderTopRightRadius: 3,
         }} />
-        <span style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
+        <span className="brain-lock-body" style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
       </span>
-      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK_LOCKED }}>{name}</span>
+      <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK_LOCKED }}>{name}</span>
     </div>
   );
 }
@@ -3673,14 +3695,14 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
   selectedId: number | null; onSelect: (id: number) => void; arm: number; style?: React.CSSProperties;
 }) {
   return (
-    <Panel arm={arm} style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
+    <Panel arm={arm} className="brain-panel-left" style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
+        <span className="brain-text" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
           SYS_03 // NEURAL_ARCHIVE
         </span>
-        <span style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
+        <span className="brain-dot" style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
       </div>
-      <div style={{ height: 1, background: RULE_STRONG, marginTop: 14 }} />
+      <div className="brain-rule" style={{ height: 1, background: RULE_STRONG, marginTop: 14 }} />
 
       <RuledLabel text={`ACTIVE NEURONS [${ACTIVE_PROJECTS.length}/${PROJECTS.length}]`} style={{ marginTop: 20 }} />
       <div style={{ marginTop: 4 }}>
@@ -3783,7 +3805,7 @@ function SegmentedProgress({ pct }: { pct: number }) {
         const lo = Math.min(filled, lastFilled < 0 ? 0 : lastFilled);
         const hi = Math.max(filled, lastFilled);
         for (let i = lo; i < hi && i < track.children.length; i++) {
-          (track.children[i] as HTMLElement).style.background = i < filled ? INK : SEGMENT_OFF;
+          (track.children[i] as HTMLElement).style.background = i < filled ? "var(--brain-seg-on)" : "var(--brain-seg-off)";
         }
         lastFilled = filled;
       }
@@ -3801,7 +3823,7 @@ function SegmentedProgress({ pct }: { pct: number }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div ref={trackRef} style={{
+      <div ref={trackRef} className="brain-progress-track" style={{
         flex: 1, minWidth: 0, height: 18, boxSizing: "border-box",
         border: "1px solid rgba(255,255,255,0.25)", borderRadius: 2,
         display: "flex", alignItems: "center", gap: 2, padding: "0 3px",
@@ -3812,11 +3834,11 @@ function SegmentedProgress({ pct }: { pct: number }) {
         {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => (
           <span key={i} style={{
             flex: "1 1 0", minWidth: 0, height: 10,
-            background: SEGMENT_OFF,
+            background: "var(--brain-seg-off)",
           }} />
         ))}
       </div>
-      <span ref={labelRef} style={{ fontFamily: MONO, fontSize: 10, color: INK_MID, whiteSpace: "nowrap" }}>0%</span>
+      <span ref={labelRef} className="brain-pct" style={{ fontFamily: MONO, fontSize: 10, color: INK_MID, whiteSpace: "nowrap" }}>0%</span>
     </div>
   );
 }
@@ -3831,7 +3853,7 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
   return (
     // Height-driven rather than width-driven, so capping the height shrinks the block while
     // aspect-ratio keeps it at 16:9 (a width-driven box would just get squashed instead).
-    <div style={{
+    <div className="brain-preview" style={{
       position: "relative", height: maxHeight, width: "auto", maxWidth: "100%",
       marginInline: "auto", aspectRatio: "16 / 9",
       border: `1px solid ${PANEL_BORDER}`, borderRadius: 3, overflow: "hidden",
@@ -3840,7 +3862,7 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
     }}>
       {src
         ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
+        : <span className="brain-nosignal" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
       <CornerBracket pos="tl" arm={arm} inset={4} />
       <CornerBracket pos="tr" arm={arm} inset={4} />
       <CornerBracket pos="bl" arm={arm} inset={4} />
@@ -3877,9 +3899,10 @@ function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel }:
     onMouseLeave: () => setHover(false),
   };
   const body = icon ?? label;
+  const cls = `brain-btn${hover ? " is-hover" : ""}`;
   return href
-    ? <a href={href} target="_blank" rel="noreferrer" aria-label={ariaLabel} style={style} {...handlers}>{body}</a>
-    : <button onClick={onClick} aria-label={ariaLabel} style={style} {...handlers}>{body}</button>;
+    ? <a href={href} target="_blank" rel="noreferrer" aria-label={ariaLabel} className={cls} style={style} {...handlers}>{body}</a>
+    : <button onClick={onClick} aria-label={ariaLabel} className={cls} style={style} {...handlers}>{body}</button>;
 }
 
 function GithubMark() {
@@ -3897,6 +3920,7 @@ function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      className="brain-navlink"
       style={{
         background: "transparent", border: "none", padding: 0, cursor: "pointer",
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em",
@@ -3994,7 +4018,7 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
           >
             <SegmentedProgress pct={pct} />
 
-            <h3 style={{
+            <h3 className="brain-title" style={{
               margin: "20px 0 0", fontFamily: MONO, fontWeight: 700,
               fontSize: titleSize(project.name, narrow ? 26 : 44, avail),
               color: INK, letterSpacing: "0.02em", lineHeight: 1.1, whiteSpace: "nowrap",
@@ -4011,14 +4035,14 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="DESCRIPTION:" />
-              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: INK_MID, lineHeight: 1.75 }}>
                 {project.desc}
               </p>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="TECH_STACK:" />
-              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: INK_MID, lineHeight: 1.75 }}>
                 {project.tech.join(", ")}
               </p>
             </div>
@@ -4030,7 +4054,7 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
           </motion.div>
 
         <div style={{ paddingTop: 50, flexShrink: 0 }}>
-          <div style={{ height: 1, background: RULE_SOFT }} />
+          <div className="brain-rule" style={{ height: 1, background: RULE_SOFT }} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
             <NavLink label="‹ PREV" onClick={onPrev} />
             <NavLink label="NEXT ›" onClick={onNext} />
@@ -4081,6 +4105,7 @@ function NodeTooltip({ name }: { name: string }) {
     >
       {/* The label box */}
       <div
+        className="brain-tip"
         style={{
           position: "relative",
           // Near-opaque dark fill rather than a tint: the label can land over the bright brain
@@ -4105,6 +4130,7 @@ function NodeTooltip({ name }: { name: string }) {
         {TOOLTIP_CORNERS.map(({ key, css }) => (
           <span
             key={key}
+            className="brain-tip-corner"
             style={{ position: "absolute", width: 8, height: 8, pointerEvents: "none", ...css }}
           />
         ))}
@@ -4126,6 +4152,9 @@ function NodeTooltip({ name }: { name: string }) {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProjectsSection() {
   const narrow = useNarrowLayout();
+  // Read here, OUTSIDE the Canvas, and passed down as a prop: React context does
+  // not cross the react-three-fiber reconciler boundary.
+  const isLight = useTheme().theme === "light";
   // null = default state: no readout panel, camera at the external shot.
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [tip, setTip] = useState<{ name: string } | null>(null);
@@ -4179,7 +4208,8 @@ export default function ProjectsSection() {
       // Transparent, not the palette's #020008, so the page starfield still reads through
       // the near-transparent panels and behind the free-floating brain.
       background: BG, position: "relative",
-      height: "130vh", overflow: "hidden",
+      height: "115vh", overflow: "hidden",
+      paddingTop: "96px", paddingBottom: "96px",
     }}>
       {/* The readout body scrolls when its content exceeds the shortened panel, but the
           scrollbar itself stays hidden — a visible one cuts across the panel border and its
@@ -4188,6 +4218,93 @@ export default function ProjectsSection() {
       <style>{`
         .readout-body { scrollbar-width: none; -ms-overflow-style: none; }
         .readout-body::-webkit-scrollbar { display: none; }
+
+        /* Progress-bar segment colours. Declared as custom properties because the
+           rAF loop writes one string per segment 60x/sec — it stays theme-blind
+           and the cascade resolves the actual colour. */
+        :root { --brain-seg-on: #ffffff; --brain-seg-off: rgba(255,255,255,0.16); --brain-ink: #ffffff; }
+        .light { --brain-seg-on: #000000; --brain-seg-off: rgba(0,0,0,0.15); --brain-ink: #000000; }
+
+        /* ── Light mode ──────────────────────────────────────────────────────
+           Every colour in these panels is an inline style, so overrides need
+           !important. Dark mode keeps the inline value untouched. */
+        .light .brain-panel {
+          background: rgba(255,255,255,0.3) !important;
+          border: 1px solid rgba(0,0,0,0.12) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+        /* Left panel only — the right readout keeps the 0.3 and blur(10px) above.
+           Fully see-through in BOTH themes: just a hairline border, the corner
+           brackets and the text over the starfield. ThemeContext stamps "dark"
+           or "light" on <html>, so each theme gets its own rule. */
+        .light .brain-section-label { color: #000000 !important; }
+
+        .light .brain-panel-left {
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: 1px solid rgba(0,0,0,0.2) !important;
+        }
+        .dark .brain-panel-left {
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+        }
+
+        /* Brackets are 1px-tall/wide divs coloured by background, not border. */
+        .light .brain-bracket-arm { background: #000000 !important; }
+
+        .light .brain-title    { color: #000000 !important; }
+        .light .brain-text     { color: #000000 !important; }
+        .light .brain-panel > div > .brain-text { font-weight: 600 !important; }
+        .light .brain-body     { color: #111111 !important; }
+        .light .brain-dim      { color: rgba(0,0,0,0.5) !important; }
+        .light .brain-rule     { background: rgba(0,0,0,0.15) !important; }
+        .light .brain-pct      { color: #000000 !important; }
+        .light .brain-navlink  { color: #000000 !important; }
+
+        .light .brain-progress-track { border-color: rgba(0,0,0,0.25) !important; }
+
+        /* Buttons keep their hover invert: is-hover is set by the component, so
+           the resting and hovered states stay distinct under !important. */
+        .light .brain-btn {
+          background: transparent !important;
+          border: 1px solid rgba(0,0,0,0.3) !important;
+          color: #000000 !important;
+        }
+        .light .brain-btn.is-hover {
+          background: #000000 !important;
+          color: #ffffff !important;
+        }
+
+        .light .brain-preview {
+          border: 1px solid rgba(0,0,0,0.2) !important;
+          background: rgba(0,0,0,0.05) !important;
+        }
+        .light .brain-nosignal { color: rgba(0,0,0,0.3) !important; }
+
+        /* Colour only — never border-width. Tailwind preflight leaves every side
+           "solid" at width 0, so a width here would fill the box in. */
+        .light .brain-checkbox { border-color: rgba(0,0,0,0.5) !important; }
+
+        /* Hover label. Corners set only two borders each (inline), so the rule
+           touches border-color alone — a width here would fill them into squares. */
+        .light .brain-tip {
+          background: rgba(255,255,255,0.85) !important;
+          border: 1px solid rgba(0,0,0,0.2) !important;
+          color: #000000 !important;
+          backdrop-filter: blur(4px) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
+        }
+        .light .brain-tip-corner { border-color: #000000 !important; }
+        /* Small square beside SYS_03, and the section headings above each list. */
+        .light .brain-dot          { background: #000000 !important; }
+        .light .brain-ruled-label  { color: #000000 !important; }
+        /* Padlock: arc is a border, body is a fill — both follow the dim tone. */
+        .light .brain-lock-arc     { border-color: rgba(0,0,0,0.5) !important; }
+        .light .brain-lock-body    { background: rgba(0,0,0,0.5) !important; }
       `}</style>
 
       {/* Brain — no frame, no border, no brackets: it floats directly on the starfield.
@@ -4213,9 +4330,37 @@ export default function ProjectsSection() {
           gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
           style={{ background: "transparent", position: "absolute", inset: 0 }}
         >
-          <BrainScene selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
+          <BrainScene light={isLight} selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
         </Canvas>
       </div>
+
+      {/* Section label + strapline. Absolutely positioned rather than in flow:
+          this section is a fixed-height 130vh canvas stage with no document flow
+          to insert into, so a normal block would displace the brain. Sits at the
+          same NAV_CLEARANCE / EDGE_PAD the rest of the section uses.
+
+          Desktop only: on narrow the NodeChipRow already occupies exactly this
+          slot (top: NAV_CLEARANCE), and rendering both would overlap them. */}
+      {!narrow && (
+        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: EDGE_PAD, zIndex: 10, marginBottom: "205px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+            <span className="brain-section-label" style={{
+              fontFamily: MONO, fontSize: 12, letterSpacing: "0.2em",
+              textTransform: "uppercase", color: INK,
+            }}>
+              03 — Projects
+            </span>
+          </div>
+          <div style={{
+            fontFamily: MONO, fontSize: "0.65rem", fontWeight: 400,
+            letterSpacing: "0.05em", color: "rgba(226,232,240,0.6)",
+            marginTop: 0, marginBottom: "0.5rem",
+          }}>
+            // select a neuron to explore each project
+          </div>
+        </div>
+      )}
 
       {/* Left: node index — desktop column, vertically centred and only as tall as its
           content; mobile a horizontal chip scroller above the brain. */}

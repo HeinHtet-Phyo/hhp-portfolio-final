@@ -62,11 +62,27 @@ type EduEntry = {
   // exit vertically then bend horizontally. One right-angle bend either way.
   exit: "right" | "top" | "bottom";
   exitFrac: number;
-  // px offset applied to the pin, to separate the two co-located Yangon pins.
-  // Offset vertically, not horizontally, so their leader lines' horizontal
-  // segments don't land on the same y and overlap.
+  // Which leg runs first on a "top"/"bottom" exit. "vertical" leaves the card
+  // edge, runs to the pin's y, then goes horizontal along y=pinY. "horizontal"
+  // runs across to the pin's x first, then drops vertically along x=pinX.
+  // Ignored when exit is "right".
+  bend?: "vertical" | "horizontal";
+  // px offset applied to the MARKER. 0 everywhere: one campus is one dot, drawn
+  // on the exact projected coordinate. The flight path also departs from this
+  // offset, so changing it moves where the plane launches from.
   pinDx: number;
   pinDy: number;
+  // px offset applied to this LEADER LINE'S ENDPOINT only — not to the marker,
+  // not to the flight path. Both GUSTO cards target the same pin, so without a
+  // separation their final legs lie on the identical rail and the shorter is
+  // swallowed by the longer. -3 and +3 park them 6px apart: near enough to the
+  // dot to read as one location, far enough to stay two visible lines.
+  //
+  // Deliberately SEPARATE from pinDx/pinDy. Fanning the pins themselves apart
+  // is what previously split one campus into two apparent places; this moves
+  // only where the strokes stop.
+  endDx: number;
+  endDy: number;
 };
 
 const EDUCATION: EduEntry[] = [
@@ -79,7 +95,7 @@ const EDUCATION: EduEntry[] = [
     period: "Jul 2022 – Oct 2022",
     url: "https://gustocollege.com",
     coords: YANGON, side: "right", topPct: 0.62,
-    exit: "top", exitFrac: 0.68, pinDx: 0, pinDy: 7,
+    exit: "top", exitFrac: 0.68, pinDx: 0, pinDy: 0, endDx: 0, endDy: 3,
   },
   {
     id: "gusto-hnd",
@@ -90,7 +106,7 @@ const EDUCATION: EduEntry[] = [
     period: "Nov 2022 – Nov 2024",
     url: "https://gustocollege.com",
     coords: YANGON, side: "right", topPct: 0.04,
-    exit: "bottom", exitFrac: 0.45, pinDx: 0, pinDy: -7,
+    exit: "bottom", exitFrac: 0.45, pinDx: 0, pinDy: 0, endDx: 0, endDy: -3,
   },
   {
     id: "uwe-bristol",
@@ -101,9 +117,25 @@ const EDUCATION: EduEntry[] = [
     period: "Sep 2023 – Jun 2026",
     url: "https://www.uwe.ac.uk",
     coords: BRISTOL, side: "left", topPct: 0.45,
-    exit: "right", exitFrac: 0.5, pinDx: 0, pinDy: 0,
+    exit: "right", exitFrac: 0.5, pinDx: 0, pinDy: 0, endDx: 0, endDy: 0,
   },
 ];
+
+/** Identity of a map location. Two entries with the same key are one place. */
+const coordKey = (c: [number, number]) => `${c[0]},${c[1]}`;
+
+// One pin per unique coordinate, not one per entry. The two GUSTO College
+// entries share the YANGON constant exactly, so rendering per-entry stacked two
+// identical dots and two identical pulse haloes on the same point — the doubled
+// glow read as a second, slightly-offset location. Each card still routes its
+// own leader line to that shared point; only the marker is deduplicated.
+// `index` is the ORIGINAL EDUCATION index, kept so the staggered fade-in delays
+// are unchanged by the dedup.
+const PINS = EDUCATION
+  .map((entry, index) => ({ entry, index }))
+  .filter(({ entry, index }) =>
+    EDUCATION.findIndex((o) => coordKey(o.coords) === coordKey(entry.coords)) === index,
+  );
 
 const CARD_W = 240;
 const CARD_PAD = 16;
@@ -127,10 +159,10 @@ function CornerBrackets() {
   const base: React.CSSProperties = { position: "absolute", width: 10, height: 10, pointerEvents: "none" };
   return (
     <>
-      <span style={{ ...base, top: -1, left: -1, borderTop: `1px solid ${c}`, borderLeft: `1px solid ${c}` }} />
-      <span style={{ ...base, top: -1, right: -1, borderTop: `1px solid ${c}`, borderRight: `1px solid ${c}` }} />
-      <span style={{ ...base, bottom: -1, left: -1, borderBottom: `1px solid ${c}`, borderLeft: `1px solid ${c}` }} />
-      <span style={{ ...base, bottom: -1, right: -1, borderBottom: `1px solid ${c}`, borderRight: `1px solid ${c}` }} />
+      <span className="edu-bracket edu-bracket-tl" style={{ ...base, top: -1, left: -1, borderTop: `1px solid ${c}`, borderLeft: `1px solid ${c}` }} />
+      <span className="edu-bracket edu-bracket-tr" style={{ ...base, top: -1, right: -1, borderTop: `1px solid ${c}`, borderRight: `1px solid ${c}` }} />
+      <span className="edu-bracket edu-bracket-bl" style={{ ...base, bottom: -1, left: -1, borderBottom: `1px solid ${c}`, borderLeft: `1px solid ${c}` }} />
+      <span className="edu-bracket edu-bracket-br" style={{ ...base, bottom: -1, right: -1, borderBottom: `1px solid ${c}`, borderRight: `1px solid ${c}` }} />
     </>
   );
 }
@@ -150,6 +182,7 @@ function EduCard({
       rel="noopener noreferrer"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="edu-card"
       style={{
         display: "block",
         position: "relative",
@@ -172,7 +205,7 @@ function EduCard({
       <CornerBrackets />
 
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{
+        <div className="edu-monogram" style={{
           width: 40, height: 40,
           border: "1px solid rgba(255,255,255,0.2)",
           borderRadius: 4, background: "transparent",
@@ -185,7 +218,7 @@ function EduCard({
         <span style={{ fontSize: 13, color: "#6b7280", lineHeight: 1 }} aria-hidden>↗</span>
       </div>
 
-      <div style={{
+      <div className="edu-location" style={{
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase",
         color: "#8b929b", marginBottom: 6,
@@ -193,7 +226,7 @@ function EduCard({
         {entry.location}
       </div>
 
-      <div style={{
+      <div className="edu-institution" style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontSize: 15, fontWeight: 500, color: "#ffffff",
         lineHeight: 1.3, marginBottom: 12,
@@ -201,12 +234,12 @@ function EduCard({
         {entry.institution}
       </div>
 
-      <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: 12 }} />
+      <div className="edu-divider" style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: 12 }} />
 
-      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#9aa3ad", lineHeight: 1.45, marginBottom: 6 }}>
+      <div className="edu-programme" style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#9aa3ad", lineHeight: 1.45, marginBottom: 6 }}>
         {entry.programme}
       </div>
-      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#6b7280" }}>
+      <div className="edu-period" style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: "#6b7280" }}>
         {entry.period}
       </div>
     </a>
@@ -345,6 +378,49 @@ function MapLayout({ inView }: { inView: boolean }) {
     return { height, project, dim, highlight, pts, cum, flightD };
   }, [width, countries]);
 
+  // ONE projected screen point per unique map location, resolved here and read
+  // by everything that draws to it — connector lines and pin markers alike.
+  //
+  // Both GUSTO College cards carry the same YANGON coordinate, so both now look
+  // their endpoint up under the same key and receive the SAME object: identical
+  // pixel by construction. Previously each connector called scene.project()
+  // independently; those calls agreed numerically, but nothing in the code said
+  // they had to, and any per-entry adjustment slipped in later would silently
+  // split one campus into two destinations again.
+  const pinPoints = useMemo(() => {
+    const m = new Map<string, { x: number; y: number } | null>();
+    if (!scene) return m;
+    for (const e of EDUCATION) {
+      const key = coordKey(e.coords);
+      if (!m.has(key)) m.set(key, scene.project(e.coords));
+    }
+    return m;
+  }, [scene]);
+
+  // Verification that both GUSTO connectors terminate on one pixel. Logged from
+  // an effect, not from render, so it fires once per layout instead of on every
+  // re-render. Endpoint = pin + that entry's endDx/endDy, which is exactly the
+  // final "L px py" of each path below.
+  useEffect(() => {
+    if (!pinPoints.size) return;
+    const ends = EDUCATION
+      .filter((e) => e.institution === "GUSTO College Myanmar")
+      .map((e) => {
+        const p = pinPoints.get(coordKey(e.coords));
+        return { id: e.id, x: p ? p.x + e.endDx : NaN, y: p ? p.y + e.endDy : NaN };
+      });
+    ends.forEach((e, i) => {
+      // eslint-disable-next-line no-console
+      console.log(`Card ${i + 1} endpoint (${e.id}):`, e.x, e.y);
+    });
+    const marker = pinPoints.get(coordKey(YANGON));
+    // eslint-disable-next-line no-console
+    console.log(
+      "Yangon marker:", marker?.x, marker?.y,
+      "| endpoint gap:", ends.length === 2 ? Math.abs(ends[0].y - ends[1].y) : NaN, "px",
+    );
+  }, [pinPoints]);
+
   // Plane loops the projected great circle continuously for as long as the
   // section is mounted: fly Myanmar → UK over ~2s eased, pause ~0.4s at the
   // UK pin, snap instantly back to the Myanmar pin, repeat. Not gated by
@@ -415,19 +491,22 @@ function MapLayout({ inView }: { inView: boolean }) {
           {/* ── Map: decorative, behind everything ── */}
           <g>
             {scene.dim.map((d, i) => (
-              <path key={i} d={d} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={0.6} />
+              <path key={i} className="edu-map-dim" d={d} fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth={0.6} />
             ))}
             {scene.highlight.map((d, i) => (
-              <path key={i} d={d} fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
+              <path key={i} className="edu-map-highlight" d={d} fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.6)" strokeWidth={1} />
             ))}
           </g>
 
           {/* ── Leader lines: card edge → horizontal → vertical → pin ── */}
           {EDUCATION.map((entry, i) => {
-            const pin = scene.project(entry.coords);
+            const pin = pinPoints.get(coordKey(entry.coords));
             if (!pin) return null;
-            const px = pin.x + entry.pinDx;
-            const py = pin.y + entry.pinDy;
+            // Line endpoint, offset off the marker by endDx/endDy so two
+            // connectors into one pin stay visually distinct. The marker below
+            // is drawn from the unoffset point.
+            const px = pin.x + entry.endDx;
+            const py = pin.y + entry.endDy;
 
             const top = entry.topPct * height;
             const left = entry.side === "left" ? 0 : width - CARD_W;
@@ -442,7 +521,11 @@ function MapLayout({ inView }: { inView: boolean }) {
             } else {
               const x = left + CARD_W * entry.exitFrac;
               const edgeY = entry.exit === "bottom" ? top + h : top;
-              d = `M ${x} ${edgeY} L ${x} ${py} L ${px} ${py}`;
+              d = entry.bend === "horizontal"
+                // Across to the pin's x first, then straight down the pin's
+                // column — approaches the dot perpendicular to the other card.
+                ? `M ${x} ${edgeY} L ${px} ${edgeY} L ${px} ${py}`
+                : `M ${x} ${edgeY} L ${x} ${py} L ${px} ${py}`;
             }
 
             return (
@@ -450,6 +533,7 @@ function MapLayout({ inView }: { inView: boolean }) {
                 key={entry.id}
                 d={d}
                 fill="none"
+                className="edu-leader"
                 stroke="rgba(255,255,255,0.28)"
                 strokeWidth={1}
                 style={{ opacity: inView ? 1 : 0, transition: `opacity 0.6s ease ${0.12 * i + 0.2}s` }}
@@ -466,8 +550,8 @@ function MapLayout({ inView }: { inView: boolean }) {
           />
 
           {/* ── Pins ── */}
-          {EDUCATION.map((entry, i) => {
-            const pin = scene.project(entry.coords);
+          {PINS.map(({ entry, index: i }) => {
+            const pin = pinPoints.get(coordKey(entry.coords));
             if (!pin) return null;
             const px = pin.x + entry.pinDx;
             const py = pin.y + entry.pinDy;
@@ -550,7 +634,7 @@ export default function EducationSection() {
         // Matches HeroSection's horizontal padding (80px 8vw 0) so the two
         // sections share identical left/right content margins. Hero sets no
         // max-width — its inner grid is width:100% — so neither does this.
-        padding: "6rem 8vw",
+        padding: "96px 8vw 56px",
         position: "relative",
         zIndex: 2,
         // Keeps the map's antimeridian geometry from adding to the page's
@@ -561,16 +645,16 @@ export default function EducationSection() {
       {/* Shared content box: header and map measure against the same edges. */}
       <div style={{ width: "100%", boxSizing: "border-box" }}>
         <div style={{
-          display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "4rem",
+          display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "5.25rem",
           opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
         }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-          <span style={{
+          <span className="edu-section-label" style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#ffffff",
           }}>
-            02 — Education
+            05 — Education
           </span>
         </div>
 
@@ -590,6 +674,54 @@ export default function EducationSection() {
         @media (prefers-reduced-motion: reduce) {
           .edu-pin-pulse { animation: none; }
         }
+
+        /* ── Light mode ──────────────────────────────────────────────────────
+           Every colour in this section is an inline style, and inline styles
+           beat any selector, so these overrides need !important. Dark mode is
+           the inline value and is untouched — these rules only apply under
+           .light. */
+        .light .edu-section-label { color: #000000 !important; font-weight: 600 !important; }
+
+        .light .edu-card {
+          background: rgba(0,0,0,0.08) !important;
+          border: 1.5px solid rgba(0,0,0,0.3) !important;
+        }
+        /* Corner brackets.
+           Tailwind's preflight applies "border: 0 solid" to EVERY element, so
+           all four sides of these spans already have border-style: solid at
+           width 0 — the inline style only sets a width on two of them. That is
+           why a blanket "border-width: 2px" drew a complete 2px outline and the
+           brackets rendered as filled black squares.
+           The fix is per-side: zero all four widths here, then re-arm exactly
+           the two sides each corner needs in the rules below. Those rules come
+           second and carry equal specificity, so they win. */
+        .light .edu-bracket {
+          border-color: #000000 !important;
+          border-width: 0 !important;
+          background: transparent !important;
+          background-color: transparent !important;
+          width: 12px !important;
+          height: 12px !important;
+        }
+        .light .edu-bracket-tl { border-top-width: 2px !important; border-left-width: 2px !important; }
+        .light .edu-bracket-tr { border-top-width: 2px !important; border-right-width: 2px !important; }
+        .light .edu-bracket-bl { border-bottom-width: 2px !important; border-left-width: 2px !important; }
+        .light .edu-bracket-br { border-bottom-width: 2px !important; border-right-width: 2px !important; }
+        .light .edu-monogram    { color: #000000 !important; font-weight: 700 !important; border-color: rgba(0,0,0,0.3) !important; }
+        .light .edu-location    { color: #000000 !important; font-weight: 600 !important; }
+        .light .edu-institution { color: #000000 !important; font-weight: 700 !important; font-size: 16px !important; }
+        .light .edu-programme   { color: #111111 !important; font-weight: 500 !important; }
+        .light .edu-period      { color: #333333 !important; font-weight: 500 !important; }
+        /* Not in the brief, but a white rule is invisible on a light card. */
+        .light .edu-divider     { border-top-color: rgba(0,0,0,0.12) !important; }
+
+        /* Map: country outlines to mid grey; the two highlighted countries keep
+           a darker stroke and an inked fill so they still read as highlighted.
+           The SVG itself has no background — it stays transparent. */
+        .light .edu-map-dim       { stroke: #999999 !important; }
+        .light .edu-map-highlight { stroke: #555555 !important; fill: rgba(0,0,0,0.07) !important; }
+
+        .light .edu-leader { stroke: rgba(0,0,0,0.5) !important; }
       `}</style>
     </section>
   );

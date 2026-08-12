@@ -86,6 +86,7 @@ function NetworkBtn({
       rel="noopener noreferrer"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="ct-net-row"
       style={{
         display: "flex",
         alignItems: "center",
@@ -104,7 +105,7 @@ function NetworkBtn({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <span style={{ opacity: 0.7, display: "flex", flexShrink: 0 }}>{icon}</span>
+        <span className="ct-icon" style={{ opacity: 0.7, display: "flex", flexShrink: 0 }}>{icon}</span>
         <div>
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -112,7 +113,7 @@ function NetworkBtn({
             fontWeight: 700,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-          }}>
+          }} className="ct-net-label">
             {label}
           </div>
           {sub && (
@@ -121,13 +122,13 @@ function NetworkBtn({
               fontSize: "0.58rem",
               opacity: 0.4,
               marginTop: "0.1rem",
-            }}>
+            }} className="ct-net-sub">
               {sub}
             </div>
           )}
         </div>
       </div>
-      <span style={{
+      <span className="ct-arrow" style={{
         opacity: hovered ? 1 : 0.3,
         transition: "opacity 0.25s, transform 0.25s",
         transform: hovered ? "translate(2px, -2px)" : "translate(0,0)",
@@ -147,6 +148,7 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
       href={href}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={`ct-link${hovered ? " is-hover" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
@@ -187,21 +189,21 @@ export default function ContactSection() {
     <section
       id="contact"
       ref={ref}
-      style={{ padding: "6rem 8vw 7rem", position: "relative", zIndex: 1, borderTop: "1px solid rgba(255,255,255,0.08)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      style={{ padding: "96px 8vw 120px 8vw", position: "relative", zIndex: 1, borderBottom: "1px solid rgba(255,255,255,0.08)" }}
     >
       {/* Top label */}
       <div style={{
         display: "flex",
         alignItems: "center",
         gap: "0.6rem",
-        marginBottom: "2.5rem",
+        marginBottom: "84px",
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(12px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", display: "inline-block", boxShadow: "0 0 8px rgba(132,204,22,0.6)" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.5 }}>
-          05 — Contact
+        <span className="ct-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.5 }}>
+          07 — Contact
         </span>
       </div>
 
@@ -230,7 +232,7 @@ export default function ContactSection() {
               letterSpacing: "-0.04em",
               marginBottom: "0.1em",
               color: "rgba(255,255,255,0.95)",
-            }}>
+            }} className="ct-heading">
               LET'S
             </div>
             <div style={{
@@ -242,13 +244,13 @@ export default function ContactSection() {
               color: "transparent",
               WebkitTextStroke: "2px rgba(255,255,255,0.85)",
               marginBottom: "1.5rem",
-            }}>
+            }} className="ct-outline">
               CONNECT.
             </div>
           </div>
 
           {/* Tagline */}
-          <p style={{
+          <p className="ct-body" style={{
             fontSize: "0.95rem",
             lineHeight: 1.7,
             color: "rgba(255,255,255,0.45)",
@@ -274,7 +276,7 @@ export default function ContactSection() {
             borderLeft: "2px solid rgba(255,255,255,0.2)",
             paddingLeft: "0.7rem",
             transition: "opacity 0.6s ease 0.1s",
-          }}>
+          }} className="ct-col-label">
             Sitemap
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1.6rem" }}>
@@ -298,7 +300,7 @@ export default function ContactSection() {
             borderLeft: "2px solid rgba(255,255,255,0.2)",
             paddingLeft: "0.7rem",
             transition: "opacity 0.6s ease 0.1s",
-          }}>
+          }} className="ct-col-label">
             Networks
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -338,6 +340,27 @@ export default function ContactSection() {
 
 
       <style>{`
+        /* ── Light mode ──────────────────────────────────────────────────────
+           All colours here are inline styles, so overrides need !important.
+           Several elements are also dimmed with opacity, which colour alone
+           cannot undo — those reset opacity too. Dark mode is untouched. */
+        .light .ct-label     { color: #000000 !important; opacity: 1 !important; }
+        .light .ct-heading   { color: #000000 !important; }
+        .light .ct-outline   { color: #000000 !important; -webkit-text-stroke: 1px #000000 !important; }
+        .light .ct-body      { color: #111111 !important; }
+        .light .ct-col-label { color: rgba(0,0,0,0.5) !important; opacity: 1 !important; border-left-color: rgba(0,0,0,0.25) !important; }
+
+        .light .ct-link          { color: #000000 !important; }
+        .light .ct-link.is-hover { color: rgba(0,0,0,0.6) !important; }
+
+        .light .ct-net-row {
+          border-color: rgba(0,0,0,0.1) !important;
+          background: rgba(0,0,0,0.02) !important;
+        }
+        .light .ct-net-label { color: #000000 !important; }
+        .light .ct-net-sub   { color: rgba(0,0,0,0.4) !important; opacity: 1 !important; }
+        .light .ct-icon      { color: #000000 !important; opacity: 1 !important; }
+        .light .ct-arrow     { color: rgba(0,0,0,0.4) !important; }
         @media (max-width: 900px) {
           .contact-grid {
             grid-template-columns: 1fr 1fr !important;

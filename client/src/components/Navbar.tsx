@@ -138,7 +138,7 @@ const Navbar = memo(function Navbar() {
           >
             <span>Let's Talk</span>
             <div className="lets-talk-icon">
-              <ArrowUpRight size={13} strokeWidth={2.5} />
+              <ArrowUpRight size={14} strokeWidth={2.5} />
             </div>
           </motion.a>
 
@@ -249,7 +249,7 @@ const Navbar = memo(function Navbar() {
               >
                 <span>Let's Talk</span>
                 <div className="lets-talk-icon">
-                  <ArrowUpRight size={13} strokeWidth={2.5} />
+                  <ArrowUpRight size={14} strokeWidth={2.5} />
                 </div>
               </button>
             </div>

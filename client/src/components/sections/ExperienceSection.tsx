@@ -112,7 +112,7 @@ function GearIcon() {
 // ── Stat Card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, delay, inView }: { label: string; value: string; delay: number; inView: boolean }) {
   return (
-    <div style={{
+    <div className="exp-stat" style={{
       border: "1px solid rgba(255,255,255,0.1)",
       borderRadius: "6px",
       padding: "0.9rem 1rem",
@@ -120,10 +120,10 @@ function StatCard({ label, value, delay, inView }: { label: string; value: strin
       transform: inView ? "translateY(0)" : "translateY(16px)",
       transition: `opacity 0.6s ease ${delay}s, transform 0.6s cubic-bezier(0.23,1,0.32,1) ${delay}s`,
     }}>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.4, marginBottom: "0.4rem" }}>
+      <div className="exp-dim" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.58rem", letterSpacing: "0.18em", textTransform: "uppercase", opacity: 0.4, marginBottom: "0.4rem" }}>
         {label}
       </div>
-      <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
+      <div className="exp-num" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "1.4rem", fontWeight: 700, letterSpacing: "-0.02em" }}>
         {value}
       </div>
     </div>
@@ -157,7 +157,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
         background: expanded ? "rgba(255,255,255,0.9)" : "rgba(8,8,18,0.98)",
         transition: "border-color 0.25s, background 0.25s",
         zIndex: 2,
-      }} />
+      }} className="exp-dot" />
 
       {/* Card button */}
       <button
@@ -176,8 +176,9 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
         }}
         className="exp-card-btn"
         onMouseEnter={e => {
-          (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.2)";
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 8px 24px rgba(0,0,0,0.3)";
+          const lit = document.documentElement.classList.contains("light");
+          (e.currentTarget as HTMLButtonElement).style.borderColor = lit ? "rgba(0,0,0,0.3)" : "rgba(255,255,255,0.2)";
+          (e.currentTarget as HTMLButtonElement).style.boxShadow = lit ? "0 8px 24px rgba(0,0,0,0.1)" : "0 8px 24px rgba(0,0,0,0.3)";
         }}
         onMouseLeave={e => {
           (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(255,255,255,0.08)";
@@ -188,7 +189,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
           <div style={{ flex: 1, minWidth: 0 }}>
             {/* Date + Active badge */}
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <span style={{
+              <span className="exp-chip" style={{
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: "0.65rem",
                 letterSpacing: "0.14em",
@@ -222,7 +223,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
             </div>
 
             {/* Role */}
-            <h3 style={{
+            <h3 className="exp-role" style={{
               fontSize: "clamp(1.3rem, 2.5vw, 1.9rem)",
               fontWeight: 900,
               letterSpacing: "-0.02em",
@@ -235,7 +236,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
             </h3>
 
             {/* Company */}
-            <p style={{
+            <p className="exp-dim" style={{
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: "0.68rem",
               letterSpacing: "0.14em",
@@ -251,7 +252,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
             </p>
 
             {/* Impact */}
-            <p style={{
+            <p className="exp-dim" style={{
               fontSize: "0.9rem",
               lineHeight: 1.65,
               color: "rgba(255,255,255,0.55)",
@@ -276,7 +277,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
             transition: "border-color 0.25s, background 0.25s, transform 0.25s",
             transform: expanded ? "rotate(45deg)" : "rotate(0deg)",
             color: expanded ? "#000" : "rgba(255,255,255,0.6)",
-          }}>
+          }} className={`exp-toggle${expanded ? " is-open" : ""}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
@@ -292,7 +293,7 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
         opacity: expanded ? 1 : 0,
         transition: "max-height 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.22s ease",
       }}>
-        <div style={{
+        <div className="exp-panel" style={{
           marginTop: "0.5rem",
           borderRadius: "6px",
           border: "1px solid rgba(255,255,255,0.08)",
@@ -302,16 +303,16 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
           {/* Description bullets */}
           <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "0.7rem", marginBottom: "1.2rem" }}>
             {exp.description.map((point, i) => (
-              <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", fontSize: "0.9rem", lineHeight: 1.65, color: "rgba(255,255,255,0.55)", fontWeight: 300 }}>
-                <span style={{ marginTop: "0.55em", width: "6px", height: "6px", borderRadius: "50%", background: "rgba(255,255,255,0.25)", flexShrink: 0 }} />
+              <li key={i} className="exp-bullet" style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem", fontSize: "0.9rem", lineHeight: 1.65, color: "rgba(255,255,255,0.55)", fontWeight: 300 }}>
+                <span className="exp-bullet-dot" style={{ marginTop: "0.55em", width: "6px", height: "6px", borderRadius: "50%", background: "rgba(255,255,255,0.25)", flexShrink: 0 }} />
                 {point}
               </li>
             ))}
           </ul>
           {/* Stack tags */}
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+          <div className="exp-rule" style={{ borderTop: "1px solid rgba(255,255,255,0.07)", paddingTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
             {exp.stack.map((item) => (
-              <span key={item} style={{
+              <span key={item} className="exp-chip" style={{
                 fontFamily: "'JetBrains Mono', monospace",
                 fontSize: "0.6rem",
                 letterSpacing: "0.12em",
@@ -346,17 +347,17 @@ export default function ExperienceSection() {
     <section
       id="work"
       ref={ref}
-      style={{ padding: "6rem 8vw", position: "relative", zIndex: 1 }}
+      style={{ padding: "96px 8vw", position: "relative", zIndex: 1 }}
     >
       {/* Section label */}
       <div style={{
-        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "3.5rem",
+        display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "4.75rem",
         opacity: inView ? 1 : 0, transform: inView ? "translateY(0)" : "translateY(16px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block", boxShadow: "0 0 8px rgba(132,204,22,0.6)" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
-          03 — Experience
+        <span className="exp-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          04 — Work Experience
         </span>
       </div>
 
@@ -371,7 +372,7 @@ export default function ExperienceSection() {
             transform: inView ? "translateY(0)" : "translateY(24px)",
             transition: "opacity 0.7s ease 0.05s, transform 0.7s cubic-bezier(0.23,1,0.32,1) 0.05s",
           }}>
-            <h2 style={{
+            <h2 className="exp-heading" style={{
               fontSize: "clamp(2rem, 3.5vw, 2.8rem)",
               fontWeight: 900,
               letterSpacing: "-0.03em",
@@ -381,7 +382,7 @@ export default function ExperienceSection() {
             }}>
               Professional<br />Experience
             </h2>
-            <p style={{
+            <p className="exp-dim" style={{
               fontSize: "0.88rem",
               lineHeight: 1.7,
               color: "rgba(255,255,255,0.45)",
@@ -427,7 +428,7 @@ export default function ExperienceSection() {
             bottom: "2.5rem",
             width: "1px",
             background: "rgba(255,255,255,0.08)",
-          }} />
+          }} className="exp-line" />
 
           {/* Cards */}
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -448,7 +449,7 @@ export default function ExperienceSection() {
             display: "flex",
             alignItems: "center",
             gap: "0.5rem",
-          }}>
+          }} className="exp-dim">
             End of Timeline
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M7 17L17 7M17 7H7M17 7v10"/>
@@ -470,6 +471,50 @@ export default function ExperienceSection() {
         .exp-card-btn:focus {
           outline: none;
           border-color: rgba(255,255,255,0.3) !important;
+        }
+
+        /* ── Light mode ──────────────────────────────────────────────────────
+           Every colour here is an inline style, so overrides need !important.
+           Dark mode keeps the inline value and is untouched. */
+        .light .exp-label   { color: #000000 !important; opacity: 1 !important; }
+        .light .exp-heading { color: #000000 !important; }
+        .light .exp-num     { color: #000000 !important; }
+        .light .exp-dim     { color: rgba(0,0,0,0.5) !important; opacity: 1 !important; }
+        .light .exp-stat    { border-color: rgba(0,0,0,0.15) !important; }
+
+        .light .exp-role    { color: #000000 !important; font-weight: 600 !important; }
+        .light .exp-dot     { background: #000000 !important; border-color: #000000 !important; }
+        .light .exp-line    { background: rgba(0,0,0,0.2) !important; }
+
+        .light .exp-card-btn {
+          background: rgba(255,255,255,0.5) !important;
+          border-color: rgba(0,0,0,0.15) !important;
+        }
+        .light .exp-card-btn:focus { border-color: rgba(0,0,0,0.4) !important; }
+
+        .light .exp-panel {
+          background: rgba(255,255,255,0.7) !important;
+          border-color: rgba(0,0,0,0.15) !important;
+        }
+        .light .exp-bullet     { color: #111111 !important; }
+        .light .exp-bullet-dot { background: rgba(0,0,0,0.4) !important; }
+        .light .exp-rule       { border-top-color: rgba(0,0,0,0.12) !important; }
+        .light .exp-chip {
+          color: rgba(0,0,0,0.6) !important;
+          border-color: rgba(0,0,0,0.15) !important;
+          background: rgba(0,0,0,0.04) !important;
+        }
+
+        /* Toggle: closed is an outline, open inverts to a filled disc. */
+        .light .exp-toggle {
+          color: #000000 !important;
+          border-color: rgba(0,0,0,0.15) !important;
+          background: rgba(0,0,0,0.08) !important;
+        }
+        .light .exp-toggle.is-open {
+          background: #000000 !important;
+          border-color: #000000 !important;
+          color: #ffffff !important;
         }
       `}</style>
     </section>

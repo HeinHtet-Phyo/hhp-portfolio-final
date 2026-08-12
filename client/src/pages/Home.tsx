@@ -61,11 +61,11 @@ export default function Home() {
       <main style={{ position: "relative", zIndex: 2 }}>
         <HeroSection />
         <AboutSection />
+        <SkillsSection />
+        <BrainProjectsSection />
+        <ExperienceSection />
         <EducationSection />
         <CertificateGallery />
-        <BrainProjectsSection />
-        <SkillsSection />
-        <ExperienceSection />
         <ContactSection />
       </main>
 
