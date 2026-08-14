@@ -86,7 +86,7 @@ function NetworkBtn({
       rel="noopener noreferrer"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="ct-net-row"
+      className={`ct-net-row${hovered ? " is-hover" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
@@ -146,11 +146,10 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
   return (
     <a
       href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       className={`ct-link${hovered ? " is-hover" : ""}`}
       style={{
-        display: "flex",
+        display: "inline-flex",
+        alignSelf: "flex-start",
         alignItems: "center",
         gap: "0.6rem",
         fontFamily: "'JetBrains Mono', monospace",
@@ -167,7 +166,7 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
         cursor: "pointer",
       }}
     >
-      <span style={{
+      <span className="ct-link-marker" style={{
         width: "6px",
         height: "6px",
         borderRadius: "1px",
@@ -176,7 +175,13 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
         transition: "background 0.2s",
         display: "inline-block",
       }} />
-      {label}
+      <span
+        className="ct-link-text"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {label}
+      </span>
     </a>
   );
 }
@@ -215,7 +220,7 @@ export default function ContactSection() {
         className="contact-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "1.4fr 0.7fr 0.85fr",
+          gridTemplateColumns: "1.55fr 0.65fr 0.75fr",
           gap: "3rem",
           alignItems: "start",
         }}
@@ -274,7 +279,7 @@ export default function ContactSection() {
             .contact-grid's 1.4fr/0.7fr/0.85fr columns exactly as before. */}
         <div className="contact-sitemap-networks">
         {/* ── MIDDLE: SITEMAP ── */}
-        <div>
+        <div className="ct-sitemap-column">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
@@ -292,13 +297,12 @@ export default function ContactSection() {
             <SitemapLink label="About" href="#about" delay={0.15} inView={inView} />
             <SitemapLink label="Projects" href="#projects" delay={0.2} inView={inView} />
             <SitemapLink label="Experience" href="#experience" delay={0.25} inView={inView} />
-            <SitemapLink label="Skills" href="#skills" delay={0.3} inView={inView} />
-            <SitemapLink label="Certificates" href="#certificates" delay={0.35} inView={inView} />
+            <SitemapLink label="Education" href="#education" delay={0.3} inView={inView} />
           </div>
         </div>
 
         {/* ── RIGHT: NETWORKS ── */}
-        <div>
+        <div className="ct-networks-column">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
@@ -309,7 +313,7 @@ export default function ContactSection() {
             borderLeft: "2px solid rgba(255,255,255,0.2)",
             paddingLeft: "0.7rem",
             transition: "opacity 0.6s ease 0.1s",
-          }} className="ct-col-label">
+          }} className="ct-col-label ct-networks-label">
             Networks
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -371,6 +375,60 @@ export default function ContactSection() {
         .light .ct-net-sub   { color: rgba(0,0,0,0.4) !important; opacity: 1 !important; }
         .light .ct-icon      { color: #000000 !important; opacity: 1 !important; }
         .light .ct-arrow     { color: rgba(0,0,0,0.4) !important; }
+
+        /* Theme-aware column bar, link underline, and network-card inversion. */
+        .ct-networks-label { border-left-color: #ffffff !important; }
+        .ct-net-row.is-hover {
+          background: #ffffff !important;
+          border-color: #ffffff !important;
+          color: #000000 !important;
+        }
+        .ct-net-row.is-hover .ct-icon,
+        .ct-net-row.is-hover .ct-net-label,
+        .ct-net-row.is-hover .ct-net-sub,
+        .ct-net-row.is-hover .ct-arrow {
+          color: #000000 !important;
+          opacity: 1 !important;
+        }
+        .ct-link-text {
+          display: inline-block;
+          border-bottom: 2px solid transparent;
+          padding-bottom: 3px;
+          transition: border-color 0.2s ease;
+        }
+        .ct-link.is-hover { color: #ffffff !important; }
+        .ct-link.is-hover .ct-link-text { border-bottom-color: #ffffff; }
+        .ct-link.is-hover .ct-link-marker { background: #ffffff !important; }
+        .light .ct-networks-label { border-left-color: #000000 !important; }
+        .light .ct-net-row.is-hover {
+          background: #000000 !important;
+          border-color: #000000 !important;
+          color: #ffffff !important;
+        }
+        .light .ct-net-row.is-hover .ct-icon,
+        .light .ct-net-row.is-hover .ct-net-label,
+        .light .ct-net-row.is-hover .ct-net-sub,
+        .light .ct-net-row.is-hover .ct-arrow {
+          color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .light .ct-link.is-hover { color: #000000 !important; }
+        .light .ct-link.is-hover .ct-link-text { border-bottom-color: #000000; }
+        .light .ct-link.is-hover .ct-link-marker { background: #000000 !important; }
+
+        @media (min-width: 1024px) {
+          /* Pull both utility columns toward the right, while letting the Network column
+             finish on the same 8vw outer edge as the rest of the page. */
+          .ct-sitemap-column { transform: translateX(12vw); }
+          .ct-networks-column {
+            /* Right-align the card column to the same 8vw page padding as the section itself. */
+            transform: translateX(1.5vw);
+            width: 330px;
+            max-width: none;
+            justify-self: end;
+          }
+          .ct-net-row { width: 100%; max-width: none; padding: 0.78rem 0.9rem !important; }
+        }
         /* Desktop default: invisible to the box tree, so .contact-grid sees the
            SITEMAP/NETWORKS divs directly and lays them out exactly as before. */
         .contact-sitemap-networks { display: contents; }
@@ -391,7 +449,7 @@ export default function ContactSection() {
             margin-top: 3rem !important;
           }
           .ct-net-row {
-            width: 100% !important;
+            width: 122% !important;
             box-sizing: border-box !important;
             min-height: 56px !important;
           }

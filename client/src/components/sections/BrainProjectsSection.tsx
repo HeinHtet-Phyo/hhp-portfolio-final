@@ -395,11 +395,27 @@ function HotspotDot({ position, index, active, interactive, onSelect, onHover }:
           pointer-move handler and no cursor coordinate anywhere in this path. Inert nodes get
           none of it. */}
       <mesh
-        onClick={(e) => { if (!interactive) return; e.stopPropagation(); onSelect(); }}
+        // A generous transparent sphere makes the small visual marker easy to tap on touch
+        // devices and easy to acquire with a tablet trackpad. Pointer-down is intentional:
+        // mobile browsers can delay or occasionally lose a synthetic click on tiny WebGL meshes.
+        onPointerDown={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          setHovered(true);
+          onHover(index);
+          onSelect();
+        }}
         onPointerOver={(e) => {
           if (!interactive) return;
           e.stopPropagation();
           setHovered(true);
+          document.body.style.cursor = "pointer";
+          onHover(index);
+        }}
+        onPointerMove={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          if (!hovered) setHovered(true);
           document.body.style.cursor = "pointer";
           onHover(index);
         }}
@@ -411,7 +427,7 @@ function HotspotDot({ position, index, active, interactive, onSelect, onHover }:
           onHover(null);
         }}
       >
-        <sphereGeometry args={[0.057, 8, 8]} />
+        <sphereGeometry args={[0.12, 12, 12]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>
@@ -833,6 +849,13 @@ const DEFAULT_MARGIN = 1.335;
 // genuinely different angle, and lookAt stays on brainCentre so the brain cannot slide.
 const ZOOM_DISTANCE_FACTOR = 0.825;
 
+// Narrow screens reserve room for the wide project readout. Keep the selected camera a little
+// farther back there so the complete brain and pedestal remain visible beside the panel.
+function zoomFactorForViewport() {
+  if (typeof window !== "undefined" && window.innerWidth < 1024) return 1.02;
+  return ZOOM_DISTANCE_FACTOR;
+}
+
 // ─── Bottom-region projects: look UP from underneath — TUNE HERE ─────────────
 // The three nodes with a negative y in PROJECT_NODES: CityPulse "back, lower" (2), PreventPath
 // "left, lower" (3), PROJECT_05 "lower right" (4). Their own directions give elevations of only
@@ -993,12 +1016,11 @@ function CameraController({ selected }: { selected: Project | null }) {
     const fov0 = (camera as THREE.PerspectiveCamera).fov ?? 45;
     const liveAspect = (camera as THREE.PerspectiveCamera).aspect || aspect;
     let dist = orbitDistance(liveAspect, fov0, DEFAULT_MARGIN);
-    // Mobile/tablet only: move the camera closer so the brain fills the (much taller,
-    // fluid-height) canvas properly instead of reading small. Desktop (>=1024px) gets no
-    // multiplier at all, so its distance is untouched.
+    // Preserve the strong desktop-like brain presence on narrow screens. Tablet and phone
+    // stages are deliberately taller, so a modest closer camera remains fully in frame.
     if (typeof window !== "undefined") {
-      if (window.innerWidth < 768) dist *= 0.75;
-      else if (window.innerWidth < 1024) dist *= 1.05;
+      if (window.innerWidth < 768) dist *= 0.92;
+      else if (window.innerWidth < 1024) dist *= 0.95;
     }
     return dist;
   };
@@ -1007,12 +1029,27 @@ function CameraController({ selected }: { selected: Project | null }) {
   }
 
   useEffect(() => {
+    let resizeFrame = 0;
     const onResize = () => {
-      defaultDistanceRef.current = computeDefaultDistance();
-      narrowRef.current = window.innerWidth < 1024;
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        const nextDistance = computeDefaultDistance();
+        defaultDistanceRef.current = nextDistance;
+        narrowRef.current = window.innerWidth < 1024;
+        // The canvas aspect updates immediately, but easing the orbital radius avoids the
+        // visible snap when a live resize crosses the laptop/tablet/phone breakpoints.
+        if (anim.ready) {
+          const targetRadius = nextDistance * (anim.depth > 0.001 ? zoomFactorForViewport() : 1);
+          gsap.killTweensOf(anim, "radius");
+          gsap.to(anim, { radius: targetRadius, duration: 0.38, ease: "power2.out", overwrite: "auto" });
+        }
+      });
     };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(resizeFrame);
+      window.removeEventListener("resize", onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -1034,6 +1071,7 @@ function CameraController({ selected }: { selected: Project | null }) {
     gsap.killTweensOf(anim);
 
     const defaultDistance = defaultDistanceRef.current!;
+    const zoomFactor = zoomFactorForViewport();
     _centreV.set(0, SCENE_CENTRE_Y, 0);
 
     if (nextId === null) {
@@ -1091,7 +1129,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       const ce = Math.cos(el);
       _dirV2.set(Math.sin(az) * ce, Math.sin(el), Math.cos(az) * ce).normalize();
     }
-    _startV.copy(_centreV).addScaledVector(_dirV2, defaultDistance * ZOOM_DISTANCE_FACTOR);
+    _startV.copy(_centreV).addScaledVector(_dirV2, defaultDistance * zoomFactor);
 
     // eslint-disable-next-line no-console
     console.log(
@@ -1100,14 +1138,14 @@ function CameraController({ selected }: { selected: Project | null }) {
       `\n    direction           = (${_dirV2.x.toFixed(4)}, ${_dirV2.y.toFixed(4)}, ${_dirV2.z.toFixed(4)})`,
       isBottom ? `  [bottom region: elevation forced to ${bottomElev}deg, glow+bloom to ${BOTTOM_DIM_FRAC * 100}%]` : "",
       `\n    camera position     = (${_startV.x.toFixed(4)}, ${_startV.y.toFixed(4)}, ${_startV.z.toFixed(4)})`,
-      ` distance=${(defaultDistance * ZOOM_DISTANCE_FACTOR).toFixed(4)} (${ZOOM_DISTANCE_FACTOR} x default)`,
+      ` distance=${(defaultDistance * zoomFactor).toFixed(4)} (${zoomFactor} x default)`,
       `\n    lookAt = brainCentre (${_centreV.x.toFixed(4)}, ${_centreV.y.toFixed(4)}, ${_centreV.z.toFixed(4)}) — fixed in every state`,
       `\n    camera-to-node ${_startV.distanceTo(_toV).toFixed(4)} = ${(_startV.distanceTo(_toV) / NODE_GLOW_RADIUS).toFixed(2)}x glow radius`,
     );
 
     const fromDefault = toId.current === null || anim.depth <= 0.01;
     toId.current = nextId;
-    const zoomRadius = defaultDistance * ZOOM_DISTANCE_FACTOR;
+    const zoomRadius = defaultDistance * zoomFactor;
 
     if (fromDefault) {
       // First click from the default view — the one move that IS interpolated. There is no
@@ -3542,12 +3580,12 @@ const LEFT_W    = 260;
 // 100vw - READOUT_RIGHT_GAP - READOUT_VW, which stays right of the viewport centre at any
 // realistic width — so the centred brain, and the selected node (which projects to the exact
 // screen centre at full zoom), stay unobscured.
-const READOUT_VW = 35;
+const READOUT_VW = 37;
 // Gap between the panel's right edge and the viewport edge. Deliberately NOT the hero's 8vw
 // gutter used elsewhere in this section: 8vw resolves to ~121px on a 1512px viewport, which
 // left a wide dead band down the right-hand side. A small fixed 24px hugs the edge instead.
 const READOUT_RIGHT_GAP = 24;
-const SHEET_VH   = 70;   // mobile bottom sheet
+const SHEET_VH   = 62;   // compact bottom sheet on tablet and mobile, leaving the brain visible above it.
 // The site navbar is 83px tall, full width, z-index 100 — above this section.
 const NAV_CLEARANCE = 96;
 // Horizontal page gutter. Matches the hero section's `padding: "80px 8vw 0"` exactly, so the
@@ -3614,11 +3652,13 @@ const READOUT_HEIGHT = "90vh";
 const READOUT_TOP_OFFSET = 50;
 // Extra top padding inside the panel, above the standard vertical padding.
 const READOUT_PAD_TOP = 24;
+// Below 1024px the side archive is removed. Laptop and desktop retain the archive;
+// tablet and phone use the uncluttered centred brain stage.
 const NARROW_QUERY  = "(max-width: 1023px)";
 const SLIDE_MS      = 320;
 
 function useNarrowLayout() {
-  const [narrow, setNarrow] = useState(false);
+  const [narrow, setNarrow] = useState(typeof window !== "undefined" && window.matchMedia(NARROW_QUERY).matches);
   useEffect(() => {
     const mql = window.matchMedia(NARROW_QUERY);
     const onChange = () => setNarrow(mql.matches);
@@ -3629,19 +3669,10 @@ function useNarrowLayout() {
   return narrow;
 }
 
-// Mobile-only (<768px): the readout panel's fixed-bottom-sheet layout. Tablet
-// (768-1023px, covered by useNarrowLayout above) keeps the desktop right-side
-// column instead, just narrower — only mobile collapses to a full-width sheet.
+// Every selected-project view uses an edge-aligned column. On phones the CSS turns this
+// into a compact right drawer rather than a centred bottom sheet, so the brain remains visible.
 function useSheetLayout() {
-  const [sheet, setSheet] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    const onChange = () => setSheet(mql.matches);
-    onChange();
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
-  }, []);
-  return sheet;
+  return false;
 }
 
 // ─── Corner bracket accent ────────────────────────────────────────────────────
@@ -3788,7 +3819,7 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
 // ─── Mobile node chips (horizontal scroller above the brain) ──────────────────
 function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSelect: (id: number) => void }) {
   return (
-    <div style={{
+    <div className="brain-node-chip-row" style={{
       display: "flex", gap: 8, overflowX: "auto", padding: "0 16px 2px",
       WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
     }}>
@@ -4014,7 +4045,8 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
   const [avail, setAvail] = useState(360);
   useEffect(() => {
     const measure = () => {
-      const w = sheet ? window.innerWidth : (window.innerWidth * READOUT_VW) / 100;
+      const phoneDrawer = window.innerWidth < 768;
+      const w = sheet || phoneDrawer ? window.innerWidth * (phoneDrawer ? 0.82 : 1) : (window.innerWidth * READOUT_VW) / 100;
       setAvail(Math.max(160, w - padX * 2 - 2));
     };
     measure();
@@ -4023,7 +4055,8 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
   }, [sheet, padX]);
 
   return (
-    <motion.div
+      <motion.div
+      className={`brain-readout ${sheet ? "is-sheet" : "is-column"}`}
       initial={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
       animate={sheet ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
       exit={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
@@ -4289,7 +4322,7 @@ export default function ProjectsSection() {
   const open = project !== null;
 
   return (
-    <section id="projects" ref={sectionRootRef as React.RefObject<HTMLElement>} style={{
+    <section id="projects" className={`projects-section${open ? " is-project-open" : ""}`} ref={sectionRootRef as React.RefObject<HTMLElement>} style={{
       // Transparent, not the palette's #020008, so the page starfield still reads through
       // the near-transparent panels and behind the free-floating brain.
       background: BG, position: "relative",
@@ -4398,18 +4431,109 @@ export default function ProjectsSection() {
         .light .brain-lock-arc     { border-color: rgba(0,0,0,0.5) !important; }
         .light .brain-lock-body    { background: rgba(0,0,0,0.5) !important; }
 
-        /* Responsive brain size. Laptop: a subtle scale-down. Tablet/mobile:
-           full viewport height, so the canvas fills the screen instead of a
-           partial box. */
-        @media (max-width: 1279px) and (min-width: 1024px) {
-          .brain-canvas-scale-wrap { transform: scale(0.9); transform-origin: center center; }
+        /* Ensure R3F's internal canvas always fills the stage. Without this rule the canvas
+           can retain its intrinsic 300×150 size after a viewport resize, causing the rendered
+           brain to appear offset and clipped inside a correctly sized wrapper. */
+        #projects .brain-canvas-wrapper canvas {
+          display: block !important;
+          width: 100% !important;
+          height: 100% !important;
         }
+
+        /* Responsive Projects stage. The narrow layout uses one deliberately centred
+           100vw canvas stage. This avoids the earlier conflict between absolute inset positioning
+           and a responsive height, which made the renderer appear to drift right on resize. */
+        /* Keep one continuous scale model across laptop and tablet widths. The previous
+           0.9 scale at the breakpoint caused the visible brain-size jump during resizing. */
+        #projects .brain-canvas-wrapper {
+          transition: left 1500ms cubic-bezier(.22,.61,.36,1), transform 1500ms cubic-bezier(.22,.61,.36,1), width 420ms ease-out, height 420ms ease-out !important;
+        }
+        /* Tablet and phone: no archive box and no chip bar above the brain. The default
+           scene remains centred; only an open tablet project shifts the stage left to make
+           room for the expanded right-side readout. */
         @media (max-width: 1023px) {
-          .brain-canvas-wrapper { width: 100% !important; height: clamp(500px, 85vw, 920px) !important; transition: height 0.5s ease !important; }
+          #projects.projects-section {
+            height: 100svh !important;
+            min-height: max(100svh, 760px) !important;
+          }
+          #projects .brain-canvas-wrapper {
+            top: clamp(116px, 12svh, 156px) !important;
+            right: auto !important;
+            bottom: auto !important;
+            left: 50% !important;
+            width: 100vw !important;
+            height: min(84svh, 860px) !important;
+            transform: translateX(-50%) !important;
+            transform-origin: center center !important;
+          }
+          #projects.projects-section.is-project-open .brain-canvas-wrapper {
+            left: calc(50% - 18vw) !important;
+            transform: translateX(-50%) scale(0.97) !important;
+          }
+          #projects .projects-chip-overlay {
+            display: none !important;
+          }
+          #projects .projects-title-block {
+            top: 96px !important;
+            left: clamp(20px, 6vw, 54px) !important;
+          }
         }
-        /* Tablet only — mobile keeps the clamp above untouched. */
+        /* Tablet project readout: large right-side half panel, never a centred sheet. */
         @media (min-width: 768px) and (max-width: 1023px) {
-          .brain-canvas-wrapper { height: clamp(700px, 88vh, 960px) !important; transition: height 0.6s ease !important; }
+          #projects .brain-readout.is-column {
+            top: 20svh !important;
+            right: 3vw !important;
+            width: 57.5vw !important;
+            height: min(78svh, 800px) !important;
+          }
+          #projects .brain-readout.is-column .brain-panel {
+            height: min(78svh, 800px) !important;
+            min-height: min(78svh, 800px) !important;
+            max-height: min(78svh, 800px) !important;
+            padding-inline: clamp(24px, 4vw, 44px) !important;
+          }
+        }
+        /* Phone: clean centred brain; detail stays in a bottom sheet and no project bar is shown. */
+        /* The archive stays mounted, so this CSS rule—not a React remount—controls
+           whether it is visible. It therefore returns instantly and reliably after
+           resizing a phone/tablet view back to laptop or desktop width. */
+        @media (max-width: 1023px) {
+          #projects .projects-archive-overlay { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          #projects.projects-section {
+            height: 100svh !important;
+            min-height: max(100svh, 720px) !important;
+          }
+          #projects .brain-canvas-wrapper {
+            top: clamp(118px, 15svh, 160px) !important;
+            height: min(80svh, 700px) !important;
+          }
+          #projects.projects-section.is-project-open .brain-canvas-wrapper {
+            left: calc(50% - 17vw) !important;
+            transform: translateX(-50%) scale(0.90) !important;
+          }
+          #projects .projects-title-block {
+            top: 96px !important;
+          }
+          #projects .brain-readout.is-column {
+            position: absolute !important;
+            top: 22svh !important;
+            right: 0 !important;
+            left: auto !important;
+            width: 63.333vw !important;
+            height: min(74svh, 620px) !important;
+          }
+          #projects .brain-readout.is-column .brain-panel {
+            height: min(74svh, 620px) !important;
+            min-height: min(74svh, 620px) !important;
+            max-height: min(74svh, 620px) !important;
+            padding: 20px 18px 24px !important;
+          }
+        }
+        /* Only compact phones use the wider 2.1/3 readout. Wider phone layouts retain the prior proportion. */
+        @media (max-width: 600px) {
+          #projects .brain-readout.is-column { width: 70vw !important; }
         }
       `}</style>
 
@@ -4441,11 +4565,14 @@ export default function ProjectsSection() {
         zIndex: 1,
       }}>
         <Canvas
+          // Keep local canvas coordinates: offset-based pointer data is measured against the
+          // actual WebGL canvas and remains correct when its responsive parent is transformed.
+          // Keep taps responsive on touch devices without allowing browser gesture delays.
+          style={{ background: "transparent", position: "absolute", inset: 0, touchAction: "manipulation" }}
           // near is driven per-frame by CameraController: 0.1 outside, 0.004 once the camera
           // is inside the brain, where the default would slice through the surrounding mesh.
           camera={{ position: [0, 0, 1.25], fov: 45, near: 0.1, far: 20 }}
           gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
-          style={{ background: "transparent", position: "absolute", inset: 0 }}
         >
           <BrainScene light={isLight} selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
         </Canvas>
@@ -4459,7 +4586,7 @@ export default function ProjectsSection() {
 
           Now shown on all sizes (was desktop-only) — NodeChipRow's own top
           offset below is pushed down to clear it on narrow. */}
-      <div style={{ position: "absolute", top: "53px", left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
+      <div className="projects-title-block" style={{ position: "absolute", top: "53px", left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
           <span className="brain-section-label" style={{
@@ -4479,27 +4606,17 @@ export default function ProjectsSection() {
         {!narrow && <div style={{ height: '320px' }} />}
       </div>
 
-      {/* Left: node index — desktop column, vertically centred and only as tall as its
-          content; mobile a horizontal chip scroller above the brain. */}
-      {narrow ? (
-        // top pushed to 140px (was NAV_CLEARANCE/96px) — the heading above is
-        // no longer desktop-only, so this needs to clear it now.
-        // hidden lg:flex: this branch only ever renders below the lg (1024px)
-        // breakpoint in the first place (that's what `narrow` gates on), so
-        // the class makes the node tabs bar fully removed on mobile/tablet.
-        <div className="hidden lg:flex" style={{ position: "absolute", top: 140, left: 0, right: 0, zIndex: 10 }}>
-          <NodeChipRow selectedId={selectedId} onSelect={setSelectedId} />
+      {/* Left archive stays mounted while resizing. CSS hides it below tablet width,
+          avoiding the stale responsive state that previously left the panel missing after
+          a phone or tablet view was expanded again. */}
+      <div className="projects-archive-overlay" style={{
+        position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
+        width: LEFT_W, zIndex: 10,
+      }}>
+        <div className="reveal-left">
+          <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={18} />
         </div>
-      ) : (
-        <div style={{
-          position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
-          width: LEFT_W, zIndex: 10,
-        }}>
-          <div className="reveal-left hidden lg:flex">
-            <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={arm} />
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Right: readout — absent entirely until a project is selected */}
       <AnimatePresence>
