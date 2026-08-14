@@ -13,6 +13,7 @@ import BrainProjectsSection from "../components/sections/BrainProjectsSection";
 import FooterSection from "../components/sections/FooterSection";
 import Preloader from "../components/Preloader";
 import { useState } from "react";
+import { useReveal } from "../hooks/useReveal";
 
 // Placeholder sections — will be built section by section
 function PlaceholderSection({ id, label }: { id: string; label: string }) {
@@ -44,6 +45,7 @@ function PlaceholderSection({ id, label }: { id: string; label: string }) {
 
 export default function Home() {
   const [preloaderDone, setPreloaderDone] = useState(false);
+  useReveal(0.1);
 
   return (
     <div style={{ background: "var(--background)", minHeight: "100vh", position: "relative" }}>

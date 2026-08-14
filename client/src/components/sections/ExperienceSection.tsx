@@ -347,8 +347,11 @@ export default function ExperienceSection() {
     <section
       id="work"
       ref={ref}
-      style={{ padding: "96px 8vw", position: "relative", zIndex: 1 }}
+      style={{
+        padding: "96px 8vw 46px", marginTop: "-65px", position: "relative", zIndex: 1,
+      }}
     >
+    <div className="reveal">
       {/* Section label */}
       <div style={{
         display: "flex", alignItems: "center", gap: "0.6rem", marginBottom: "4.75rem",
@@ -356,7 +359,7 @@ export default function ExperienceSection() {
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block", boxShadow: "0 0 8px rgba(132,204,22,0.6)" }} />
-        <span className="exp-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+        <span className="exp-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ffffff" }}>
           04 — Work Experience
         </span>
       </div>
@@ -459,13 +462,27 @@ export default function ExperienceSection() {
       </div>
 
       <style>{`
-        @media (max-width: 900px) {
+        /* Tablet and below: single column layout. */
+        @media (max-width: 1023px) {
           .exp-layout {
             grid-template-columns: 1fr !important;
             gap: 3rem !important;
           }
           .exp-layout > div:first-child {
             position: static !important;
+          }
+        }
+        /* Mobile: smaller cards, 44px minimum tap target on the expand toggle. */
+        @media (max-width: 767px) {
+          .exp-card-btn {
+            padding: 1.1rem 1.25rem !important;
+          }
+          .exp-role {
+            font-size: 0.95rem !important;
+          }
+          .exp-toggle {
+            width: 44px !important;
+            height: 44px !important;
           }
         }
         .exp-card-btn:focus {
@@ -517,6 +534,7 @@ export default function ExperienceSection() {
           color: #ffffff !important;
         }
       `}</style>
+    </div>
     </section>
   );
 }

@@ -745,7 +745,7 @@ const SWITCH_SLOW_FACTOR = 0.6;
 // drifts in over the other five. Switch to sine.inOut if the arrival wants easing at both ends.
 // Only the timing changes here — direction, radius and ZOOM_DISTANCE_FACTOR are untouched, so
 // every shot ends in exactly the same place it did before.
-const ZOOM_DURATION_S = 6.3;
+const ZOOM_DURATION_S = 6;
 const ZOOM_EASE       = "power2.out";
 
 // Readout content cross-fade (140ms out + 140ms in) sits centred on the zoom-out leg's midpoint,
@@ -982,15 +982,39 @@ function CameraController({ selected }: { selected: Project | null }) {
   const toId = useRef<number | null>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
 
-  // defaultDistance is read once, here, at mount — not recomputed on every frame or on
-  // resize — so it can never be derived from a camera position that a previous zoom has
-  // already moved, and can't drift across zoom cycles. The trade-off (stated explicitly) is
-  // that framing no longer re-adapts if the window is resized after mount.
+  // defaultDistance: NOT recomputed per-frame (it can never be derived from a camera
+  // position that a previous zoom has already moved, and can't drift across zoom cycles) —
+  // but IS recomputed on window resize below, so mobile/tablet framing still adapts if the
+  // viewport changes size after mount.
   const defaultDistanceRef = useRef<number | null>(null);
-  if (defaultDistanceRef.current === null) {
+  const narrowRef = useRef(typeof window !== "undefined" && window.innerWidth < 1024);
+
+  const computeDefaultDistance = () => {
     const fov0 = (camera as THREE.PerspectiveCamera).fov ?? 45;
-    defaultDistanceRef.current = orbitDistance(aspect, fov0, DEFAULT_MARGIN);
+    const liveAspect = (camera as THREE.PerspectiveCamera).aspect || aspect;
+    let dist = orbitDistance(liveAspect, fov0, DEFAULT_MARGIN);
+    // Mobile/tablet only: move the camera closer so the brain fills the (much taller,
+    // fluid-height) canvas properly instead of reading small. Desktop (>=1024px) gets no
+    // multiplier at all, so its distance is untouched.
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 768) dist *= 0.75;
+      else if (window.innerWidth < 1024) dist *= 1.05;
+    }
+    return dist;
+  };
+  if (defaultDistanceRef.current === null) {
+    defaultDistanceRef.current = computeDefaultDistance();
   }
+
+  useEffect(() => {
+    const onResize = () => {
+      defaultDistanceRef.current = computeDefaultDistance();
+      narrowRef.current = window.innerWidth < 1024;
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-base the move on wherever the camera actually is: evaluate the in-flight slerp at its
   // current t and make that the new start. This is what guarantees a switch continues from the
@@ -1196,7 +1220,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       const fovRad = ((camera as THREE.PerspectiveCamera).fov ?? 45) * Math.PI / 180;
       // tan(hHalf) === tan(vHalf) * aspect, so no atan round-trip is needed.
       const tanHalfW = Math.tan(fovRad / 2) * Math.max(aspect, 0.01);
-      const shift = 2 * ZOOM_LEFT_SHIFT_FRAC * anim.radius * tanHalfW * anim.depth;
+      const shift = narrowRef.current ? 0 : 2 * ZOOM_LEFT_SHIFT_FRAC * anim.radius * tanHalfW * anim.depth;
       // Both by the same vector: a pure sideways translation of the frustum. The view direction
       // is unchanged, so the orientation — and therefore the roll — is exactly what it was.
       camera.position.addScaledVector(_rightV, shift);
@@ -3500,14 +3524,14 @@ function BrainScene({ selected, onHotspotSelect, onHotspotHover, light }: {
 const INK         = "#ffffff";
 const INK_BRIGHT  = "#c8cfd6";
 const INK_MID     = "#8b929b";
-const INK_DIM     = "#5a6472";
+const INK_DIM     = "#888888";
 const INK_LOCKED  = "#3f4754";
 const ROW_IDLE    = "#6b7280";
 const VOID        = "#020008";
 const MONO        = "'JetBrains Mono', monospace";
 
-const PANEL_BORDER = "rgba(255,255,255,0.18)";
-const PANEL_BG     = "rgba(255,255,255,0.012)";
+const PANEL_BORDER = "rgba(255,255,255,0.15)";
+const PANEL_BG     = "rgba(0,0,0,0.6)";
 const BRACKET_COL  = "rgba(255,255,255,0.45)";
 const RULE_STRONG  = "rgba(255,255,255,0.14)";
 const RULE_SOFT    = "rgba(255,255,255,0.1)";
@@ -3523,7 +3547,7 @@ const READOUT_VW = 35;
 // gutter used elsewhere in this section: 8vw resolves to ~121px on a 1512px viewport, which
 // left a wide dead band down the right-hand side. A small fixed 24px hugs the edge instead.
 const READOUT_RIGHT_GAP = 24;
-const SHEET_VH   = 72;   // mobile bottom sheet
+const SHEET_VH   = 70;   // mobile bottom sheet
 // The site navbar is 83px tall, full width, z-index 100 — above this section.
 const NAV_CLEARANCE = 96;
 // Horizontal page gutter. Matches the hero section's `padding: "80px 8vw 0"` exactly, so the
@@ -3603,6 +3627,21 @@ function useNarrowLayout() {
     return () => mql.removeEventListener("change", onChange);
   }, []);
   return narrow;
+}
+
+// Mobile-only (<768px): the readout panel's fixed-bottom-sheet layout. Tablet
+// (768-1023px, covered by useNarrowLayout above) keeps the desktop right-side
+// column instead, just narrower — only mobile collapses to a full-width sheet.
+function useSheetLayout() {
+  const [sheet, setSheet] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const onChange = () => setSheet(mql.matches);
+    onChange();
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return sheet;
 }
 
 // ─── Corner bracket accent ────────────────────────────────────────────────────
@@ -3685,7 +3724,7 @@ function NodeRow({ name, active, onSelect }: { name: string; active: boolean; on
       }} />
       <span className="brain-text" style={{
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em",
-        color: active ? INK : lit ? INK_BRIGHT : ROW_IDLE,
+        color: active ? INK : lit ? INK_BRIGHT : "#777777",
         transition: "color 0.15s ease",
       }}>
         {name}
@@ -3707,7 +3746,7 @@ function LockedRow({ name }: { name: string }) {
         }} />
         <span className="brain-lock-body" style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
       </span>
-      <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK_LOCKED }}>{name}</span>
+      <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: "#666666" }}>{name}</span>
     </div>
   );
 }
@@ -3860,7 +3899,7 @@ function SegmentedProgress({ pct }: { pct: number }) {
           }} />
         ))}
       </div>
-      <span ref={labelRef} className="brain-pct" style={{ fontFamily: MONO, fontSize: 10, color: INK_MID, whiteSpace: "nowrap" }}>0%</span>
+      <span ref={labelRef} className="brain-pct" style={{ fontFamily: MONO, fontSize: 10, color: "#aaaaaa", whiteSpace: "nowrap" }}>0%</span>
     </div>
   );
 }
@@ -3896,9 +3935,9 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
 // Shared bracket-button treatment. `compact` is the smaller BACK variant.
 // `half` makes the button an equal-width flex item so a pair fills one row; `icon` swaps the
 // text label for arbitrary content, which inherits `color` and so follows the same hover invert.
-function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel }: {
+function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel, idleColor }: {
   href?: string; label?: string; onClick?: () => void; compact?: boolean;
-  icon?: React.ReactNode; half?: boolean; ariaLabel?: string;
+  icon?: React.ReactNode; half?: boolean; ariaLabel?: string; idleColor?: string;
 }) {
   const [hover, setHover] = useState(false);
   const style: React.CSSProperties = {
@@ -3912,7 +3951,7 @@ function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel }:
     padding: compact ? "0 16px" : undefined,
     border: "1px solid rgba(255,255,255,0.3)", borderRadius: 3,
     background: hover ? INK : "transparent",
-    color: hover ? VOID : INK,
+    color: hover ? VOID : (idleColor ?? INK),
     fontFamily: MONO, fontSize: compact ? 10 : 12, letterSpacing: "0.14em",
     textDecoration: "none", transition: "background 0.15s ease, color 0.15s ease",
   };
@@ -3946,7 +3985,7 @@ function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
       style={{
         background: "transparent", border: "none", padding: 0, cursor: "pointer",
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em",
-        color: hover ? INK : INK_MID, transition: "color 0.15s ease",
+        color: hover ? INK : "#888888", transition: "color 0.15s ease",
       }}
     >
       {label}
@@ -3955,43 +3994,43 @@ function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 // ─── Right panel — project readout ────────────────────────────────────────────
-function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, narrow }: {
+function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, sheet }: {
   project: Project; position: number; total: number;
   onPrev: () => void; onNext: () => void; onBack: () => void;
-  arm: number; narrow: boolean;
+  arm: number; sheet: boolean;
 }) {
   const pct = Math.round(((position + 1) / total) * 100);
-  const padX = narrow ? 24 : READOUT_PAD_X;
-  const padY = narrow ? 24 : READOUT_PAD_Y;
+  const padX = sheet ? 24 : READOUT_PAD_X;
+  const padY = sheet ? 24 : READOUT_PAD_Y;
   // Breathing room between the PREV/NEXT row and the panel's bottom border and corner brackets.
   // Because the desktop panel shrink-wraps its content, this padding IS the panel's extra height
   // — the box grows by exactly this much. The mobile sheet keeps its own padY instead: it is
   // anchored to the screen edge, so its padding does not affect its height.
-  const padBottom = narrow ? padY : 50.47;
-  const padTop = narrow ? 24 : READOUT_PAD_TOP;
+  const padBottom = sheet ? padY : 50.47;
+  const padTop = sheet ? 24 : READOUT_PAD_TOP;
   // Width the title has to fit inside: the panel minus its border and horizontal padding. The
-  // desktop panel is READOUT_VW of the viewport, so this is resolved from the live viewport
-  // width.
+  // desktop/tablet column panel is READOUT_VW of the viewport, so this is resolved from the live
+  // viewport width. Only the mobile sheet (<768px) measures against the full window width.
   const [avail, setAvail] = useState(360);
   useEffect(() => {
     const measure = () => {
-      const w = narrow ? window.innerWidth : (window.innerWidth * READOUT_VW) / 100;
+      const w = sheet ? window.innerWidth : (window.innerWidth * READOUT_VW) / 100;
       setAvail(Math.max(160, w - padX * 2 - 2));
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [narrow, padX]);
+  }, [sheet, padX]);
 
   return (
     <motion.div
-      initial={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
-      animate={narrow ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-      exit={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      initial={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      animate={sheet ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+      exit={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
       transition={{ duration: SLIDE_MS / 1000, ease: "easeOut" }}
       style={{
-        position: "absolute", zIndex: 20,
-        ...(narrow
+        position: sheet ? "fixed" : "absolute", zIndex: 20,
+        ...(sheet
           ? { left: 0, right: 0, bottom: 0, height: `${SHEET_VH}vh` }
           // Full-height column rather than a vertically-centred block. The top stops at
           // READOUT_TOP rather than 0: the site navbar is fixed, full width and z-index 100,
@@ -3999,26 +4038,29 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
           // and both top corner brackets hidden behind the navbar, and the [ BACK ] button
           // with it. Height is the fixed READOUT_HEIGHT rather than shrink-wrapped, so the box
           // is identical for all five projects instead of tracking each one's content length.
+          // Now also the tablet (768-1023px) branch, not just desktop: READOUT_VW/READOUT_RIGHT_GAP
+          // are viewport-relative already, so this column just renders narrower on tablet instead
+          // of switching to the full-width sheet.
           : { top: READOUT_TOP + READOUT_TOP_OFFSET, height: READOUT_HEIGHT, right: READOUT_RIGHT_GAP, width: `${READOUT_VW}vw` }),
       }}
     >
       <Panel
         arm={arm}
         style={{
-          // Desktop is pinned to READOUT_HEIGHT on all three height properties so every project
-          // gets the same box; past that the body scrolls. The mobile sheet keeps its fixed
-          // SHEET_VH box, so it still fills its parent.
-          height: narrow ? "100%" : READOUT_HEIGHT,
-          minHeight: narrow ? "100%" : READOUT_HEIGHT,
-          maxHeight: narrow ? "100%" : READOUT_HEIGHT,
+          // Desktop/tablet column is pinned to READOUT_HEIGHT on all three height properties so
+          // every project gets the same box; past that the body scrolls. The mobile sheet keeps
+          // its fixed SHEET_VH box, so it still fills its parent.
+          height: sheet ? "100%" : READOUT_HEIGHT,
+          minHeight: sheet ? "100%" : READOUT_HEIGHT,
+          maxHeight: sheet ? "100%" : READOUT_HEIGHT,
           width: "100%",
           padding: `${padTop}px ${padX}px ${padBottom}px`,
           display: "flex", flexDirection: "column", overflow: "hidden",
-          background: "rgba(2,0,8,0.72)", backdropFilter: "blur(6px)",
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
         }}
       >
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
-          <BracketButton label="[ BACK ]" onClick={onBack} compact />
+          <BracketButton label="[ BACK ]" onClick={onBack} compact idleColor="#cccccc" />
         </div>
 
         {/* Content swaps INSTANTLY on click, deliberately decoupled from the camera.
@@ -4042,7 +4084,7 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
 
             <h3 className="brain-title" style={{
               margin: "20px 0 0", fontFamily: MONO, fontWeight: 700,
-              fontSize: titleSize(project.name, narrow ? 26 : 44, avail),
+              fontSize: titleSize(project.name, sheet ? 26 : 44, avail),
               color: INK, letterSpacing: "0.02em", lineHeight: 1.1, whiteSpace: "nowrap",
             }}>
               {project.name}
@@ -4051,20 +4093,20 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="PREVIEW //" />
               <div style={{ marginTop: 10 }}>
-                <PreviewFrame src={project.preview} arm={narrow ? 8 : 12} maxHeight={narrow ? 170 : 150} />
+                <PreviewFrame src={project.preview} arm={sheet ? 8 : 12} maxHeight={sheet ? 170 : 150} />
               </div>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="DESCRIPTION:" />
-              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: "#cccccc", lineHeight: 1.75 }}>
                 {project.desc}
               </p>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="TECH_STACK:" />
-              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: "#aaaaaa", lineHeight: 1.75 }}>
                 {project.tech.join(", ")}
               </p>
             </div>
@@ -4174,6 +4216,7 @@ function NodeTooltip({ name }: { name: string }) {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProjectsSection() {
   const narrow = useNarrowLayout();
+  const sheet = useSheetLayout();
   // Read here, OUTSIDE the Canvas, and passed down as a prop: React context does
   // not cross the react-three-fiber reconciler boundary.
   const isLight = useTheme().theme === "light";
@@ -4183,6 +4226,26 @@ export default function ProjectsSection() {
 
   const project = selectedId === null ? null : PROJECTS[selectedId];
   const position = selectedId === null ? -1 : ACTIVE_PROJECTS.findIndex((p) => p.id === selectedId);
+
+  // Brain canvas fade-in when the projects section scrolls into view.
+  const sectionRootRef = useRef<HTMLElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const [brainVisible, setBrainVisible] = useState(false);
+  useEffect(() => {
+    const el = sectionRootRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setBrainVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const step = useCallback((delta: number) => {
     setSelectedId((cur) => {
@@ -4226,12 +4289,19 @@ export default function ProjectsSection() {
   const open = project !== null;
 
   return (
-    <section id="projects" style={{
+    <section id="projects" ref={sectionRootRef as React.RefObject<HTMLElement>} style={{
       // Transparent, not the palette's #020008, so the page starfield still reads through
       // the near-transparent panels and behind the free-floating brain.
       background: BG, position: "relative",
-      height: "115vh", overflow: "hidden",
-      paddingTop: "96px", paddingBottom: "96px",
+      // min-height:100vh set unconditionally, on all sizes. Desktop's own
+      // height:115vh already exceeds 100vh, so this doesn't change desktop's
+      // rendered size at all. Mobile/tablet: no fixed 115vh + 96px top/bottom
+      // padding on top of that — that combination left ~15vh of empty space
+      // below the canvas, so narrow gets nothing beyond the 100vh minimum.
+      minHeight: "100vh",
+      ...(narrow
+        ? { overflow: "visible" }
+        : { height: "115vh", overflow: "hidden", paddingTop: "96px", paddingBottom: "96px" }),
     }}>
       {/* The readout body scrolls when its content exceeds the shortened panel, but the
           scrollbar itself stays hidden — a visible one cuts across the panel border and its
@@ -4327,11 +4397,36 @@ export default function ProjectsSection() {
         /* Padlock: arc is a border, body is a fill — both follow the dim tone. */
         .light .brain-lock-arc     { border-color: rgba(0,0,0,0.5) !important; }
         .light .brain-lock-body    { background: rgba(0,0,0,0.5) !important; }
+
+        /* Responsive brain size. Laptop: a subtle scale-down. Tablet/mobile:
+           full viewport height, so the canvas fills the screen instead of a
+           partial box. */
+        @media (max-width: 1279px) and (min-width: 1024px) {
+          .brain-canvas-scale-wrap { transform: scale(0.9); transform-origin: center center; }
+        }
+        @media (max-width: 1023px) {
+          .brain-canvas-wrapper { width: 100% !important; height: clamp(500px, 85vw, 920px) !important; transition: height 0.5s ease !important; }
+        }
+        /* Tablet only — mobile keeps the clamp above untouched. */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          .brain-canvas-wrapper { height: clamp(700px, 88vh, 960px) !important; transition: height 0.6s ease !important; }
+        }
       `}</style>
 
       {/* Brain — no frame, no border, no brackets: it floats directly on the starfield.
-          Both panels overlay this layer rather than displacing it. */}
-      <div style={{
+          Both panels overlay this layer rather than displacing it.
+          Fade+rise driven by brainVisible (IntersectionObserver on the section root).
+          Wrapped in a plain, non-animated div purely so responsive breakpoints below
+          can apply a CSS `transform: scale(...)` without colliding with the fade/rise
+          transform on the inner div — camera/distance/FOV constants are untouched. */}
+      <div className="brain-canvas-scale-wrap brain-canvas-wrapper" style={{ position: "absolute", inset: 0 }}>
+      <div
+        ref={canvasWrapperRef}
+        style={{
+        opacity: brainVisible ? 1 : 0,
+        transform: brainVisible ? 'translateY(0px)' : 'translateY(40px)',
+        transition: 'opacity 1s ease-out, transform 1s ease-out',
+        transitionDelay: '0.3s',
         position: "absolute",
         top: 0,
         // Full-width layer sitting BEHIND both panels, spanning the whole viewport, so the
@@ -4355,39 +4450,44 @@ export default function ProjectsSection() {
           <BrainScene light={isLight} selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
         </Canvas>
       </div>
+      </div>
 
       {/* Section label + strapline. Absolutely positioned rather than in flow:
           this section is a fixed-height 130vh canvas stage with no document flow
           to insert into, so a normal block would displace the brain. Sits at the
           same NAV_CLEARANCE / EDGE_PAD the rest of the section uses.
 
-          Desktop only: on narrow the NodeChipRow already occupies exactly this
-          slot (top: NAV_CLEARANCE), and rendering both would overlap them. */}
-      {!narrow && (
-        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-            <span className="brain-section-label" style={{
-              fontFamily: MONO, fontSize: 12, letterSpacing: "0.2em",
-              textTransform: "uppercase", color: INK,
-            }}>
-              03 — Projects
-            </span>
-          </div>
-          <div style={{
-            fontFamily: MONO, fontSize: "0.65rem", fontWeight: 400,
-            letterSpacing: "0.05em", color: "rgba(226,232,240,0.6)",
-            marginTop: 0, marginBottom: "0.5rem",
+          Now shown on all sizes (was desktop-only) — NodeChipRow's own top
+          offset below is pushed down to clear it on narrow. */}
+      <div style={{ position: "absolute", top: "53px", left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+          <span className="brain-section-label" style={{
+            fontFamily: MONO, fontSize: "0.68rem", letterSpacing: "0.2em",
+            textTransform: "uppercase", color: INK,
           }}>
-            // select a neuron to explore each project
-          </div>
+            03 — Projects
+          </span>
         </div>
-      )}
+        <div style={{
+          fontFamily: MONO, fontSize: "0.5875rem", fontWeight: 400,
+          letterSpacing: "0.05em", color: "rgba(226,232,240,0.6)",
+          marginTop: 0, marginBottom: "0.5rem",
+        }}>
+          // select a neuron to explore each project
+        </div>
+        {!narrow && <div style={{ height: '320px' }} />}
+      </div>
 
       {/* Left: node index — desktop column, vertically centred and only as tall as its
           content; mobile a horizontal chip scroller above the brain. */}
       {narrow ? (
-        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: 0, right: 0, zIndex: 10 }}>
+        // top pushed to 140px (was NAV_CLEARANCE/96px) — the heading above is
+        // no longer desktop-only, so this needs to clear it now.
+        // hidden lg:flex: this branch only ever renders below the lg (1024px)
+        // breakpoint in the first place (that's what `narrow` gates on), so
+        // the class makes the node tabs bar fully removed on mobile/tablet.
+        <div className="hidden lg:flex" style={{ position: "absolute", top: 140, left: 0, right: 0, zIndex: 10 }}>
           <NodeChipRow selectedId={selectedId} onSelect={setSelectedId} />
         </div>
       ) : (
@@ -4395,7 +4495,9 @@ export default function ProjectsSection() {
           position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
           width: LEFT_W, zIndex: 10,
         }}>
-          <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={arm} />
+          <div className="reveal-left hidden lg:flex">
+            <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={arm} />
+          </div>
         </div>
       )}
 
@@ -4408,7 +4510,7 @@ export default function ProjectsSection() {
             position={position}
             total={ACTIVE_PROJECTS.length}
             onPrev={prev} onNext={next} onBack={back}
-            arm={arm} narrow={narrow}
+            arm={arm} sheet={sheet}
           />
         )}
       </AnimatePresence>

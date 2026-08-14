@@ -575,22 +575,46 @@ function MapLayout({ inView }: { inView: boolean }) {
         </svg>
       )}
 
-      {EDUCATION.map((entry, i) => (
-        <EduCard
-          key={entry.id}
-          entry={entry}
-          inView={inView}
-          delay={0.12 * i}
-          innerRef={(el) => { cardEls.current[entry.id] = el; }}
-          style={{
-            position: "absolute",
-            width: CARD_W,
-            top: `${entry.topPct * 100}%`,
-            ...(entry.side === "left" ? { left: 0 } : { right: 0 }),
-            zIndex: 2,
-          }}
-        />
-      ))}
+      {EDUCATION.map((entry) => {
+        // UWE slides in from the left; both GUSTO cards slide in from the right,
+        // staggered 0.2s / 0.4s apart (gusto-foundation first, gusto-hnd second).
+        //
+        // Driven directly off the `inView` prop rather than the global
+        // .reveal-left/.reveal-right CSS classes: those classes only ever get
+        // their .visible flag from a one-time document.querySelectorAll scan
+        // at app mount (useReveal.ts). MapLayout unmounts/remounts whenever
+        // isDesktop flips, so a resize from mobile back to desktop creates
+        // fresh .reveal-left/.reveal-right nodes the scan never saw — they'd
+        // sit at the class's default opacity:0 forever. inView is a live,
+        // always-current per-section observer, so it doesn't have that gap.
+        const delayStyle =
+          entry.id === "gusto-foundation" ? { transitionDelay: "0.2s" }
+          : entry.id === "gusto-hnd" ? { transitionDelay: "0.4s" }
+          : undefined;
+        return (
+          <div
+            key={entry.id}
+            style={{
+              position: "absolute",
+              width: CARD_W,
+              top: `${entry.topPct * 100}%`,
+              ...(entry.side === "left" ? { left: 0 } : { right: 0 }),
+              zIndex: 2,
+              opacity: inView ? 1 : 0,
+              transform: inView ? "translateX(0)" : `translateX(${entry.side === "left" ? "-40px" : "40px"})`,
+              transition: "opacity 0.7s ease-out, transform 0.7s ease-out",
+              ...delayStyle,
+            }}
+          >
+            <EduCard
+              entry={entry}
+              inView={inView}
+              delay={0}
+              innerRef={(el) => { cardEls.current[entry.id] = el; }}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -634,12 +658,15 @@ export default function EducationSection() {
         // Matches HeroSection's horizontal padding (80px 8vw 0) so the two
         // sections share identical left/right content margins. Hero sets no
         // max-width — its inner grid is width:100% — so neither does this.
-        padding: "96px 8vw 56px",
+        padding: "46px 8vw 6px",
         position: "relative",
         zIndex: 2,
         // Keeps the map's antimeridian geometry from adding to the page's
         // horizontal scroll area.
         overflowX: "hidden",
+        opacity: inView ? 1 : 0,
+        transform: inView ? "translateY(0)" : "translateY(30px)",
+        transition: "opacity 0.6s ease-out, transform 0.6s ease-out",
       }}
     >
       {/* Shared content box: header and map measure against the same edges. */}
@@ -652,7 +679,7 @@ export default function EducationSection() {
           <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
           <span className="edu-section-label" style={{
             fontFamily: "'JetBrains Mono', monospace",
-            fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#ffffff",
+            fontSize: "0.68rem", letterSpacing: "0.2em", textTransform: "uppercase", color: "#ffffff",
           }}>
             05 — Education
           </span>

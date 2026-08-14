@@ -265,6 +265,7 @@ export default function SkillsSection() {
         zIndex: 1,
       }}
     >
+    <div className="reveal">
       <style>{`
         /* Light mode overrides */
         .light .skills-pill {
@@ -298,6 +299,19 @@ export default function SkillsSection() {
           0% { transform: translateX(-33.333%); }
           100% { transform: translateX(0); }
         }
+        /* Tablet/mobile: smaller pills, wrapping already handled by flex-wrap. */
+        @media (max-width: 1023px) {
+          .skills-pill {
+            padding: 0.32rem 0.8rem !important;
+            font-size: 0.85rem !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .skills-pill {
+            padding: 0.28rem 0.7rem !important;
+            font-size: 0.78rem !important;
+          }
+        }
       `}</style>
 
       {/* Header */}
@@ -315,7 +329,7 @@ export default function SkillsSection() {
         {/* Section label */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-          <span className="skills-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
+          <span className="skills-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ffffff" }}>
             02 — Skills
           </span>
         </div>
@@ -385,6 +399,7 @@ export default function SkillsSection() {
           </div>
         )}
       </div>
+    </div>
     </section>
   );
 }

@@ -189,8 +189,11 @@ export default function ContactSection() {
     <section
       id="contact"
       ref={ref}
-      style={{ padding: "96px 8vw 120px 8vw", position: "relative", zIndex: 1, borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      style={{
+        padding: "56px 8vw 120px 8vw", position: "relative", zIndex: 1, borderBottom: "1px solid rgba(255,255,255,0.08)",
+      }}
     >
+    <div className="reveal">
       {/* Top label */}
       <div style={{
         display: "flex",
@@ -202,7 +205,7 @@ export default function ContactSection() {
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", display: "inline-block", boxShadow: "0 0 8px rgba(132,204,22,0.6)" }} />
-        <span className="ct-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.5 }}>
+        <span className="ct-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ffffff" }}>
           07 — Contact
         </span>
       </div>
@@ -264,6 +267,12 @@ export default function ContactSection() {
           </p>
         </div>
 
+        {/* Wraps SITEMAP + NETWORKS so they can become a 2-col grid pair on
+            mobile/tablet (see .contact-sitemap-networks in the style block)
+            while staying `display:contents` on desktop — invisible to the box
+            tree there, so the two divs below still land directly in
+            .contact-grid's 1.4fr/0.7fr/0.85fr columns exactly as before. */}
+        <div className="contact-sitemap-networks">
         {/* ── MIDDLE: SITEMAP ── */}
         <div>
           <div style={{
@@ -335,6 +344,7 @@ export default function ContactSection() {
             />
           </div>
         </div>
+        </div>
       </div>
 
 
@@ -361,21 +371,42 @@ export default function ContactSection() {
         .light .ct-net-sub   { color: rgba(0,0,0,0.4) !important; opacity: 1 !important; }
         .light .ct-icon      { color: #000000 !important; opacity: 1 !important; }
         .light .ct-arrow     { color: rgba(0,0,0,0.4) !important; }
-        @media (max-width: 900px) {
+        /* Desktop default: invisible to the box tree, so .contact-grid sees the
+           SITEMAP/NETWORKS divs directly and lays them out exactly as before. */
+        .contact-sitemap-networks { display: contents; }
+        /* Tablet and below: single column overall; SITEMAP + NETWORKS become a
+           real 2-col grid pair (grid-cols-2) below the full-width heading. */
+        @media (max-width: 1023px) {
           .contact-grid {
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: 1fr !important;
             gap: 2.5rem !important;
           }
           .contact-grid > div:first-child {
             grid-column: 1 / -1;
           }
+          .contact-sitemap-networks {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 2rem !important;
+            margin-top: 3rem !important;
+          }
+          .ct-net-row {
+            width: 100% !important;
+            box-sizing: border-box !important;
+            min-height: 56px !important;
+          }
+          .ct-body {
+            max-width: 500px !important;
+          }
         }
-        @media (max-width: 600px) {
-          .contact-grid {
-            grid-template-columns: 1fr !important;
+        /* Mobile: heading shrinks further so it never risks overflowing at 320px. */
+        @media (max-width: 767px) {
+          .ct-heading, .ct-outline {
+            font-size: clamp(2rem, 12vw, 3.5rem) !important;
           }
         }
       `}</style>
+    </div>
     </section>
   );
 }

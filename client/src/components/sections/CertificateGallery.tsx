@@ -393,11 +393,14 @@ export default function CertificateGallery() {
     <section
       id="certificates"
       ref={ref}
-      style={{ padding: "96px 0 56px", position: "relative", zIndex: 1 }}
+      className="cert-section"
+      style={{
+        padding: "46px 8vw 16px", position: "relative", zIndex: 1, overflowX: "hidden",
+      }}
     >
+    <div className="reveal">
       {/* Section header */}
-      <div style={{
-        padding: "0 8vw",
+      <div className="cert-header" style={{
         marginBottom: "42px",
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(16px)",
@@ -419,7 +422,7 @@ export default function CertificateGallery() {
               fontSize: "0.68rem",
               letterSpacing: "0.22em",
               textTransform: "uppercase",
-              opacity: 0.55,
+              color: "#ffffff",
             }}>
               06 — Certificates
             </span>
@@ -440,8 +443,6 @@ export default function CertificateGallery() {
             gap: "0.8rem",
             overflowX: "auto",
             overflowY: "visible",
-            paddingLeft: "8vw",
-            paddingRight: "8vw",
             paddingBottom: "2rem",
             paddingTop: "1.5rem",
             scrollbarWidth: "none",
@@ -562,7 +563,64 @@ export default function CertificateGallery() {
           border: 1px solid rgba(0,0,0,0.2) !important;
           color: #000000 !important;
         }
+
+        /* Tablet/mobile: card takes (near) full width so effectively one shows
+           at a time; the prev/next arrows (.cert-arrow, always rendered, never
+           hidden) become the primary way to move between cards. No horizontal
+           overflow: width is capped and box-sizing is border-box. Tilt/rotate
+           removed — straightened flat, desktop keeps the ±2deg tilt. */
+        @media (max-width: 1023px) {
+          .cert-card {
+            /* width:100%, not a vw-calc — the card is a flex item inside
+               .cert-scroll, and .cert-scroll's own left/right padding already
+               matches .cert-header's padding at every breakpoint below. A
+               100% width (no separate card margin) fills exactly the space
+               between those paddings, so the card's edges land flush with
+               the heading's edges instead of double-indenting past them. */
+            width: 100% !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
+            max-width: 100% !important;
+            height: auto !important;
+            box-sizing: border-box !important;
+            transform: none !important;
+          }
+          .cert-media {
+            width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9 !important;
+          }
+        }
+        /* Tablet (768-1023px). */
+        @media (max-width: 1023px) and (min-width: 768px) {
+          .cert-media {
+            height: 340px !important;
+          }
+          .cert-title {
+            font-size: 1.125rem !important;
+          }
+          .cert-org, .cert-date {
+            font-size: 0.875rem !important;
+          }
+        }
+        /* Mobile (<768px). */
+        @media (max-width: 767px) {
+          .cert-media {
+            height: 280px !important;
+          }
+          .cert-title {
+            font-size: 1.125rem !important;
+          }
+          .cert-org, .cert-date {
+            font-size: 0.875rem !important;
+          }
+          .cert-section {
+            padding-top: 32px !important;
+            padding-bottom: 32px !important;
+          }
+        }
       `}</style>
+    </div>
     </section>
   );
 }

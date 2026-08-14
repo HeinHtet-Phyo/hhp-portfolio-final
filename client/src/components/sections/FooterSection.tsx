@@ -140,9 +140,9 @@ export default function FooterSection() {
         .light .footer-social-link:hover,
         .light .footer-social-link:focus-visible { color: #000000 !important; }
 
-        /* Single row by design; below 720px three columns cannot fit at 13px,
-           so they stack rather than overflow the viewport. */
-        @media (max-width: 720px) {
+        /* Single row by design; below tablet width (1023px) the three columns
+           stack rather than overflow the viewport. */
+        @media (max-width: 1023px) {
           .footer-section {
             grid-template-columns: 1fr !important;
             justify-items: center !important;
