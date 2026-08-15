@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { label: "Projects", href: "#projects" },
   { label: "Work", href: "#work" },
   { label: "Education", href: "#education" },
-  { label: "Contact", href: "#contact" },
+  { label: "Cert", href: "#certificates" },
 ];
 
 function scrollToSection(href: string) {

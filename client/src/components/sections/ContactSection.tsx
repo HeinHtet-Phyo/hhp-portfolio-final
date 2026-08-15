@@ -93,8 +93,8 @@ function NetworkBtn({
         justifyContent: "space-between",
         padding: "0.9rem 1.1rem",
         borderRadius: "6px",
-        border: hovered ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.1)",
-        background: hovered ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        background: hovered ? "rgba(255,255,255,0.06)" : "transparent",
         textDecoration: "none",
         color: "inherit",
         transition: "border-color 0.25s, background 0.25s, opacity 0.6s ease, transform 0.6s cubic-bezier(0.23,1,0.32,1)",
@@ -129,7 +129,8 @@ function NetworkBtn({
         </div>
       </div>
       <span className="ct-arrow" style={{
-        opacity: hovered ? 1 : 0.3,
+        color: "rgba(255,255,255,0.8)",
+        opacity: hovered ? 1 : 0.7,
         transition: "opacity 0.25s, transform 0.25s",
         transform: hovered ? "translate(2px, -2px)" : "translate(0,0)",
         display: "flex",
@@ -170,7 +171,8 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
         width: "6px",
         height: "6px",
         borderRadius: "1px",
-        background: hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+        background: hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.15)",
         flexShrink: 0,
         transition: "background 0.2s",
         display: "inline-block",
@@ -220,7 +222,7 @@ export default function ContactSection() {
         className="contact-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "1.55fr 0.65fr 0.75fr",
+          gridTemplateColumns: "1.55fr 1.4fr",
           gap: "3rem",
           alignItems: "start",
         }}
@@ -298,6 +300,7 @@ export default function ContactSection() {
             <SitemapLink label="Projects" href="#projects" delay={0.2} inView={inView} />
             <SitemapLink label="Experience" href="#experience" delay={0.25} inView={inView} />
             <SitemapLink label="Education" href="#education" delay={0.3} inView={inView} />
+            <SitemapLink label="Cert" href="#certificates" delay={0.35} inView={inView} />
           </div>
         </div>
 
@@ -360,21 +363,22 @@ export default function ContactSection() {
            cannot undo — those reset opacity too. Dark mode is untouched. */
         .light .ct-label     { color: #000000 !important; opacity: 1 !important; }
         .light .ct-heading   { color: #000000 !important; }
-        .light .ct-outline   { color: #000000 !important; -webkit-text-stroke: 1px #000000 !important; }
+        .light .ct-outline   { color: transparent !important; -webkit-text-stroke: 2px #000000 !important; }
         .light .ct-body      { color: #111111 !important; }
         .light .ct-col-label { color: rgba(0,0,0,0.5) !important; opacity: 1 !important; border-left-color: rgba(0,0,0,0.25) !important; }
 
-        .light .ct-link          { color: #000000 !important; }
+        .light .ct-link          { color: rgba(0,0,0,0.45) !important; }
         .light .ct-link.is-hover { color: rgba(0,0,0,0.6) !important; }
+        .light .ct-link-marker   { background: #888899 !important; }
 
         .light .ct-net-row {
-          border-color: rgba(0,0,0,0.1) !important;
-          background: rgba(0,0,0,0.02) !important;
+          border-color: rgba(0, 0, 0, 0.25) !important;
+          background: transparent !important;
         }
         .light .ct-net-label { color: #000000 !important; }
         .light .ct-net-sub   { color: rgba(0,0,0,0.4) !important; opacity: 1 !important; }
         .light .ct-icon      { color: #000000 !important; opacity: 1 !important; }
-        .light .ct-arrow     { color: rgba(0,0,0,0.4) !important; }
+        .light .ct-arrow     { color: rgba(0,0,0,0.7) !important; }
 
         /* Theme-aware column bar, link underline, and network-card inversion. */
         .ct-networks-label { border-left-color: #ffffff !important; }
@@ -416,22 +420,24 @@ export default function ContactSection() {
         .light .ct-link.is-hover .ct-link-text { border-bottom-color: #000000; }
         .light .ct-link.is-hover .ct-link-marker { background: #000000 !important; }
 
-        @media (min-width: 1024px) {
-          /* Pull both utility columns toward the right, while letting the Network column
-             finish on the same 8vw outer edge as the rest of the page. */
-          .ct-sitemap-column { transform: translateX(12vw); }
-          .ct-networks-column {
-            /* Right-align the card column to the same 8vw page padding as the section itself. */
-            transform: translateX(1.5vw);
-            width: 330px;
-            max-width: none;
-            justify-self: end;
-          }
-          .ct-net-row { width: 100%; max-width: none; padding: 0.78rem 0.9rem !important; }
-        }
-        /* Desktop default: invisible to the box tree, so .contact-grid sees the
+        /* Below 1024px: invisible to the box tree, so .contact-grid sees the
            SITEMAP/NETWORKS divs directly and lays them out exactly as before. */
         .contact-sitemap-networks { display: contents; }
+        @media (min-width: 1024px) {
+          /* SITEMAP and NETWORKS sit close together as a narrow, centred pair
+             instead of being pushed toward the page edges. */
+          .contact-sitemap-networks {
+            display: grid;
+            grid-template-columns: auto 200px;
+            gap: 4.5rem;
+            max-width: 48rem;
+            margin-left: auto;
+            margin-right: 0;
+          }
+          .ct-sitemap-column { width: auto; }
+          .ct-networks-column { width: 200px; max-width: 200px; }
+          .ct-net-row { width: 100%; max-width: 200px; padding: 0.78rem 0.9rem !important; }
+        }
         /* Tablet and below: single column overall; SITEMAP + NETWORKS become a
            real 2-col grid pair (grid-cols-2) below the full-width heading. */
         @media (max-width: 1023px) {

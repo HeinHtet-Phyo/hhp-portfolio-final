@@ -443,6 +443,13 @@ export default function CertificateGallery() {
             gap: "0.8rem",
             overflowX: "auto",
             overflowY: "visible",
+            // 12px, not a large edge inset like 8vw: cert-section's own 8vw
+            // padding already aligns the first card with the heading above.
+            // This just gives the corner brackets' -1px overshoot visible
+            // breathing room inside the scrollable area — without it,
+            // overflowX:auto clips anything left of x:0.
+            paddingLeft: "12px",
+            paddingRight: "12px",
             paddingBottom: "2rem",
             paddingTop: "1.5rem",
             scrollbarWidth: "none",
@@ -504,64 +511,50 @@ export default function CertificateGallery() {
           background: rgba(255,255,255,0.2) !important;
         }
         .light .cert-arrow:hover, .light .cert-arrow:focus-visible {
-          background: rgba(0,0,0,0.16) !important;
+          background: rgba(255,255,255,0.2) !important;
         }
         .light .cert-fade-hint {
-          background: linear-gradient(to left, var(--background, #f8f8f8) 0%, transparent 100%) !important;
+          background: linear-gradient(to left, #e0e0e0 0%, transparent 100%) !important;
         }
 
-        /* ── Light mode ──────────────────────────────────────────────────────
-           Every colour here is an inline style and inline styles beat any
-           selector, so these need !important. Dark mode is the inline value
-           and is untouched — these rules only apply under .light. */
-        .light .cert-section-label { color: #000000 !important; font-weight: 600 !important; opacity: 1 !important; }
+        /* Certificates section is kept permanently dark regardless of theme —
+           these .light overrides now force the same dark palette as the base
+           (dark-mode) styles, rather than switching to a light one. The
+           "06 — Certificates" section LABEL is the one exception: it falls
+           through to the shared rule in index.css that all seven section
+           labels use, so it matches "07 — Contact" (and the other five)
+           exactly in light mode instead of being the only one left white. */
 
-        /* Transparent, not a white wash. The text area below the image has no
-           fill of its own — it was showing THIS through, so the only way to get
-           a clear content area is to drop the card's own background. The image
-           area is unaffected: .light .cert-media paints its own gradient over
-           this same box. Border is untouched. */
         .light .cert-card {
           background: transparent !important;
           background-color: transparent !important;
-          border: 1px solid rgba(0,0,0,0.12) !important;
+          border: 1px solid rgba(0,0,0,0.15) !important;
         }
-        /* The dark theme's coloured glow does not read on white, so hover just
-           deepens the border. No shadow — the sci-fi cards are flat. */
-        .light .cert-card:hover { border-color: rgba(0,0,0,0.4) !important; }
-        /* Colour only. Touching border-width here would arm all four sides
-           (Tailwind preflight leaves every side "solid" at width 0) and turn
-           each bracket into a filled square. */
-        .light .cert-bracket { border-color: rgba(0,0,0,0.4) !important; }
+        .light .cert-card:hover { border-color: rgba(0,0,0,0.35) !important; }
+        .light .cert-bracket { border-color: rgba(0,0,0,0.6) !important; }
 
-        /* 5. The per-card dark gradient is what made these read as near-black
-           in light mode. Replaced with a light neutral wash; each card's
-           identity colour still shows through its hover border and the dark
-           theme keeps the original gradient untouched. */
         .light .cert-media {
-          background: linear-gradient(160deg, #f4f5f7 0%, #eceef1 60%, #e4e6ea 100%) !important;
+          background: transparent !important;
         }
 
         .light .cert-frame {
-          background: rgba(0,0,0,0.05) !important;
-          border: 1px dashed rgba(0,0,0,0.2) !important;
+          background: transparent !important;
+          border: 1px dashed rgba(0,0,0,0.08) !important;
         }
-        .light .cert-noimg { color: rgba(0,0,0,0.3) !important; }
+        .light .cert-noimg { color: rgba(0,0,0,0.25) !important; }
 
-        .light .cert-title { color: #000000 !important; font-weight: 600 !important; }
+        .light .cert-title { color: #000000 !important; }
         .light .cert-org   { color: rgba(0,0,0,0.5) !important; }
         .light .cert-date  { color: #000000 !important; }
-        /* The text area carries no fill of its own — the card behind it is the
-           only background, so nothing light sits under the copy. */
         .light .cert-text  {
           background: transparent !important;
           background-color: transparent !important;
         }
 
         .light .cert-arrow {
-          background: rgba(0,0,0,0.08) !important;
-          border: 1px solid rgba(0,0,0,0.2) !important;
-          color: #000000 !important;
+          background: rgba(255,255,255,0.1) !important;
+          border: 1px solid rgba(255,255,255,0.2) !important;
+          color: #ffffff !important;
         }
 
         /* Tablet/mobile: card takes (near) full width so effectively one shows

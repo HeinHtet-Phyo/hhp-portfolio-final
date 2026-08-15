@@ -3,7 +3,7 @@
 // Right has a macOS-style terminal window showing developer info as JS object
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
+import { ArrowUpRight, Mail, Github, Linkedin, Twitter, Download } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 // ── Typing Role ──
@@ -347,7 +347,8 @@ export default function HeroSection() {
 
             <motion.a
               className="hero-cta-btn"
-              href="mailto:heinhtetphyo@email.com"
+              href="/Hein_Htet_Phyo_CV.pdf"
+              download
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               style={{
@@ -362,7 +363,7 @@ export default function HeroSection() {
                 borderRadius: "6px", textDecoration: "none",
               }}
             >
-              Let's Talk <Mail size={15} />
+              Download CV <Download size={15} />
             </motion.a>
           </motion.div>
 

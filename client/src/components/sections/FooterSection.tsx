@@ -99,9 +99,22 @@ export default function FooterSection() {
       }}
       className="footer-section"
     >
-      {/* ── Left: name ── */}
-      <div className="footer-name" style={{ justifySelf: "start", color: "#ffffff", fontWeight: 600 }}>
-        Hein Htet Phyo
+      {/* ── Left: name — styled as a pill matching the navbar logo (.navbar-logo
+          in index.css: translucent glass pill, not a solid-fill badge). */}
+      <div className="footer-name" style={{
+        justifySelf: "start",
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "12px 20px 12px 0",
+        borderRadius: "9999px",
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontWeight: 700,
+        fontSize: "15px",
+        letterSpacing: "0.12em",
+        textTransform: "uppercase",
+        color: "#ffffff",
+      }}>
+        HEIN
       </div>
 
       {/* ── Centre: social icons ── */}
@@ -147,11 +160,17 @@ export default function FooterSection() {
             grid-template-columns: 1fr !important;
             justify-items: center !important;
             gap: 1rem !important;
-            padding: 24px !important;
+            padding: 24px 8vw !important;
           }
           .footer-section > * {
             justify-self: center !important;
             text-align: center !important;
+          }
+          /* HEIN stays left-aligned with "LET'S CONNECT" above, unlike the
+             other two rows which stay centered in the mobile stack. */
+          .footer-name {
+            justify-self: start !important;
+            text-align: left !important;
           }
         }
       `}</style>
