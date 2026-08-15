@@ -3,7 +3,7 @@
 // Right has a macOS-style terminal window showing developer info as JS object
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Mail, Github, Linkedin, Twitter } from "lucide-react";
+import { ArrowUpRight, Mail, Github, Linkedin, Twitter, Download } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 // ── Typing Role ──
@@ -38,8 +38,8 @@ function TypingRole({ isDark }: { isDark: boolean }) {
 }
 
 // ── Terminal Code Window ──
-function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boolean }) {
-  const [linesDone, setLinesDone] = useState(0);
+function TerminalWindow({ isDark, revealed, animated }: { isDark: boolean; revealed: boolean; animated: boolean }) {
+  const [visibleLines, setVisibleLines] = useState(0);
 
   // Each line: array of {text, color} spans for syntax highlighting
   const lines: { spans: { text: string; color: string }[] }[] = [
@@ -125,15 +125,29 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
     ]},
   ];
 
+  // Reveal the code lines one by one, starting 400ms after the right panel itself
+  // fades in (animated === true, ~2200ms from load), 150ms apart, until all lines
+  // are shown.
   useEffect(() => {
-    if (!revealed) return;
-    if (linesDone >= lines.length) return;
-    const t = setTimeout(() => setLinesDone((n) => n + 1), 90);
-    return () => clearTimeout(t);
-  }, [revealed, linesDone, lines.length]);
+    if (!animated) return;
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const start = setTimeout(() => {
+      interval = setInterval(() => {
+        setVisibleLines((n) => {
+          if (n >= lines.length - 1) {
+            if (interval) clearInterval(interval);
+            return lines.length;
+          }
+          return n + 1;
+        });
+      }, 150);
+    }, 400);
+    return () => { clearTimeout(start); if (interval) clearInterval(interval); };
+  }, [animated, lines.length]);
 
   return (
     <motion.div
+      className="hero-terminal-card"
       initial={{ opacity: 0, x: 40, y: 20 }}
       animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
       transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
@@ -173,14 +187,14 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
       </div>
 
       {/* Code content */}
-      <div style={{
+      <div className="hero-terminal-code" style={{
         padding: "22px 28px 26px",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: "clamp(0.65rem, 1.15vw, 0.77rem)",
         lineHeight: 1.7,
       }}>
-        {lines.slice(0, linesDone).map((line, i) => (
-          <div key={i} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+        {lines.map((line, i) => (
+          <div key={i} style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", opacity: i < visibleLines ? 1 : 0, transition: 'opacity 0.2s ease' }}>
             <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
               {String(i + 1).padStart(2, "0")}
             </span>
@@ -189,14 +203,6 @@ function TerminalWindow({ isDark, revealed }: { isDark: boolean; revealed: boole
             ))}
           </div>
         ))}
-        {linesDone < lines.length && (
-          <div style={{ color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.4)", whiteSpace: "pre" }}>
-            <span style={{ color: isDark ? "rgba(255,255,255,0.18)" : "rgba(10,10,10,0.35)", marginRight: 16, userSelect: "none", fontSize: "0.65rem" }}>
-              {String(linesDone + 1).padStart(2, "0")}
-            </span>
-            <span className="typing-cursor" style={{ color: "#60a5fa" }} />
-          </div>
-        )}
       </div>
     </motion.div>
   );
@@ -207,10 +213,16 @@ export default function HeroSection() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [revealed, setRevealed] = useState(false);
+  const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setRevealed(true), 200);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnimated(true), 1800);
+    return () => clearTimeout(timer);
   }, []);
 
   const fadeUp = (delay: number) => ({
@@ -239,11 +251,13 @@ export default function HeroSection() {
       className="hero-grid"
       >
         {/* ── LEFT: Text ── */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", overflow: "visible", minWidth: 0 }}>
+        <div
+          className={`hero-left ${animated ? 'hero-left-visible' : 'hero-left-hidden'}`}
+          style={{ display: "flex", flexDirection: "column", gap: "1.25rem", overflow: "visible", minWidth: 0 }}>
 
           {/* Available badge */}
           <motion.div {...fadeUp(0.1)} style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem" }}>
-            <div style={{
+            <div className="hero-available-pill" style={{
               display: "inline-flex", alignItems: "center", gap: "0.5rem",
               padding: "0.35rem 0.9rem",
               border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)"}`,
@@ -259,9 +273,9 @@ export default function HeroSection() {
 
           {/* Name */}
           <div>
-            <motion.div {...fadeUp(0.2)} style={{
+            <motion.div className="hero-name-line" {...fadeUp(0.2)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
+              fontSize: "clamp(3.75rem, 8.5vw, 7.5rem)",
               fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               color: isDark ? "white" : "#0a0a0a",
@@ -270,9 +284,9 @@ export default function HeroSection() {
             }}>
               Hein Htet
             </motion.div>
-            <motion.div {...fadeUp(0.28)} style={{
+            <motion.div className="hero-name-line" {...fadeUp(0.28)} style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              fontSize: "clamp(3.2rem, 8.5vw, 7.5rem)",
+              fontSize: "clamp(3.75rem, 8.5vw, 7.5rem)",
               fontWeight: 900, lineHeight: 0.92,
               letterSpacing: "-0.03em",
               WebkitTextStroke: isDark ? "2px white" : "2px #0a0a0a",
@@ -285,7 +299,7 @@ export default function HeroSection() {
           </div>
 
           {/* Typing role */}
-          <motion.p {...fadeUp(0.36)} style={{
+          <motion.p className="hero-subtitle" {...fadeUp(0.36)} style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "clamp(1rem, 2.2vw, 1.25rem)",
             fontWeight: 600,
@@ -299,7 +313,7 @@ export default function HeroSection() {
           </motion.p>
 
           {/* Bio */}
-          <motion.p {...fadeUp(0.44)} style={{
+          <motion.p className="hero-bio-text" {...fadeUp(0.44)} style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontSize: "clamp(0.95rem, 1.75vw, 1.1rem)",
             lineHeight: 1.8, fontWeight: 300,
@@ -311,8 +325,9 @@ export default function HeroSection() {
           </motion.p>
 
           {/* CTA Buttons */}
-          <motion.div {...fadeUp(0.52)} style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
+          <motion.div className="hero-cta-row" {...fadeUp(0.52)} style={{ display: "flex", gap: "0.875rem", flexWrap: "wrap" }}>
             <motion.button
+              className="hero-cta-btn"
               onClick={() => document.getElementById("projects")?.scrollIntoView({ behavior: "smooth" })}
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
@@ -331,7 +346,9 @@ export default function HeroSection() {
             </motion.button>
 
             <motion.a
-              href="mailto:heinhtetphyo@email.com"
+              className="hero-cta-btn"
+              href="/Hein_Htet_Phyo_CV.pdf"
+              download
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               style={{
@@ -346,12 +363,12 @@ export default function HeroSection() {
                 borderRadius: "6px", textDecoration: "none",
               }}
             >
-              Let's Talk <Mail size={15} />
+              Download CV <Download size={15} />
             </motion.a>
           </motion.div>
 
           {/* Social Links */}
-          <motion.div {...fadeUp(0.60)} style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
+          <motion.div className="hero-social-row" {...fadeUp(0.60)} style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
             {[
               { icon: Github, href: "https://github.com/heinhtetphyo", label: "GitHub" },
               { icon: Linkedin, href: "https://linkedin.com/in/heinhtetphyo", label: "LinkedIn" },
@@ -360,6 +377,7 @@ export default function HeroSection() {
             ].map(({ icon: Icon, href, label }) => (
               <motion.a
                 key={label}
+                className="hero-social-icon"
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -382,16 +400,109 @@ export default function HeroSection() {
         </div>
 
         {/* ── RIGHT: Terminal Window ── */}
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-          <TerminalWindow isDark={isDark} revealed={revealed} />
+        <div
+          className={`hero-terminal ${animated ? 'hero-right-visible' : 'hero-right-hidden'}`}
+          style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", transitionDelay: animated ? '0.4s' : '0s' }}
+        >
+          <TerminalWindow isDark={isDark} revealed={revealed} animated={animated} />
         </div>
       </div>
 
       {/* Responsive styles */}
       <style>{`
-        @media (max-width: 768px) {
+        /* Laptop (1024-1279px): slightly smaller heading, keep the two-column grid */
+        @media (max-width: 1279px) and (min-width: 1024px) {
+          .hero-name-line {
+            font-size: clamp(3.5rem, 7.5vw, 6.25rem) !important;
+          }
+        }
+        /* Tablet and below: stack into a single column */
+        @media (max-width: 1023px) {
           .hero-grid {
             grid-template-columns: 1fr !important;
+          }
+        }
+        /* Tablet and below: centre everything (text, pill, buttons, socials, terminal) —
+           a single text-align + flex justify-content pass on the containers, rather than
+           centring each element individually. */
+        @media (max-width: 1023px) {
+          .hero-left {
+            text-align: center;
+            align-items: center;
+          }
+          .hero-cta-row,
+          .hero-social-row {
+            justify-content: center !important;
+          }
+          .hero-terminal {
+            justify-content: center !important;
+          }
+        }
+        /* Tablet (768-1023px): terminal stays visible, big centred heading */
+        @media (max-width: 1023px) and (min-width: 768px) {
+          .hero-name-line {
+            font-size: clamp(5rem, 12vw, 9rem) !important;
+          }
+          .hero-subtitle {
+            font-size: 1.5rem !important;
+          }
+          .hero-bio-text {
+            max-width: 600px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+          }
+          .hero-cta-row {
+            gap: 1rem !important;
+          }
+          .hero-terminal-card {
+            width: 100% !important;
+            max-width: 680px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            margin-top: 3rem !important;
+          }
+          .hero-terminal-code {
+            font-size: 0.95rem !important;
+            padding: 2rem !important;
+          }
+        }
+        /* Mobile (<768px): terminal stays visible, full width, centred, readable text, side-by-side CTAs */
+        @media (max-width: 767px) {
+          .hero-name-line {
+            font-size: clamp(3.5rem, 14vw, 6rem) !important;
+          }
+          .hero-bio-text {
+            font-size: 0.9rem !important;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            max-width: none !important;
+          }
+          .hero-cta-row {
+            gap: 0.75rem !important;
+          }
+          .hero-social-row {
+            gap: 0.5rem !important;
+          }
+          .hero-social-icon {
+            width: 34px !important;
+            height: 34px !important;
+          }
+          .hero-available-pill {
+            width: 100% !important;
+            justify-content: center !important;
+            box-sizing: border-box;
+          }
+          .hero-terminal-card {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-left: 1rem !important;
+            margin-right: 1rem !important;
+            margin-top: 2.5rem !important;
+            box-sizing: border-box !important;
+          }
+          .hero-terminal-code {
+            font-size: 0.75rem !important;
+            padding: 1.5rem !important;
           }
         }
       `}</style>

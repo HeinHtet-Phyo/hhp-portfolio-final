@@ -86,14 +86,15 @@ function NetworkBtn({
       rel="noopener noreferrer"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={`ct-net-row${hovered ? " is-hover" : ""}`}
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "0.9rem 1.1rem",
         borderRadius: "6px",
-        border: hovered ? "1px solid rgba(255,255,255,0.25)" : "1px solid rgba(255,255,255,0.1)",
-        background: hovered ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.02)",
+        border: "1px solid rgba(255,255,255,0.3)",
+        background: hovered ? "rgba(255,255,255,0.06)" : "transparent",
         textDecoration: "none",
         color: "inherit",
         transition: "border-color 0.25s, background 0.25s, opacity 0.6s ease, transform 0.6s cubic-bezier(0.23,1,0.32,1)",
@@ -104,7 +105,7 @@ function NetworkBtn({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-        <span style={{ opacity: 0.7, display: "flex", flexShrink: 0 }}>{icon}</span>
+        <span className="ct-icon" style={{ opacity: 0.7, display: "flex", flexShrink: 0 }}>{icon}</span>
         <div>
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
@@ -112,7 +113,7 @@ function NetworkBtn({
             fontWeight: 700,
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-          }}>
+          }} className="ct-net-label">
             {label}
           </div>
           {sub && (
@@ -121,14 +122,15 @@ function NetworkBtn({
               fontSize: "0.58rem",
               opacity: 0.4,
               marginTop: "0.1rem",
-            }}>
+            }} className="ct-net-sub">
               {sub}
             </div>
           )}
         </div>
       </div>
-      <span style={{
-        opacity: hovered ? 1 : 0.3,
+      <span className="ct-arrow" style={{
+        color: "rgba(255,255,255,0.8)",
+        opacity: hovered ? 1 : 0.7,
         transition: "opacity 0.25s, transform 0.25s",
         transform: hovered ? "translate(2px, -2px)" : "translate(0,0)",
         display: "flex",
@@ -145,10 +147,10 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
   return (
     <a
       href={href}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      className={`ct-link${hovered ? " is-hover" : ""}`}
       style={{
-        display: "flex",
+        display: "inline-flex",
+        alignSelf: "flex-start",
         alignItems: "center",
         gap: "0.6rem",
         fontFamily: "'JetBrains Mono', monospace",
@@ -165,16 +167,23 @@ function SitemapLink({ label, href, delay, inView }: { label: string; href: stri
         cursor: "pointer",
       }}
     >
-      <span style={{
+      <span className="ct-link-marker" style={{
         width: "6px",
         height: "6px",
         borderRadius: "1px",
-        background: hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.25)",
+        background: hovered ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.15)",
         flexShrink: 0,
         transition: "background 0.2s",
         display: "inline-block",
       }} />
-      {label}
+      <span
+        className="ct-link-text"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        {label}
+      </span>
     </a>
   );
 }
@@ -187,21 +196,24 @@ export default function ContactSection() {
     <section
       id="contact"
       ref={ref}
-      style={{ padding: "6rem 8vw 7rem", position: "relative", zIndex: 1, borderTop: "1px solid rgba(255,255,255,0.08)", borderBottom: "1px solid rgba(255,255,255,0.08)" }}
+      style={{
+        padding: "56px 8vw 120px 8vw", position: "relative", zIndex: 1, borderBottom: "1px solid rgba(255,255,255,0.08)",
+      }}
     >
+    <div className="reveal">
       {/* Top label */}
       <div style={{
         display: "flex",
         alignItems: "center",
         gap: "0.6rem",
-        marginBottom: "2.5rem",
+        marginBottom: "84px",
         opacity: inView ? 1 : 0,
         transform: inView ? "translateY(0)" : "translateY(12px)",
         transition: "opacity 0.6s ease, transform 0.6s ease",
       }}>
         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", display: "inline-block", boxShadow: "0 0 8px rgba(132,204,22,0.6)" }} />
-        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.5 }}>
-          05 — Contact
+        <span className="ct-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ffffff" }}>
+          07 — Contact
         </span>
       </div>
 
@@ -210,7 +222,7 @@ export default function ContactSection() {
         className="contact-grid"
         style={{
           display: "grid",
-          gridTemplateColumns: "1.4fr 0.7fr 0.85fr",
+          gridTemplateColumns: "1.55fr 1.4fr",
           gap: "3rem",
           alignItems: "start",
         }}
@@ -230,7 +242,7 @@ export default function ContactSection() {
               letterSpacing: "-0.04em",
               marginBottom: "0.1em",
               color: "rgba(255,255,255,0.95)",
-            }}>
+            }} className="ct-heading">
               LET'S
             </div>
             <div style={{
@@ -242,13 +254,13 @@ export default function ContactSection() {
               color: "transparent",
               WebkitTextStroke: "2px rgba(255,255,255,0.85)",
               marginBottom: "1.5rem",
-            }}>
+            }} className="ct-outline">
               CONNECT.
             </div>
           </div>
 
           {/* Tagline */}
-          <p style={{
+          <p className="ct-body" style={{
             fontSize: "0.95rem",
             lineHeight: 1.7,
             color: "rgba(255,255,255,0.45)",
@@ -262,8 +274,14 @@ export default function ContactSection() {
           </p>
         </div>
 
+        {/* Wraps SITEMAP + NETWORKS so they can become a 2-col grid pair on
+            mobile/tablet (see .contact-sitemap-networks in the style block)
+            while staying `display:contents` on desktop — invisible to the box
+            tree there, so the two divs below still land directly in
+            .contact-grid's 1.4fr/0.7fr/0.85fr columns exactly as before. */}
+        <div className="contact-sitemap-networks">
         {/* ── MIDDLE: SITEMAP ── */}
-        <div>
+        <div className="ct-sitemap-column">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
@@ -274,20 +292,20 @@ export default function ContactSection() {
             borderLeft: "2px solid rgba(255,255,255,0.2)",
             paddingLeft: "0.7rem",
             transition: "opacity 0.6s ease 0.1s",
-          }}>
+          }} className="ct-col-label">
             Sitemap
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1.6rem" }}>
             <SitemapLink label="About" href="#about" delay={0.15} inView={inView} />
             <SitemapLink label="Projects" href="#projects" delay={0.2} inView={inView} />
             <SitemapLink label="Experience" href="#experience" delay={0.25} inView={inView} />
-            <SitemapLink label="Skills" href="#skills" delay={0.3} inView={inView} />
-            <SitemapLink label="Certificates" href="#certificates" delay={0.35} inView={inView} />
+            <SitemapLink label="Education" href="#education" delay={0.3} inView={inView} />
+            <SitemapLink label="Cert" href="#certificates" delay={0.35} inView={inView} />
           </div>
         </div>
 
         {/* ── RIGHT: NETWORKS ── */}
-        <div>
+        <div className="ct-networks-column">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
@@ -298,7 +316,7 @@ export default function ContactSection() {
             borderLeft: "2px solid rgba(255,255,255,0.2)",
             paddingLeft: "0.7rem",
             transition: "opacity 0.6s ease 0.1s",
-          }}>
+          }} className="ct-col-label ct-networks-label">
             Networks
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
@@ -333,26 +351,126 @@ export default function ContactSection() {
             />
           </div>
         </div>
+        </div>
       </div>
 
 
 
       <style>{`
-        @media (max-width: 900px) {
+        /* ── Light mode ──────────────────────────────────────────────────────
+           All colours here are inline styles, so overrides need !important.
+           Several elements are also dimmed with opacity, which colour alone
+           cannot undo — those reset opacity too. Dark mode is untouched. */
+        .light .ct-label     { color: #000000 !important; opacity: 1 !important; }
+        .light .ct-heading   { color: #000000 !important; }
+        .light .ct-outline   { color: transparent !important; -webkit-text-stroke: 2px #000000 !important; }
+        .light .ct-body      { color: #111111 !important; }
+        .light .ct-col-label { color: rgba(0,0,0,0.5) !important; opacity: 1 !important; border-left-color: rgba(0,0,0,0.25) !important; }
+
+        .light .ct-link          { color: rgba(0,0,0,0.45) !important; }
+        .light .ct-link.is-hover { color: rgba(0,0,0,0.6) !important; }
+        .light .ct-link-marker   { background: #888899 !important; }
+
+        .light .ct-net-row {
+          border-color: rgba(0, 0, 0, 0.25) !important;
+          background: transparent !important;
+        }
+        .light .ct-net-label { color: #000000 !important; }
+        .light .ct-net-sub   { color: rgba(0,0,0,0.4) !important; opacity: 1 !important; }
+        .light .ct-icon      { color: #000000 !important; opacity: 1 !important; }
+        .light .ct-arrow     { color: rgba(0,0,0,0.7) !important; }
+
+        /* Theme-aware column bar, link underline, and network-card inversion. */
+        .ct-networks-label { border-left-color: #ffffff !important; }
+        .ct-net-row.is-hover {
+          background: #ffffff !important;
+          border-color: #ffffff !important;
+          color: #000000 !important;
+        }
+        .ct-net-row.is-hover .ct-icon,
+        .ct-net-row.is-hover .ct-net-label,
+        .ct-net-row.is-hover .ct-net-sub,
+        .ct-net-row.is-hover .ct-arrow {
+          color: #000000 !important;
+          opacity: 1 !important;
+        }
+        .ct-link-text {
+          display: inline-block;
+          border-bottom: 2px solid transparent;
+          padding-bottom: 3px;
+          transition: border-color 0.2s ease;
+        }
+        .ct-link.is-hover { color: #ffffff !important; }
+        .ct-link.is-hover .ct-link-text { border-bottom-color: #ffffff; }
+        .ct-link.is-hover .ct-link-marker { background: #ffffff !important; }
+        .light .ct-networks-label { border-left-color: #000000 !important; }
+        .light .ct-net-row.is-hover {
+          background: #000000 !important;
+          border-color: #000000 !important;
+          color: #ffffff !important;
+        }
+        .light .ct-net-row.is-hover .ct-icon,
+        .light .ct-net-row.is-hover .ct-net-label,
+        .light .ct-net-row.is-hover .ct-net-sub,
+        .light .ct-net-row.is-hover .ct-arrow {
+          color: #ffffff !important;
+          opacity: 1 !important;
+        }
+        .light .ct-link.is-hover { color: #000000 !important; }
+        .light .ct-link.is-hover .ct-link-text { border-bottom-color: #000000; }
+        .light .ct-link.is-hover .ct-link-marker { background: #000000 !important; }
+
+        /* Below 1024px: invisible to the box tree, so .contact-grid sees the
+           SITEMAP/NETWORKS divs directly and lays them out exactly as before. */
+        .contact-sitemap-networks { display: contents; }
+        @media (min-width: 1024px) {
+          /* SITEMAP and NETWORKS sit close together as a narrow, centred pair
+             instead of being pushed toward the page edges. */
+          .contact-sitemap-networks {
+            display: grid;
+            grid-template-columns: auto 200px;
+            gap: 4.5rem;
+            max-width: 48rem;
+            margin-left: auto;
+            margin-right: 0;
+          }
+          .ct-sitemap-column { width: auto; }
+          .ct-networks-column { width: 200px; max-width: 200px; }
+          .ct-net-row { width: 100%; max-width: 200px; padding: 0.78rem 0.9rem !important; }
+        }
+        /* Tablet and below: single column overall; SITEMAP + NETWORKS become a
+           real 2-col grid pair (grid-cols-2) below the full-width heading. */
+        @media (max-width: 1023px) {
           .contact-grid {
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: 1fr !important;
             gap: 2.5rem !important;
           }
           .contact-grid > div:first-child {
             grid-column: 1 / -1;
           }
+          .contact-sitemap-networks {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            gap: 2rem !important;
+            margin-top: 3rem !important;
+          }
+          .ct-net-row {
+            width: 122% !important;
+            box-sizing: border-box !important;
+            min-height: 56px !important;
+          }
+          .ct-body {
+            max-width: 500px !important;
+          }
         }
-        @media (max-width: 600px) {
-          .contact-grid {
-            grid-template-columns: 1fr !important;
+        /* Mobile: heading shrinks further so it never risks overflowing at 320px. */
+        @media (max-width: 767px) {
+          .ct-heading, .ct-outline {
+            font-size: clamp(2rem, 12vw, 3.5rem) !important;
           }
         }
       `}</style>
+    </div>
     </section>
   );
 }

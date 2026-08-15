@@ -8,10 +8,11 @@ import { useTheme } from "../contexts/ThemeContext";
 
 const NAV_ITEMS = [
   { label: "About", href: "#about" },
-  { label: "Projects", href: "#projects" },
-  { label: "Work", href: "#experience" },
   { label: "Skills", href: "#skills" },
-  { label: "Contact", href: "#contact" },
+  { label: "Projects", href: "#projects" },
+  { label: "Work", href: "#work" },
+  { label: "Education", href: "#education" },
+  { label: "Cert", href: "#certificates" },
 ];
 
 function scrollToSection(href: string) {
@@ -119,9 +120,9 @@ const Navbar = memo(function Navbar() {
 
         {/* ── Right Side ── */}
         <div className="navbar-right">
-          {/* Theme toggle */}
+          {/* Theme toggle — visible on all screen sizes */}
           <button
-            className="theme-toggle hidden md:flex"
+            className="theme-toggle flex"
             onClick={toggleTheme}
             aria-label="Toggle theme"
           >
@@ -131,21 +132,20 @@ const Navbar = memo(function Navbar() {
           {/* Let's Talk */}
           <motion.a
             href="#contact"
-            className="lets-talk-btn hidden md:flex"
+            className="lets-talk-btn hidden lg:flex shrink-0"
             onClick={(e) => { e.preventDefault(); scrollToSection("#contact"); }}
             whileHover={{ scale: 1.02 }}
             transition={{ type: "spring", stiffness: 300, damping: 20 }}
           >
             <span>Let's Talk</span>
             <div className="lets-talk-icon">
-              <ArrowUpRight size={13} strokeWidth={2.5} />
+              <ArrowUpRight size={14} strokeWidth={2.5} />
             </div>
           </motion.a>
 
-          {/* Mobile hamburger — ONLY on mobile (hidden via CSS media query) */}
+          {/* Mobile/tablet hamburger — hidden lg+, shown below lg via Tailwind */}
           <button
-            className="hamburger-btn"
-            style={{ display: 'none' }}
+            className="hamburger-btn flex lg:hidden"
             id="mobile-hamburger"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -249,7 +249,7 @@ const Navbar = memo(function Navbar() {
               >
                 <span>Let's Talk</span>
                 <div className="lets-talk-icon">
-                  <ArrowUpRight size={13} strokeWidth={2.5} />
+                  <ArrowUpRight size={14} strokeWidth={2.5} />
                 </div>
               </button>
             </div>

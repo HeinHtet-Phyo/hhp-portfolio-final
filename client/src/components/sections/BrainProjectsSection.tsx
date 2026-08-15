@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import gsap from "gsap";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
 if (import.meta.hot) {
@@ -99,7 +100,12 @@ const PROJECTS: Project[] = [
     github: "#",
     demo: "#",
     preview: null,
-    active: false,
+    // Live like the other four. `active` is the single switch behind every interaction: it
+    // becomes HotspotDot's `interactive` prop (which gates onClick, onPointerOver and
+    // onPointerOut alike), decides whether the rail row gets an onSelect, filters the mobile
+    // chip row, and defines ACTIVE_PROJECTS for PREV/NEXT. Being false made this node inert on
+    // all of those at once. Genuinely locked entries are CLASSIFIED_NODES, a separate list.
+    active: true,
   },
 ];
 
@@ -141,6 +147,48 @@ const PROJECT_HOTSPOTS: [number, number, number][] = PROJECT_NODES.map((n) => [.
 // this each frame is what keeps an interior camera locked to its region as the brain turns,
 // rather than drifting off it the moment the tween lands.
 const brainGroupRef: { current: THREE.Group | null } = { current: null };
+// Outer scene group (brain + pedestal + beam) — separate from brainGroupRef
+// above, which is the inner idle-spin group nested inside BrainModel. Written
+// every frame from camAnim.groupY, in the SAME useFrame tick that sets the
+// camera's position, so the two can never be one frame apart.
+const sceneGroupRef: { current: THREE.Group | null } = { current: null };
+
+// Hover tooltip anchoring. The label is a DOM overlay but must sit on the NODE, not the cursor,
+// so its screen position is recomputed each frame by projecting the node's live world position
+// through the camera — which also means it tracks the node as the brain rotates. Module-level
+// because the projecting code lives inside the Canvas and the element is rendered outside it.
+// `place` is raised when a new node is hovered and cleared once the frame loop has positioned
+// the label. That makes the projection run EXACTLY ONCE per hover.
+const hoveredNode: { index: number | null; place: boolean } = { index: null, place: false };
+
+// Whether the label keeps following its node after that first placement.
+//
+// true  — re-projects the node's world position every frame in CameraController's useFrame, so
+//         the callout and its leader line stay locked to the dot while the brain turns.
+// false — frozen at hover start; cannot move at all, but the brain rotates out from under it.
+//
+// The brain never stops turning: 8.59 deg/s in the default view, which walks a node up to
+// 24 px/s across the screen (PROJECT_05 worst; MoodTunes AI barely moves, sitting near the spin
+// axis). Tracking means the label moves with it — that motion is the node's, not the cursor's,
+// and there is no code path by which pointer position can influence it.
+const TOOLTIP_TRACK_NODE = true;
+const tooltipElRef: { current: HTMLDivElement | null } = { current: null };
+// The label's CURRENTLY DISPLAYED screen position, eased toward the node's projected position
+// each frame. A plain module object, never React state — setState in the frame loop would
+// re-render every frame and thrash. Kept fractional: rounding here would let a slow approach
+// stall, because a sub-pixel step would round away to nothing and the label would never arrive.
+// Also re-applied by the ref callback, so a recreated element mounts where it belongs.
+const tooltipPos = { x: -9999, y: -9999 };
+// Easing factor per frame. Lower is smoother and laggier; at 0.1 the label settles with about a
+// 0.16s time constant, which at the node's 24 px/s peak leaves it trailing roughly 4px — enough
+// to absorb the per-frame steps without visibly lagging behind the dot.
+const TOOLTIP_LERP = 0.1;
+// The callout is anchored by its BOTTOM CENTRE, which sits directly over the node with a small
+// gap, so the leader line drops from the box straight onto the marker. Height of that line and
+// the gap below it, in px. Both constant, so the whole callout is rigid — box and line move as
+// one unit and stay connected however the node travels.
+const TOOLTIP_LEADER_H = 34;
+const TOOLTIP_GAP = 6;
 
 // Brain idle rotation. BrainModel owns the integration and writes the angle onto the group every
 // frame. It runs UNCONDITIONALLY at one speed in every state — default, mid-tween and zoomed.
@@ -149,14 +197,22 @@ const brainGroupRef: { current: THREE.Group | null } = { current: null };
 // project is open. The camera controller tweens it; BrainModel just reads it.
 const brainSpin = { angle: -Math.PI / 2, speedScale: 1 };
 const BRAIN_SPIN_SPEED = 0.15;
-// Fraction of the idle rate the brain turns at while zoomed in. At 0.25 the apparent rate drops
-// from 8.6 deg/s to 2.1, so a full revolution takes about 168s instead of 42s — the brain still
-// clearly turns, but calmly rather than sweeping past.
+// Fraction of the idle rate the brain turns at while zoomed in. At 0.7 the apparent rate drops
+// from 8.6 deg/s to 6.02, so a full revolution takes about 60s instead of 42s — only modestly
+// calmer than the default view now. Walked up from 0.15 (read as frozen) through 0.4 and 0.55.
+//
+// Applied INSTANTLY on selection, not eased in: the brain must already be at this rate as the
+// camera starts moving, not still winding down into it. Only the rate steps — the angle is
+// integrated, so the brain's position stays continuous and nothing jumps. BACK still eases back
+// up over BRAIN_SPIN_RAMP_S, since arriving at the default view has no such constraint.
+//
+// This is the brain's OWN rotation only. It has nothing to do with how long the camera takes to
+// travel between projects — that is arcDuration/SWITCH_SLOW_FACTOR, deliberately untouched here.
 //
 // There is exactly ONE writer to this group's rotation.y (the useFrame in BrainModel). The other
 // rotation.y writes in this file belong to HolographicBeam and HolographicPedestal, which own
 // their own refs and their own groups — nothing else touches the brain.
-const BRAIN_SPIN_SLOW_FRAC = 0.25;
+const BRAIN_SPIN_SLOW_FRAC = 0.7;
 // Ease between the two rates. Because the angle is INTEGRATED from the scaled rate, ramping the
 // scale changes only the velocity — the angle itself stays continuous, so there is no jump in
 // either direction, just a smooth slow-down and speed-up.
@@ -283,7 +339,7 @@ function HotspotDot({ position, index, active, interactive, onSelect, onHover }:
   active: boolean;
   interactive: boolean;
   onSelect: () => void;
-  onHover: (name: string | null, x: number, y: number) => void;
+  onHover: (index: number | null) => void;
 }) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glow1Ref = useRef<THREE.Mesh>(null);
@@ -333,32 +389,45 @@ function HotspotDot({ position, index, active, interactive, onSelect, onHover }:
         <meshBasicMaterial color="#F5F5FF" transparent opacity={active ? 0.18 : 0.1} depthWrite={false} depthTest={false} blending={THREE.AdditiveBlending} />
       </mesh>
       {/* Invisible click target — larger hitbox for usability. Hover drives the cursor, the
-          1.25x marker bump above, and the cursor-following tooltip rendered as a DOM overlay
-          by the section (not a 3D label, so nothing points at or overlays the mesh). Inert
-          nodes get none of it. */}
+          1.25x marker bump above, and the tooltip rendered as a DOM overlay by the section (not
+          a 3D label, so nothing points at or overlays the mesh). Only the node INDEX is reported:
+          the label is anchored to the node's own projected position, so there is deliberately no
+          pointer-move handler and no cursor coordinate anywhere in this path. Inert nodes get
+          none of it. */}
       <mesh
-        onClick={(e) => { if (!interactive) return; e.stopPropagation(); onSelect(); }}
+        // A generous transparent sphere makes the small visual marker easy to tap on touch
+        // devices and easy to acquire with a tablet trackpad. Pointer-down is intentional:
+        // mobile browsers can delay or occasionally lose a synthetic click on tiny WebGL meshes.
+        onPointerDown={(e) => {
+          if (!interactive) return;
+          e.stopPropagation();
+          setHovered(true);
+          onHover(index);
+          onSelect();
+        }}
         onPointerOver={(e) => {
           if (!interactive) return;
           e.stopPropagation();
           setHovered(true);
           document.body.style.cursor = "pointer";
-          onHover(PROJECTS[index].name, e.nativeEvent.clientX, e.nativeEvent.clientY);
+          onHover(index);
         }}
         onPointerMove={(e) => {
           if (!interactive) return;
           e.stopPropagation();
-          onHover(PROJECTS[index].name, e.nativeEvent.clientX, e.nativeEvent.clientY);
+          if (!hovered) setHovered(true);
+          document.body.style.cursor = "pointer";
+          onHover(index);
         }}
         onPointerOut={(e) => {
           if (!interactive) return;
           e.stopPropagation();
           setHovered(false);
           document.body.style.cursor = "auto";
-          onHover(null, 0, 0);
+          onHover(null);
         }}
       >
-        <sphereGeometry args={[0.057, 8, 8]} />
+        <sphereGeometry args={[0.12, 12, 12]} />
         <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>
@@ -612,25 +681,92 @@ function NeuralNetworkOverlay({ selected }: { selected: Project | null }) {
 //
 // `bottom` is 1 while a lower-region project is framed; the pedestal glow and the bloom pass
 // both read it to fade themselves back. `ready` is 0 until the defaults are seeded.
-const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0 };
+// Vertical position of the brain + pedestal + beam group — ONE value, used in
+// every state. Selecting a project must only dolly the camera in; the group
+// itself does not move. Still tweened through camAnim.groupY (in the same
+// gsap calls as radius/depth) rather than a bare constant on the JSX, so a
+// future re-introduction of a per-state offset only has to change the target
+// values passed to those tweens, not rebuild the sync mechanism.
+const GROUP_Y = -0.02;
+
+const camAnim = { depth: 0, engaged: 0, t: 1, radius: 0, bottom: 0, ready: 0, groupY: GROUP_Y };
+
+// One body colour for light mode, shared by the brain shell and the pedestal so
+// the two always match. Changing this moves both together.
+const LIGHT_BODY_COL = "#8a8f96";
+// Emissive tone for the pedestal's lit accents in light mode. Pure white blows
+// out against a pale page; a mid grey keeps the rim readable as a highlight.
+const LIGHT_EMISSIVE = "#333333";
 
 // ── Transition timings ──
 // There is no orbital leg any more: switching projects shifts the aim from one node to the next
 // and nudges the camera's small lateral offset across, which reads as changing focus rather than
 // circling the brain's exterior.
-const MOVE_S = 4.0;   // first zoom-in from the default view, and BACK
 
 // Project-to-project is ONE continuous move: slerp the direction, lerp the distance, single
-// duration, single ease. The cut that was here before removed the sweep by removing the motion
-// altogether, which is not the same as making the motion calm — this makes it calm instead.
-// sine.inOut peaks at only pi/2 (1.57x) of the average rate, against 2x for power1 and 3x for
-// power2, so there is markedly less acceleration at the midpoint and no whip at either end.
-const SWITCH_S = 4.6;
+// ease. sine.inOut peaks at only pi/2 (1.57x) of the average rate, against 2x for power1 and 3x
+// for power2, so there is markedly less acceleration at the midpoint and no whip at either end.
+//
+// Duration scales with the arc actually travelled: clamp(deg / 15, 3, 6). Measured against the
+// previous clamp(deg / 22, 2.2, 4.5):
+//
+//   MoodTunes -> IT Career     53.3deg  ->  3.55s   (was 2.42s)
+//   IT Career -> PROJECT_05    87.2deg  ->  5.81s   (was 3.96s)
+//   MoodTunes -> CityPulse    107.0deg  ->  6.00s   (was 4.50s)   ceiling; raw 7.13s
+//   IT Career -> CityPulse    160.3deg  ->  6.00s   (was 4.50s)   ceiling; raw 10.69s
+//   PreventPath -> PROJECT_05 164.5deg  ->  6.00s   (was 4.50s)   ceiling; raw 10.97s
+//
+// The ceiling still binds on the three widest pairs, so those run at 27 deg/s rather than the 15
+// the rate asks for. Raise SWITCH_MAX_S toward 11 if they should slow further.
+const SWITCH_DEG_PER_S = 15;
+const SWITCH_MIN_S     = 3;
+const SWITCH_MAX_S     = 6;
+
+// Every camera move — first click, project switch, and BACK — is priced the same way, off the
+// arc it actually has to travel. They are all the same tween on the same values, so pacing them
+// differently only made short moves and long ones feel inconsistent.
+function arcDuration(from: THREE.Vector3, to: THREE.Vector3, scale = 1) {
+  const deg = THREE.MathUtils.radToDeg(from.angleTo(to));
+  return {
+    deg,
+    duration: THREE.MathUtils.clamp(deg / SWITCH_DEG_PER_S, SWITCH_MIN_S, SWITCH_MAX_S) * scale,
+  };
+}
+
+// Project-to-project only: the clamped duration above, times this. Applied after the clamp, so
+// the whole result scales — 3..6s becomes 1.8..3.6s. Scaling this one number moves the floor,
+// the divisor and the ceiling together, keeping every pair in proportion. Deliberately NOT applied to the first zoom-in
+// or to BACK: they share arcDuration, and stretching the return to default that far would make
+// leaving a project feel broken.
+//
+// Walked 3 -> 2 -> 1.4 -> 1.12 -> 0.896 and back to 1.4. The usable window is narrow: at 2
+// (6..12s) the travel felt too slow, at 0.896 (2.7..5.4s) it read as spinning again. Nothing to do
+// with BRAIN_SPIN_SLOW_FRAC — that governs the brain's own spin and is a separate value.
+const SWITCH_SLOW_FACTOR = 0.6;
+
+// ── Zoom speed ──
+// Every camera move — first zoom-in, project-to-project re-aim, and the BACK zoom-out — runs at
+// this one fixed duration and ease. This SUPERSEDES the arc-scaled pacing above: arcDuration is
+// still called, but only for the degrees it reports in the console logs; its `duration` no longer
+// drives any tween, so SWITCH_DEG_PER_S / SWITCH_MIN_S / SWITCH_MAX_S / SWITCH_SLOW_FACTOR are
+// now logging-only knobs.
+//
+// One value, applied at all three call sites, is what keeps the five projects identical: pacing
+// used to depend on the arc each pair happened to subtend, so MoodTunes -> IT Career (53deg) and
+// PreventPath -> PROJECT_05 (165deg) took visibly different times. They are now the same 6s.
+//
+// power2.out rather than the previous sine.inOut: out-only front-loads the movement, so the
+// camera leaves immediately on click and settles into the framing. At 6s that settle is a very
+// long slow tail — around half the distance is covered in the first second and the remainder
+// drifts in over the other five. Switch to sine.inOut if the arrival wants easing at both ends.
+// Only the timing changes here — direction, radius and ZOOM_DISTANCE_FACTOR are untouched, so
+// every shot ends in exactly the same place it did before.
+const ZOOM_DURATION_S = 6;
+const ZOOM_EASE       = "power2.out";
 
 // Readout content cross-fade (140ms out + 140ms in) sits centred on the zoom-out leg's midpoint,
 // so the text swaps at the top of the arc rather than at the instant of the click.
-const CONTENT_FADE_S  = 0.20;
-const CONTENT_DELAY_S = SWITCH_S / 2 - CONTENT_FADE_S;
+const CONTENT_FADE_S  = 0.12;
 
 const SCENE_CENTRE_Y = 0.02;
 // Bounding-sphere radius of the whole group about that centre. A sphere (rather than the
@@ -650,7 +786,11 @@ const SCENE_RADIUS = 0.31;
 // exact-fit, shrinking the default view by around a third. "Nothing clipped" is the hard
 // constraint and the ratio is "roughly", so the default is pulled back modestly instead and
 // the focused shot sits as close as it can while keeping real margin: a ratio of ~0.81.
-const DEFAULT_MARGIN = 1.30;
+// Raised 1.30 -> 1.50 to clear the pedestal base: at 1.30 the flank shots (PreventPath,
+// PROJECT_05, elevation -6deg) projected the pedestal to 101.8% of canvas height, cutting it
+// at the bottom edge. The zoomed radius is defaultDistance * ZOOM_DISTANCE_FACTOR, so this
+// pulls the focused shots back too and leaves ZOOM_DISTANCE_FACTOR (0.75) untouched.
+const DEFAULT_MARGIN = 1.335;
 
 // ── Click-to-zoom: dolly in on the node's side, brain stays centred ──
 // lookAt is ALWAYS the brain centre — never the node. Pointing the lens at the node is what
@@ -707,7 +847,14 @@ const DEFAULT_MARGIN = 1.30;
 // Camera distance from brainCentre while a project is open, as a fraction of defaultDistance.
 // The camera sits on the line from brainCentre out through the node, so each project gives a
 // genuinely different angle, and lookAt stays on brainCentre so the brain cannot slide.
-const ZOOM_DISTANCE_FACTOR = 0.75;
+const ZOOM_DISTANCE_FACTOR = 0.825;
+
+// Narrow screens reserve room for the wide project readout. Keep the selected camera a little
+// farther back there so the complete brain and pedestal remain visible beside the panel.
+function zoomFactorForViewport() {
+  if (typeof window !== "undefined" && window.innerWidth < 1024) return 1.02;
+  return ZOOM_DISTANCE_FACTOR;
+}
 
 // ─── Bottom-region projects: look UP from underneath — TUNE HERE ─────────────
 // The three nodes with a negative y in PROJECT_NODES: CityPulse "back, lower" (2), PreventPath
@@ -740,8 +887,26 @@ const BOTTOM_DIM_FRAC = 0.4;
 
 // Node glow reach, for the clearance figure logged on each selection.
 const NODE_GLOW_RADIUS = 0.092 * 1.6;
-// Pedestal light cone fades toward this fraction of its default opacity while zoomed.
-const CONE_INSIDE_FRAC = 0.30;
+
+// ─── Zoomed-state left shift — TUNE HERE ─────────────────────────────────────
+// How far left the brain sits on screen while a project is open, as a fraction of VIEWPORT
+// WIDTH. Applied by nudging the lookAt target to the RIGHT along the camera's own right vector:
+// the lookAt point is what lands at screen centre, so pushing it right puts the brain left of
+// centre by the same amount. Scaled by `depth`, so the default view is untouched and the shift
+// eases in and out with the existing transition rather than snapping.
+//
+// Done by TRANSLATING the whole frustum sideways — camera position and aim point both move by
+// the same vector — not by re-aiming the camera at an offset point. Re-aiming rotates it, and on
+// the near-overhead shot, where the view direction is almost parallel to up, that rotation swings
+// the roll wildly: the brain landed 14px to the RIGHT and 268px too high, and iterating against
+// the measured position diverged rather than converged. Translating changes no orientation at
+// all, so the shift is exact in one step for every shot, overhead included.
+//
+//   worldOffset = 2 * frac * radius * tan(horizontalHalfFov)
+//
+// which puts brainCentre at NDC x = -2*frac, i.e. `frac` of the frame width left of centre.
+const ZOOM_LEFT_SHIFT_FRAC = 0.05;
+
 // Near plane stays at its default in both states now — the camera never enters the mesh
 // (closest approach stays at 3.69x the node glow radius, well outside SCENE_RADIUS), and a wide
 // near/far ratio reintroduces the depth-precision sparkle noted on the Canvas.
@@ -774,18 +939,46 @@ const _dirTo   = new THREE.Vector3(0, 0, 1);
 // Target direction while a move is being set up; kept separate from _dirV, which the re-base
 // step overwrites with the live direction.
 const _dirV2   = new THREE.Vector3();
+// Camera right vector and the shifted aim point, for the zoomed left shift.
+const _rightV  = new THREE.Vector3();
+const _aimV    = new THREE.Vector3();
+const _tipV    = new THREE.Vector3();
 
-// Shortest-arc interpolation between two unit directions. Independent lerping of x/y/z takes the
-// chord instead, which both cuts in toward the brain and races through the angle at the midpoint.
-function slerpDir(a: THREE.Vector3, b: THREE.Vector3, t: number, out: THREE.Vector3) {
-  const dot = THREE.MathUtils.clamp(a.dot(b), -1, 1);
-  const omega = Math.acos(dot);
-  const sinOmega = Math.sin(omega);
-  if (sinOmega < 1e-6) return out.copy(t < 0.5 ? a : b);
-  return out
-    .copy(a).multiplyScalar(Math.sin((1 - t) * omega) / sinOmega)
-    .addScaledVector(b, Math.sin(t * omega) / sinOmega)
-    .normalize();
+// Interpolation between two camera directions, in SPHERICAL terms: azimuth takes the short way
+// round, elevation moves linearly. Both endpoints are reproduced exactly at t=0 and t=1.
+//
+// Not a slerp. A great-circle arc between two widely separated directions routes over the pole,
+// and with the bottom-region shots that meant the path dived far below both of its endpoints —
+// PreventPath -> PROJECT_05 are 164.5 degrees apart and both sit at -6 degrees elevation, yet
+// the arc bottomed out at -50.9. Interpolating the angles separately keeps elevation monotonic
+// between the two endpoint values, so the travel can never dip below the lower of them: the
+// camera swings horizontally around the brain instead of arcing under it.
+// Depth of the gentle downward bow the camera takes mid-journey, in DEGREES of elevation.
+// Expressed as an angle rather than world units because this scene is small — the camera orbits
+// at 0.79 world units, so a 0.3-unit drop would be a ~22 degree swing, nowhere near subtle. At 5
+// degrees the camera falls about 0.07 world units at the midpoint, roughly a quarter of the
+// brain's radius: visible as a slight settle, not a swoop.
+const TRAVEL_DIP_DEG = 5;
+
+function blendDir(a: THREE.Vector3, b: THREE.Vector3, t: number, out: THREE.Vector3) {
+  if (t <= 0) return out.copy(a);
+  if (t >= 1) return out.copy(b);
+  const azA = Math.atan2(a.x, a.z);
+  const azB = Math.atan2(b.x, b.z);
+  const elA = Math.asin(THREE.MathUtils.clamp(a.y, -1, 1));
+  const elB = Math.asin(THREE.MathUtils.clamp(b.y, -1, 1));
+  // Shortest way round the azimuth — never the long way, however the two wrap.
+  let dAz = azB - azA;
+  while (dAz > Math.PI) dAz -= Math.PI * 2;
+  while (dAz < -Math.PI) dAz += Math.PI * 2;
+  const az = azA + dAz * t;
+  // sin(t*PI) is zero at both ends and peaks at the halfway point, so the bow is concentrated
+  // mid-travel and both endpoints are reproduced exactly — the start and end framings are
+  // untouched by it.
+  const dip = Math.sin(t * Math.PI) * THREE.MathUtils.degToRad(TRAVEL_DIP_DEG);
+  const el = elA + (elB - elA) * t - dip;
+  const ce = Math.cos(el);
+  return out.set(Math.sin(az) * ce, Math.sin(el), Math.cos(az) * ce).normalize();
 }
 
 // A node's CURRENT world position: its local position under PROJECT_HOTSPOTS pushed through the
@@ -800,7 +993,7 @@ function nodeWorld(index: number, out: THREE.Vector3) {
 }
 
 function CameraController({ selected }: { selected: Project | null }) {
-  const { camera, size } = useThree();
+  const { camera, size, gl } = useThree();
   const aspect = size.width / Math.max(size.height, 1);
 
   // Tweened on the shared module object so the bloom pass and beam can read `depth` — they
@@ -812,21 +1005,59 @@ function CameraController({ selected }: { selected: Project | null }) {
   const toId = useRef<number | null>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
 
-  // defaultDistance is read once, here, at mount — not recomputed on every frame or on
-  // resize — so it can never be derived from a camera position that a previous zoom has
-  // already moved, and can't drift across zoom cycles. The trade-off (stated explicitly) is
-  // that framing no longer re-adapts if the window is resized after mount.
+  // defaultDistance: NOT recomputed per-frame (it can never be derived from a camera
+  // position that a previous zoom has already moved, and can't drift across zoom cycles) —
+  // but IS recomputed on window resize below, so mobile/tablet framing still adapts if the
+  // viewport changes size after mount.
   const defaultDistanceRef = useRef<number | null>(null);
-  if (defaultDistanceRef.current === null) {
+  const narrowRef = useRef(typeof window !== "undefined" && window.innerWidth < 1024);
+
+  const computeDefaultDistance = () => {
     const fov0 = (camera as THREE.PerspectiveCamera).fov ?? 45;
-    defaultDistanceRef.current = orbitDistance(aspect, fov0, DEFAULT_MARGIN);
+    const liveAspect = (camera as THREE.PerspectiveCamera).aspect || aspect;
+    let dist = orbitDistance(liveAspect, fov0, DEFAULT_MARGIN);
+    // Preserve the strong desktop-like brain presence on narrow screens. Tablet and phone
+    // stages are deliberately taller, so a modest closer camera remains fully in frame.
+    if (typeof window !== "undefined") {
+      if (window.innerWidth < 768) dist *= 0.92;
+      else if (window.innerWidth < 1024) dist *= 0.95;
+    }
+    return dist;
+  };
+  if (defaultDistanceRef.current === null) {
+    defaultDistanceRef.current = computeDefaultDistance();
   }
+
+  useEffect(() => {
+    let resizeFrame = 0;
+    const onResize = () => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        const nextDistance = computeDefaultDistance();
+        defaultDistanceRef.current = nextDistance;
+        narrowRef.current = window.innerWidth < 1024;
+        // The canvas aspect updates immediately, but easing the orbital radius avoids the
+        // visible snap when a live resize crosses the laptop/tablet/phone breakpoints.
+        if (anim.ready) {
+          const targetRadius = nextDistance * (anim.depth > 0.001 ? zoomFactorForViewport() : 1);
+          gsap.killTweensOf(anim, "radius");
+          gsap.to(anim, { radius: targetRadius, duration: 0.38, ease: "power2.out", overwrite: "auto" });
+        }
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(resizeFrame);
+      window.removeEventListener("resize", onResize);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Re-base the move on wherever the camera actually is: evaluate the in-flight slerp at its
   // current t and make that the new start. This is what guarantees a switch continues from the
   // live position rather than snapping toward any stored or default one.
   const rebaseFromCurrent = () => {
-    slerpDir(_dirFrom, _dirTo, anim.t, _dirV);
+    blendDir(_dirFrom, _dirTo, anim.t, _dirV);
     _dirFrom.copy(_dirV);
     anim.t = 0;
   };
@@ -840,6 +1071,7 @@ function CameraController({ selected }: { selected: Project | null }) {
     gsap.killTweensOf(anim);
 
     const defaultDistance = defaultDistanceRef.current!;
+    const zoomFactor = zoomFactorForViewport();
     _centreV.set(0, SCENE_CENTRE_Y, 0);
 
     if (nextId === null) {
@@ -850,10 +1082,13 @@ function CameraController({ selected }: { selected: Project | null }) {
       gsap.to(brainSpin, { speedScale: 1, duration: BRAIN_SPIN_RAMP_S, ease: "power2.inOut" });
       rebaseFromCurrent();
       _dirTo.copy(_DEFAULT_DIR);
+      const back = arcDuration(_dirFrom, _dirTo);
+      // eslint-disable-next-line no-console
+      console.log(`[Brain camera] BACK: ${back.deg.toFixed(1)}deg arc -> ${ZOOM_DURATION_S.toFixed(2)}s`);
       tlRef.current = gsap.timeline()
         .to(anim, {
-          depth: 0, t: 1, bottom: 0, radius: defaultDistance,
-          duration: MOVE_S, ease: "power2.inOut",
+          depth: 0, t: 1, bottom: 0, radius: defaultDistance, groupY: GROUP_Y,
+          duration: ZOOM_DURATION_S, ease: ZOOM_EASE,
         })
         .add(() => { anim.engaged = 0; });
       return;
@@ -861,12 +1096,20 @@ function CameraController({ selected }: { selected: Project | null }) {
 
     anim.engaged = 1;
 
-    // Ease the idle rotation down to its zoomed rate. Tweened rather than assigned, so the
-    // slow-down is gradual and the brain keeps turning throughout.
+    // Drop the idle rotation to its zoomed rate IMMEDIATELY — assigned, not tweened. A ramp here
+    // left the brain still turning at up to full speed for the first half-second of the move,
+    // which is the part of the transition where the spin is most obvious. The brain keeps turning
+    // throughout; only its rate changes, and it changes now rather than shortly.
     gsap.killTweensOf(brainSpin);
-    gsap.to(brainSpin, {
-      speedScale: BRAIN_SPIN_SLOW_FRAC, duration: BRAIN_SPIN_RAMP_S, ease: "power2.inOut",
-    });
+    const spinBefore = brainSpin.speedScale;
+    brainSpin.speedScale = BRAIN_SPIN_SLOW_FRAC;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[Brain spin] (a) before click ${spinBefore.toFixed(3)}x`,
+      `-> (b) instant of click ${brainSpin.speedScale.toFixed(3)}x`,
+      `= ${(BRAIN_SPIN_SPEED * brainSpin.speedScale * 180 / Math.PI).toFixed(3)} deg/s`,
+      `[default is ${(BRAIN_SPIN_SPEED * 180 / Math.PI).toFixed(3)} deg/s]`,
+    );
 
     // The node's CURRENT world position, with the brain's live rotation applied, then straight
     // out along that direction to the zoom radius. Sampled once, here: the brain keeps turning
@@ -886,7 +1129,7 @@ function CameraController({ selected }: { selected: Project | null }) {
       const ce = Math.cos(el);
       _dirV2.set(Math.sin(az) * ce, Math.sin(el), Math.cos(az) * ce).normalize();
     }
-    _startV.copy(_centreV).addScaledVector(_dirV2, defaultDistance * ZOOM_DISTANCE_FACTOR);
+    _startV.copy(_centreV).addScaledVector(_dirV2, defaultDistance * zoomFactor);
 
     // eslint-disable-next-line no-console
     console.log(
@@ -895,14 +1138,14 @@ function CameraController({ selected }: { selected: Project | null }) {
       `\n    direction           = (${_dirV2.x.toFixed(4)}, ${_dirV2.y.toFixed(4)}, ${_dirV2.z.toFixed(4)})`,
       isBottom ? `  [bottom region: elevation forced to ${bottomElev}deg, glow+bloom to ${BOTTOM_DIM_FRAC * 100}%]` : "",
       `\n    camera position     = (${_startV.x.toFixed(4)}, ${_startV.y.toFixed(4)}, ${_startV.z.toFixed(4)})`,
-      ` distance=${(defaultDistance * ZOOM_DISTANCE_FACTOR).toFixed(4)} (${ZOOM_DISTANCE_FACTOR} x default)`,
+      ` distance=${(defaultDistance * zoomFactor).toFixed(4)} (${zoomFactor} x default)`,
       `\n    lookAt = brainCentre (${_centreV.x.toFixed(4)}, ${_centreV.y.toFixed(4)}, ${_centreV.z.toFixed(4)}) — fixed in every state`,
       `\n    camera-to-node ${_startV.distanceTo(_toV).toFixed(4)} = ${(_startV.distanceTo(_toV) / NODE_GLOW_RADIUS).toFixed(2)}x glow radius`,
     );
 
     const fromDefault = toId.current === null || anim.depth <= 0.01;
     toId.current = nextId;
-    const zoomRadius = defaultDistance * ZOOM_DISTANCE_FACTOR;
+    const zoomRadius = defaultDistance * zoomFactor;
 
     if (fromDefault) {
       // First click from the default view — the one move that IS interpolated. There is no
@@ -910,10 +1153,13 @@ function CameraController({ selected }: { selected: Project | null }) {
       // rather than orbiting.
       rebaseFromCurrent();
       _dirTo.copy(_dirV2);
+      const first = arcDuration(_dirFrom, _dirTo);
+      // eslint-disable-next-line no-console
+      console.log(`[Brain camera] first zoom-in: ${first.deg.toFixed(1)}deg arc -> ${ZOOM_DURATION_S.toFixed(2)}s`);
       tlRef.current = gsap.timeline()
         .to(anim, {
-          depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
-          duration: MOVE_S, ease: "power2.inOut",
+          depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius, groupY: GROUP_Y,
+          duration: ZOOM_DURATION_S, ease: ZOOM_EASE,
         });
       return;
     }
@@ -926,17 +1172,29 @@ function CameraController({ selected }: { selected: Project | null }) {
     rebaseFromCurrent();
     _dirTo.copy(_dirV2);
 
+    // Measured AFTER the re-base, so an interrupted move is priced on the arc still remaining
+    // rather than the one originally requested.
+    const { deg: swingDeg } = arcDuration(_dirFrom, _dirTo, SWITCH_SLOW_FACTOR);
+    const switchDuration = ZOOM_DURATION_S;
+
     // eslint-disable-next-line no-console
     console.log(
-      `[Brain camera] switch: ${THREE.MathUtils.radToDeg(_dirFrom.angleTo(_dirTo)).toFixed(1)}deg arc`,
-      `over ${SWITCH_S}s, sine.inOut, radius held at ${zoomRadius.toFixed(4)}`,
+      `[Brain camera] switch: ${swingDeg.toFixed(1)}deg arc`,
+      `-> duration ${switchDuration.toFixed(2)}s`,
+      `(raw ${(swingDeg / SWITCH_DEG_PER_S).toFixed(2)}s${swingDeg / SWITCH_DEG_PER_S > SWITCH_MAX_S ? ", CAPPED" : swingDeg / SWITCH_DEG_PER_S < SWITCH_MIN_S ? ", floored" : ""})`,
+      `${(swingDeg / switchDuration).toFixed(0)} deg/s, ${ZOOM_EASE}, radius held at ${zoomRadius.toFixed(4)}`,
     );
 
     tlRef.current = gsap.timeline()
       .to(anim, {
-        depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius,
-        duration: SWITCH_S, ease: "sine.inOut",
-      });
+        depth: 1, t: 1, bottom: isBottom ? 1 : 0, radius: zoomRadius, groupY: GROUP_Y,
+        duration: switchDuration, ease: ZOOM_EASE,
+      })
+      // eslint-disable-next-line no-console
+      .add(() => console.log(
+        `[Brain spin] (c) after the ${switchDuration.toFixed(2)}s travel: ${brainSpin.speedScale.toFixed(3)}x`,
+        `= ${(BRAIN_SPIN_SPEED * brainSpin.speedScale * 180 / Math.PI).toFixed(3)} deg/s`,
+      ));
   }, [selected, anim]);
 
   useEffect(() => () => { tlRef.current?.kill(); gsap.killTweensOf(anim); }, [anim]);
@@ -975,21 +1233,86 @@ function CameraController({ selected }: { selected: Project | null }) {
     // Direction comes from the slerp, radius from its own tween. Between two projects the two
     // endpoints are set to the SAME vector, so the slerp is a constant and only the radius moves
     // — that is the zoom-out / cut / zoom-in, with no angular path to see.
-    slerpDir(_dirFrom, _dirTo, anim.t, _dirV);
+    blendDir(_dirFrom, _dirTo, anim.t, _dirV);
     _startV.copy(_centreV).addScaledVector(_dirV, anim.radius);
     camera.position.copy(_startV);
+    // Same frame, same tween, same value the camera radius came from above —
+    // this is what keeps the group and the camera moving in lockstep rather
+    // than one settling before the other.
+    if (sceneGroupRef.current) sceneGroupRef.current.position.y = anim.groupY;
 
-    // ── Aim: brainCentre, ALWAYS ──
-    // Never the node, and never tracked. The lookAt point is what lands at the centre of the
-    // screen, so pinning it here is precisely what stops the brain sliding: selecting a project
-    // can change how large the brain is and which side faces the lens, never where its centre
-    // sits. Anything that moved this — tracking the node, an aim floor, a lateral bias — put the
-    // brain back on the move, so there is deliberately nothing of that kind left.
+    // ── Aim: brainCentre, plus a fixed left shift while zoomed ──
+    // Still never the node and never tracked — the target is brainCentre in every state, which is
+    // what keeps the brain from sliding about as projects change. The only addition is a CONSTANT
+    // sideways nudge, identical for all five projects, that moves the brain left of centre to
+    // balance the readout panel on the right.
+    //
+    // Aim twice: once at brainCentre to establish the camera's orientation, then read its own
+    // right vector off the resulting matrix and re-aim offset along it. Deriving the right vector
+    // that way rather than from cross(viewDir, up) keeps it stable for the near-overhead shot,
+    // where the view direction is almost parallel to up and that cross product collapses.
     camera.lookAt(_centreV);
+    if (anim.depth > 0.0001) {
+      camera.updateMatrixWorld();
+      _rightV.setFromMatrixColumn(camera.matrixWorld, 0).normalize();
+      const fovRad = ((camera as THREE.PerspectiveCamera).fov ?? 45) * Math.PI / 180;
+      // tan(hHalf) === tan(vHalf) * aspect, so no atan round-trip is needed.
+      const tanHalfW = Math.tan(fovRad / 2) * Math.max(aspect, 0.01);
+      const shift = narrowRef.current ? 0 : 2 * ZOOM_LEFT_SHIFT_FRAC * anim.radius * tanHalfW * anim.depth;
+      // Both by the same vector: a pure sideways translation of the frustum. The view direction
+      // is unchanged, so the orientation — and therefore the roll — is exactly what it was.
+      camera.position.addScaledVector(_rightV, shift);
+      _aimV.copy(_centreV).addScaledVector(_rightV, shift);
+      camera.lookAt(_aimV);
+    }
 
     if (camera.near !== NEAR_OUTSIDE) {
       camera.near = NEAR_OUTSIDE;
       (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
+    }
+
+    // ── Anchor the hover tooltip to the node, not the cursor ──
+    // Runs here because this is the one place that already has the settled camera for the frame.
+    // The node's live world position is projected to screen and the label placed at a CONSTANT
+    // offset from it, so moving the pointer inside the hitbox cannot shift it — nothing in this
+    // path reads a cursor coordinate. It does follow the node as the brain turns, which is the
+    // one kind of movement wanted. Written straight to style rather than through React state,
+    // which would re-render every frame.
+    const tipEl = tooltipElRef.current;
+    const tipIdx = hoveredNode.index;
+    // Place once per hover unless tracking is switched on. `place` stays raised until an element
+    // actually exists to write to, so a hover that lands between the state update and React's
+    // commit is positioned on the following frame rather than dropped.
+    if (tipEl && tipIdx !== null && (hoveredNode.place || TOOLTIP_TRACK_NODE)) {
+      const firstPlace = hoveredNode.place;
+      hoveredNode.place = false;
+      nodeWorld(tipIdx, _tipV).project(camera);
+      // The canvas fills the section, which can sit anywhere in the page, so offset by its rect
+      // to get viewport coordinates for the position:fixed callout. Only read while hovering.
+      const rect = gl.domElement.getBoundingClientRect();
+      const px = rect.left + (_tipV.x * 0.5 + 0.5) * rect.width;
+      const py = rect.top + (-_tipV.y * 0.5 + 0.5) * rect.height;
+      // Place the element's bottom centre on the node. Measured rather than done with a CSS
+      // translate(-50%,-100%): framer-motion owns `transform` on this element, so writing one
+      // here risks being clobbered. offsetWidth/Height are only read while a tooltip is up.
+      const targetX = px - tipEl.offsetWidth / 2;
+      const targetY = py - TOOLTIP_GAP - tipEl.offsetHeight;
+
+      if (firstPlace) {
+        // Snap on the frame the hover starts. Easing in from wherever the previous label sat
+        // would send it flying across the screen between nodes.
+        tooltipPos.x = targetX;
+        tooltipPos.y = targetY;
+      } else {
+        tooltipPos.x += (targetX - tooltipPos.x) * TOOLTIP_LERP;
+        tooltipPos.y += (targetY - tooltipPos.y) * TOOLTIP_LERP;
+      }
+
+      // Direct style mutation, and left/top rather than a transform: framer-motion owns
+      // `transform` on this element and could overwrite it. Sub-pixel values are kept as-is —
+      // browsers position fractionally, and it keeps the easing smooth at small deltas.
+      tipEl.style.left = `${tooltipPos.x.toFixed(2)}px`;
+      tipEl.style.top = `${tooltipPos.y.toFixed(2)}px`;
     }
   });
 
@@ -1696,7 +2019,7 @@ function WireframeBrain({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
+function NeuralDots({ meshes, light }: { meshes: THREE.Mesh[]; light: boolean }) {
   const surfDotRef = useRef<THREE.InstancedMesh>(null);
   const surfHaloRef = useRef<THREE.InstancedMesh>(null);
   const intDotRef = useRef<THREE.InstancedMesh>(null);
@@ -1770,7 +2093,7 @@ function NeuralDots({ meshes }: { meshes: THREE.Mesh[] }) {
       </instancedMesh>
       <instancedMesh ref={surfDotRef} args={[undefined, undefined, surfaceCount]} renderOrder={2}>
         <sphereGeometry args={[0.0058, 8, 8]} />
-        <meshBasicMaterial color="#f2feff" transparent opacity={0.78} depthWrite={false} depthTest />
+        <meshBasicMaterial color="#f2feff" transparent opacity={light ? 0.6 : 0.78} depthWrite={false} depthTest />
       </instancedMesh>
 
       {/* INTERIOR layer — subtle depth hints at ~40-50% of the surface layer's weight.
@@ -1948,10 +2271,11 @@ function FoldNetworkOverlay({ meshes }: { meshes: THREE.Mesh[] }) {
   );
 }
 
-function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
+function BrainModel({ selected, onHotspotSelect, onHotspotHover, light }: {
   selected: Project | null;
   onHotspotSelect: (p: Project) => void;
-  onHotspotHover: (name: string | null, x: number, y: number) => void;
+  onHotspotHover: (index: number | null) => void;
+  light: boolean;
 }) {
   // Welded copy of the particle brain scan: the original export had zero shared vertices
   // (285,966 verts for 95,322 tris, fully non-indexed), so computeVertexNormals() could
@@ -2035,7 +2359,10 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
     // Fully opaque = blocks all far-side lines = consistent color at all angles.
     // MeshStandardMaterial responds to scene lights so brain folds are visible.
     const mat = new THREE.MeshStandardMaterial({
-      color: "#303030",
+      // #303030 reads as a near-black silhouette against a light page. A mid
+      // grey keeps the same matte shading and fold detail while separating the
+      // mass from the background.
+      color: light ? LIGHT_BODY_COL : "#303030",
       roughness: 0.42,
       metalness: 0.0,
       transparent: false,
@@ -2045,7 +2372,7 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
     mat.vertexColors = false;
     mat.map = null;
     return mat;
-  }, []);
+  }, [light]);
 
   // Backface-outline rim technique: a slightly enlarged copy of the same geometry,
   // rendered BackSide-only, so only the sliver right at the silhouette edge shows (the
@@ -2054,13 +2381,15 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
   // mesh's (imperfect, seam-heavy) normals at all, so it can't reproduce the "crack" bug.
   // Kept as a clean fallback outline underneath the new per-pixel fresnel glow.
   const rimMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: "#ffffff",
+    // A white silhouette halo is invisible on a light background and blooms
+    // out; grey gives the outline something to read against.
+    color: light ? "#4a4f57" : "#ffffff",
     transparent: true,
     opacity: 0.35,
     side: THREE.BackSide,
     depthWrite: false,
     toneMapped: false, // full brightness so bloom picks up the silhouette as a soft halo
-  }), []);
+  }), [light]);
 
   // Collect brain meshes. This asset nests its mesh several levels deep with baked
   // parent scale/translate (e.g. a 400x node under a 0.01x node) — bake each mesh's full
@@ -2136,7 +2465,7 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover }: {
               it needs to share this exact same coordinate space/scale to land on the surface
               correctly. Added on top of the existing brain material + fresnel rim, neither of
               which is modified here. */}
-          <NeuralDots meshes={brainMeshes} />
+          <NeuralDots meshes={brainMeshes} light={light} />
           {/* Gold circuit linking all 5 project nodes through the interior. */}
           <GoldCircuit />
           {/* The 5 project markers — gold glowing focal points scattered across the brain's
@@ -2429,7 +2758,7 @@ function AmbientParticles() {
 // Scene ambientLight is deliberately left alone. It is global and un-maskable, so lowering it
 // to darken this podium would also darken the brain.
 // ─── World-Space Holographic Projection Beam ─────────────────────────────────
-function HolographicBeam() {
+function HolographicBeam({ light }: { light: boolean }) {
   const BEAM_BASE_Y = -0.224;
   const BEAM_H      = 0.23;
   const BEAM_CY     = BEAM_BASE_Y + BEAM_H / 2;
@@ -2448,54 +2777,25 @@ function HolographicBeam() {
   // Hash helper
   const hash = (n: number) => ((Math.sin(n * 12.9898 + 0.5) * 43758.5453) % 1 + 1) % 1;
 
-  const loggedBefore = useRef(false);
-  const loggedDuring = useRef(false);
 
   // Animation: flickering + slow rotation
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime();
 
-    // Slow rotation — kept running even while hidden below, so it doesn't jump on return.
+    // Slow rotation.
     if (groupRef.current) groupRef.current.rotation.y = t * 0.20;
 
-    // Gentle pulse
-    const pulse = 1.0 + 0.12 * Math.sin(t * 2.1);
-    // Fade the cone toward CONE_INSIDE_FRAC (not fully to 0) as the camera travels inside the
-    // brain — full strength restored on the way back out; the default-state look is untouched
-    // (fade is exactly 1 at depth 0).
-    const fade = 1 - (1 - CONE_INSIDE_FRAC) * camAnim.depth;
-    if (mat0Ref.current)    mat0Ref.current.opacity    = 0.08 * pulse * fade;
-    if (discMatRef.current) discMatRef.current.opacity = 0.220 * pulse * fade;
-    if (particleMatRef.current) particleMatRef.current.opacity = 0.7 * fade;
-
-    // Hard safeguard (section 4): while ANY project is selected, the whole beam is hidden
-    // outright rather than relying on opacity alone — this holds regardless of camera angle,
-    // so the cone can never appear in frame during zoom no matter where the interior camera
-    // ends up. Restored the instant the BACK tween lands.
+    // Gentle pulse. Nothing here reads camAnim — the beam looks the same in every state.
     //
-    // Keyed to `engaged`, not to `depth <= 0.001`: a project-to-project switch drives depth
-    // through exactly 0 at the hand-off between its zoom-out and zoom-in legs, and the depth
-    // test alone would flash the whole beam back on for those frames mid-transition.
-    if (groupRef.current) groupRef.current.visible = camAnim.engaged === 0 && camAnim.depth <= 0.001;
-
-    // Verification logging (section 3/6).
-    if (!loggedBefore.current && camAnim.depth < 0.01) {
-      loggedBefore.current = true;
-      // eslint-disable-next-line no-console
-      console.log(
-        "[LightCone] opacity BEFORE zoom (depth=0): disc =", discMatRef.current?.opacity.toFixed(4),
-        " visible =", groupRef.current?.visible,
-      );
-    }
-    if (!loggedDuring.current && camAnim.depth > 0.99) {
-      loggedDuring.current = true;
-      // eslint-disable-next-line no-console
-      console.log(
-        "[LightCone] opacity DURING zoom (depth=1): disc =", discMatRef.current?.opacity.toFixed(4),
-        " visible =", groupRef.current?.visible,
-        " (visible must be false per the hard safeguard, regardless of the opacity fade)",
-      );
-    }
+    // Two selection-driven suppressions used to live here and are deliberately gone: an opacity
+    // fade toward CONE_INSIDE_FRAC as `depth` rose, and a hard `visible = false` gate keyed to
+    // `engaged`. Both were added back when the camera flew inside the mesh and the beam could
+    // end up across the lens; the camera now stays well outside (see ZOOM_DISTANCE_FACTOR), so
+    // the beam is simply part of the scene in the default view and in every project's view.
+    const pulse = 1.0 + 0.12 * Math.sin(t * 2.1);
+    if (mat0Ref.current)    mat0Ref.current.opacity    = light ? 0.35 * pulse : 0.08 * pulse;
+    if (discMatRef.current) discMatRef.current.opacity = light ? 0.10 * pulse : 0.220 * pulse;
+    if (particleMatRef.current) particleMatRef.current.opacity = light ? 0.4 : 0.7;
 
     // Animate rising particles: move each particle upward, reset when it exits top
     if (particlesRef.current) {
@@ -2572,9 +2872,13 @@ function HolographicBeam() {
     return tex;
   }, []);
 
-  // Rising particles geometry — 40 small glowing dots
+  // Rising particles geometry — small glowing dots drifting up the column.
+  // NUM is the single source of truth: the Float32Array is sized from it, and the per-frame
+  // rise/recycle loop iterates pos.count rather than a literal, so the buffer and the animation
+  // stay in step automatically. Walked 100 -> 450 (too dense) -> 320. The distribution is untouched — same angle, same height
+  // fraction, same cone radius — so this only fills the existing volume more densely.
   const particleGeo = useMemo(() => {
-    const NUM = 100;
+    const NUM = 320;
     const positions = new Float32Array(NUM * 3);
     for (let i = 0; i < NUM; i++) {
       const angle = hash(i * 1.7) * Math.PI * 2;
@@ -2614,23 +2918,28 @@ function HolographicBeam() {
       <group ref={groupRef}>
         <mesh position={[0, BEAM_BASE_Y + 0.2 / 2, 0]} renderOrder={2}>
           <cylinderGeometry args={[0.12, 0.09, 0.2, 128, 1, true]} />
-          <meshBasicMaterial ref={mat0Ref} map={beamTex} color="#ffffff" transparent opacity={0.0005}
-            blending={THREE.AdditiveBlending} depthWrite={false} depthTest={false}
+          {/* Additive blending ADDS to what is behind it, so a dark colour over a
+              pale page contributes almost nothing — the beam would simply vanish.
+              Normal blending is what lets a dark, low-opacity column read here. */}
+          <meshBasicMaterial ref={mat0Ref} map={beamTex} color={light ? "#000000" : "#ffffff"} transparent opacity={0.0005}
+            blending={light ? THREE.NormalBlending : THREE.AdditiveBlending} depthWrite={false} depthTest={false}
             side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
       </group>
 
       {/* Rising particles — outside rotating group so they move independently */}
       <points ref={particlesRef} geometry={particleGeo} renderOrder={4}>
+        {/* size is 20% down from the previous 0.008: at 4.5x the density the old dot size read
+            as a chunky mass rather than a fine mist. */}
         <pointsMaterial
           ref={particleMatRef}
-          color="#ffffff"
-          size={0.008}
+          color={light ? "#222222" : "#ffffff"}
+          size={0.0064}
           map={circTex}
           transparent
           opacity={0.7}
           alphaTest={0.01}
-          blending={THREE.AdditiveBlending}
+          blending={light ? THREE.NormalBlending : THREE.AdditiveBlending}
           depthWrite={false}
           sizeAttenuation
           toneMapped={false}
@@ -2640,14 +2949,14 @@ function HolographicBeam() {
       {/* Glow disc at base */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BEAM_BASE_Y + 0.0005, 0]} renderOrder={2}>
         <circleGeometry args={[0.093, 64]} />
-        <meshBasicMaterial ref={discMatRef} map={radialTex} color="#ffffff" transparent opacity={0.35}
-          blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial ref={discMatRef} map={radialTex} color={light ? "#333333" : "#ffffff"} transparent opacity={0.35}
+          blending={light ? THREE.NormalBlending : THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
 }
 
-function HolographicPedestal() {
+function HolographicPedestal({ light }: { light: boolean }) {
   // Master size knob — every radius, height, light position and light intensity below is
   // (design value × S). The brief's literals assume a unit-scale scene; this scene's brain is a
   // ~0.25-unit object near the origin (BRAIN_TRANSFORM scales the GLB by 0.20), so S brings
@@ -2739,6 +3048,13 @@ function HolographicPedestal() {
   const CORE_H = 0.3; // design units — the low surface burst; the tall beam below is separate
 
   // ══ STREAKY LIGHT BEAM ══
+  // Hidden. The four cones span world y -0.2239..-0.1560 and carry depthTest={false} with
+  // additive blending, so nothing can ever occlude them. That is fine looking down from the
+  // default view, but the bottom-region shots put the camera at y -0.1711 (CityPulse, -14deg) —
+  // INSIDE that band — where the beam draws over the pedestal and washes across frame, reading
+  // as a light shaft coming up from underneath. The pedestal's pointLights are untouched, so it
+  // stays lit; only this decorative geometry is gone. Flip to true to bring it back.
+  const SHOW_STREAKY_BEAM = false;
   // BEAM_H reaches most of the way to the brain without touching it. The gap from the beam's
   // base (RING_TOP) to the brain's underside is ~1.38 design units at this scale, so 1.15
   // covers ~83% of it and stops just short.
@@ -2798,7 +3114,9 @@ function HolographicPedestal() {
     // it blows the lower half out. `bottom` is tweened 0 <-> 1 alongside the camera move, so this
     // dims and restores in step with it rather than popping. Geometry is untouched — only how
     // hard the accents emit.
-    const glowDim = 1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom;
+    // Halve the accent emission in light mode: at full strength the neon rings
+    // blow out against a pale background. Geometry and bloom settings untouched.
+    const glowDim = (1 - (1 - BOTTOM_DIM_FRAC) * camAnim.bottom) * (light ? 0.3 : 1);
     accentRefs.current.forEach((m, i) => {
       if (m) m.emissiveIntensity = (ACCENT_BASE[i] - 0.3 + 0.5 * pulse) * glowDim;
     });
@@ -2812,7 +3130,7 @@ function HolographicPedestal() {
   // constant lift on top. Only the top rim keeps a strong reflection (passed explicitly) so the
   // silhouette still catches its highlight.
   const metal = (color: string, metalness = 0.8, roughness = 0.4, e = 0.006, envI = 0.3) => (
-    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} emissive="#ffffff" emissiveIntensity={e} envMap={envMap} envMapIntensity={envI} />
+    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={e} envMap={envMap} envMapIntensity={envI} />
   );
 
   return (
@@ -2841,7 +3159,7 @@ function HolographicPedestal() {
             recessed grooves rather than pale slots. */}
         <mesh position={[0, PANEL_CY * S, 0]}>
           <cylinderGeometry args={[2.28 * S, 2.28 * S, PANEL_H * S, 128]} />
-          {metal("#000000", 0.65, 0.4, 0.006)}
+          {metal(light ? LIGHT_BODY_COL : "#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
         {/* ══ 16 CHUNKY BEVELLED PANELS ══
@@ -2860,19 +3178,19 @@ function HolographicPedestal() {
                 {/* chamfered border plate */}
                 <mesh>
                   <boxGeometry args={[0.28 * S, PANEL_H * S, 0.95 * S]} />
-                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+                  {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
                 {/* raised face, proud of the border */}
                 <mesh position={[0.05 * S, 0, 0]}>
                   <boxGeometry args={[0.2 * S, PANEL_H * 0.78 * S, 0.78 * S]} />
-                  {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+                  {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
                 </mesh>
               </group>
               {/* recessed vertical groove, half a step round */}
               <group rotation={[0, -STEP / 2, 0]}>
                 <mesh position={[2.3 * S, PANEL_CY * S, 0]}>
                   <boxGeometry args={[0.2 * S, PANEL_H * S, 0.1 * S]} />
-                  {metal("#000000", 0.6, 0.45, 0.004)}
+                  {metal(light ? LIGHT_BODY_COL : "#000000", 0.6, 0.45, 0.004)}
                 </mesh>
               </group>
             </group>
@@ -2882,29 +3200,29 @@ function HolographicPedestal() {
         {/* ══ STEPPED RAISED LIP ══ with a lighter rim torus to catch the key light. */}
         <mesh position={[0, (BAND_TOP + LIP_H / 2) * S, 0]}>
           <cylinderGeometry args={[2.05 * S, 2.15 * S, LIP_H * S, 128]} />
-          {metal("#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
+          {metal(light ? LIGHT_BODY_COL : "#0a0a0c", 0.75, 0.25, 0.006, 0.4)}
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, LIP_TOP * S, 0]}>
           <torusGeometry args={[2.05 * S, 0.05 * S, 20, 192]} />
-          {metal("#333333", 0.85, 0.18, 0.04, 1.1)}
+          {metal(light ? LIGHT_BODY_COL : "#333333", 0.85, 0.18, 0.04, 1.1)}
         </mesh>
         {/* true emissive rim line on the same edge — visible from every angle, unlike the
             reflective torus above which only catches a highlight when a light lines up with it */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (LIP_TOP + 0.001) * S, 0]}>
           <torusGeometry args={[2.05 * S, 0.014 * S, 12, 192]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
+          <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.85} toneMapped={false} />
         </mesh>
 
         {/* ══ FLAT RECESSED TOP DECK ══ rougher and less metallic than the lip, so it reads as
             textured concrete-metal rather than polished steel. */}
         <mesh position={[0, (DECK_TOP - DECK_H / 2) * S, 0]}>
           <cylinderGeometry args={[1.9 * S, 1.9 * S, DECK_H * S, 128]} />
-          {metal("#141416", 0.6, 0.45, 0.02)}
+          {metal(light ? LIGHT_BODY_COL : "#141416", 0.6, 0.45, 0.02)}
         </mesh>
         {/* thin dark inset ring separating the deck from the lip */}
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, DECK_TOP * S, 0]}>
           <torusGeometry args={[1.93 * S, 0.025 * S, 12, 192]} />
-          {metal("#000000", 0.65, 0.4, 0.006)}
+          {metal(light ? LIGHT_BODY_COL : "#000000", 0.65, 0.4, 0.006)}
         </mesh>
 
         {/* ══ TOP RIM GLOW — bright neon spec ══ tube 0.035, emissiveIntensity 4, bloom tube
@@ -2917,11 +3235,11 @@ function HolographicPedestal() {
             The flat torus sits on top as the crisp top edge of that wall. */}
         <mesh position={[0, (DECK_TOP + 0.012 + 0.03) * S, 0]}>
           <cylinderGeometry args={[1.9 * 0.9 * S, 1.9 * 0.9 * S, 0.06 * S, 128, 1, true]} />
-          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
+          <meshStandardMaterial ref={(m) => { if (m) accentRefs.current[2] = m; }} color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} side={THREE.DoubleSide} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]}>
           <torusGeometry args={[1.9 * 0.9 * S, 0.035 * S, 12, 256]} />
-          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} toneMapped={false} />
+          <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={4} metalness={0} roughness={1} transparent opacity={0.95} toneMapped={false} />
         </mesh>
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, (DECK_TOP + 0.012) * S, 0]} renderOrder={1}>
           <torusGeometry args={[1.9 * 0.9 * S, 0.15 * S, 12, 192]} />
@@ -2992,7 +3310,7 @@ function HolographicPedestal() {
             <group key={i} rotation={[0, -(a + STEP / 2), 0]}>
               <mesh position={[2.31 * S, PANEL_CY * S, 0]}>
                 <boxGeometry args={[0.012 * S, PANEL_H * 0.92 * S, 0.02 * S]} />
-                <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.7} toneMapped={false} />
+                <meshStandardMaterial color={light ? LIGHT_BODY_COL : "#ffffff"} emissive={light ? LIGHT_EMISSIVE : "#ffffff"} emissiveIntensity={2} metalness={0} roughness={1} transparent opacity={0.7} toneMapped={false} />
               </mesh>
             </group>
           );
@@ -3035,7 +3353,7 @@ function HolographicPedestal() {
           would just stack into one thicker set of bars.
           depthWrite/depthTest stay false, and blending stays additive, so this cannot
           reintroduce the dark-oval veil. */}
-      {([[0.45, 0.70, 0.20, 0.0], [0.70, 1.00, 0.13, 0.9], [0.95, 1.30, 0.085, 1.9], [1.20, 1.60, 0.05, 2.7]] as [number, number, number, number][]).map(
+      {SHOW_STREAKY_BEAM && ([[0.45, 0.70, 0.20, 0.0], [0.70, 1.00, 0.13, 0.9], [0.95, 1.30, 0.085, 1.9], [1.20, 1.60, 0.05, 2.7]] as [number, number, number, number][]).map(
         ([rBot, rTop, op, rot], i) => (
           <mesh
             key={i}
@@ -3145,10 +3463,13 @@ function BloomZoomFade({ bloomRef }: { bloomRef: React.RefObject<BloomEffectRef 
   return null;
 }
 
-function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
+function BrainScene({ selected, onHotspotSelect, onHotspotHover, light }: {
   selected: Project | null;
   onHotspotSelect: (p: Project) => void;
-  onHotspotHover: (name: string | null, x: number, y: number) => void;
+  onHotspotHover: (index: number | null) => void;
+  // React context does not cross into the R3F reconciler, so the theme is
+  // threaded in as a prop from the section rather than read via useTheme here.
+  light: boolean;
 }) {
   const bloomRef = useRef<BloomEffectRef | null>(null);
   return (
@@ -3173,11 +3494,15 @@ function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
       {/* Point light removed — was causing bright centre */}
 
       <CameraController selected={selected} />
-      <Suspense fallback={null}>
-        <BrainModel selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
-      </Suspense>
-      <HolographicPedestal />
-      <HolographicBeam />
+      {/* Static lift, not the earlier hover-driven SceneDrop mechanism — same
+          Y in every state, so it only reframes the shot, never animates. */}
+      <group ref={(g) => { sceneGroupRef.current = g; }} position={[0, camAnim.groupY, 0]}>
+        <Suspense fallback={null}>
+          <BrainModel light={light} selected={selected} onHotspotSelect={onHotspotSelect} onHotspotHover={onHotspotHover} />
+        </Suspense>
+        <HolographicPedestal light={light} />
+        <HolographicBeam light={light} />
+      </group>
 
       {/* Bloom — threshold raised 0.7 -> 0.8 to kill the rotation shimmer. The ambient line
           network is thousands of 1px primitives; those alias sub-pixel as the brain turns no
@@ -3237,14 +3562,14 @@ function BrainScene({ selected, onHotspotSelect, onHotspotHover }: {
 const INK         = "#ffffff";
 const INK_BRIGHT  = "#c8cfd6";
 const INK_MID     = "#8b929b";
-const INK_DIM     = "#5a6472";
+const INK_DIM     = "#888888";
 const INK_LOCKED  = "#3f4754";
 const ROW_IDLE    = "#6b7280";
 const VOID        = "#020008";
 const MONO        = "'JetBrains Mono', monospace";
 
-const PANEL_BORDER = "rgba(255,255,255,0.18)";
-const PANEL_BG     = "rgba(255,255,255,0.012)";
+const PANEL_BORDER = "rgba(255,255,255,0.15)";
+const PANEL_BG     = "rgba(0,0,0,0.6)";
 const BRACKET_COL  = "rgba(255,255,255,0.45)";
 const RULE_STRONG  = "rgba(255,255,255,0.14)";
 const RULE_SOFT    = "rgba(255,255,255,0.1)";
@@ -3255,12 +3580,12 @@ const LEFT_W    = 260;
 // 100vw - READOUT_RIGHT_GAP - READOUT_VW, which stays right of the viewport centre at any
 // realistic width — so the centred brain, and the selected node (which projects to the exact
 // screen centre at full zoom), stay unobscured.
-const READOUT_VW = 35;
+const READOUT_VW = 37;
 // Gap between the panel's right edge and the viewport edge. Deliberately NOT the hero's 8vw
 // gutter used elsewhere in this section: 8vw resolves to ~121px on a 1512px viewport, which
 // left a wide dead band down the right-hand side. A small fixed 24px hugs the edge instead.
 const READOUT_RIGHT_GAP = 24;
-const SHEET_VH   = 72;   // mobile bottom sheet
+const SHEET_VH   = 62;   // compact bottom sheet on tablet and mobile, leaving the brain visible above it.
 // The site navbar is 83px tall, full width, z-index 100 — above this section.
 const NAV_CLEARANCE = 96;
 // Horizontal page gutter. Matches the hero section's `padding: "80px 8vw 0"` exactly, so the
@@ -3310,13 +3635,30 @@ const READOUT_PAD_Y = 40;
 // clipped by the section floor. Nothing further is available at the bottom without changing the
 // section's height or its overflow.
 const READOUT_TOP = 83;
+// Added below the one-screen height so LAUNCH DEMO / VIEW SOURCE and the PREV/NEXT footer get
+// breathing room. The panel grows DOWNWARD (top stays at READOUT_TOP, clear of the navbar), so
+// its last ~90px sit just past the fold; the section is 130vh, so there is room for it.
+const READOUT_EXTRA_H = 89.552;
+// Fixed panel height. The box used to shrink-wrap its content (`height: auto`), so each of the
+// five projects produced a DIFFERENT box height — a short description gave a stubby panel, a long
+// one a tall panel, and the bottom border jumped on every PREV/NEXT. One literal value, applied as
+// height AND min-height AND max-height, pins all five to the same box; the body region
+// (`flex: 0 1 auto; overflow-y: auto`) absorbs the difference by scrolling when content is longer
+// and simply leaves slack when it is shorter.
+const READOUT_HEIGHT = "90vh";
+// Pushes the whole box further down the page. Applied ONLY to `top`, never to the height
+// formula above — that stays keyed to the bare READOUT_TOP, so moving the panel down slides it
+// without resizing it.
+const READOUT_TOP_OFFSET = 50;
 // Extra top padding inside the panel, above the standard vertical padding.
-const READOUT_PAD_TOP = 48;
+const READOUT_PAD_TOP = 24;
+// Below 1024px the side archive is removed. Laptop and desktop retain the archive;
+// tablet and phone use the uncluttered centred brain stage.
 const NARROW_QUERY  = "(max-width: 1023px)";
 const SLIDE_MS      = 320;
 
 function useNarrowLayout() {
-  const [narrow, setNarrow] = useState(false);
+  const [narrow, setNarrow] = useState(typeof window !== "undefined" && window.matchMedia(NARROW_QUERY).matches);
   useEffect(() => {
     const mql = window.matchMedia(NARROW_QUERY);
     const onChange = () => setNarrow(mql.matches);
@@ -3325,6 +3667,12 @@ function useNarrowLayout() {
     return () => mql.removeEventListener("change", onChange);
   }, []);
   return narrow;
+}
+
+// Every selected-project view uses an edge-aligned column. On phones the CSS turns this
+// into a compact right drawer rather than a centred bottom sheet, so the brain remains visible.
+function useSheetLayout() {
+  return false;
 }
 
 // ─── Corner bracket accent ────────────────────────────────────────────────────
@@ -3347,14 +3695,14 @@ function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL }: {
     ...(isLeft ? { left: 0 } : { right: 0 }),
     ...(isTop  ? { top: 0 }  : { bottom: 0 }),
   };
-  return <div style={box}><div style={h} /><div style={v} /></div>;
+  return <div style={box}><div className="brain-bracket-arm" style={h} /><div className="brain-bracket-arm" style={v} /></div>;
 }
 
-function Panel({ arm, style, children }: {
-  arm: number; style?: React.CSSProperties; children: React.ReactNode;
+function Panel({ arm, style, children, className }: {
+  arm: number; style?: React.CSSProperties; children: React.ReactNode; className?: string;
 }) {
   return (
-    <div style={{
+    <div className={`brain-panel${className ? ` ${className}` : ""}`} style={{
       position: "relative", boxSizing: "border-box",
       border: `1px solid ${PANEL_BORDER}`, borderRadius: 4, background: PANEL_BG,
       ...style,
@@ -3371,17 +3719,17 @@ function Panel({ arm, style, children }: {
 function RuledLabel({ text, style }: { text: string; style?: React.CSSProperties }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, ...style }}>
-      <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, whiteSpace: "nowrap" }}>
+      <span className="brain-ruled-label" style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, whiteSpace: "nowrap" }}>
         {text}
       </span>
-      <span style={{ flex: 1, height: 1, background: RULE_STRONG }} />
+      <span className="brain-rule" style={{ flex: 1, height: 1, background: RULE_STRONG }} />
     </div>
   );
 }
 
 function FieldLabel({ text }: { text: string }) {
   return (
-    <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, display: "block" }}>
+    <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 9, letterSpacing: "0.16em", color: INK_DIM, display: "block" }}>
       {text}
     </span>
   );
@@ -3399,15 +3747,15 @@ function NodeRow({ name, active, onSelect }: { name: string; active: boolean; on
       onMouseLeave={() => setHover(false)}
       style={{ height: 30, display: "flex", alignItems: "center", gap: 14, cursor: inert ? "default" : "pointer" }}
     >
-      <span style={{
+      <span className="brain-checkbox" style={{
         width: 11, height: 11, flexShrink: 0, boxSizing: "border-box",
-        background: active ? INK : "transparent",
+        background: active ? "var(--brain-ink)" : "transparent",
         border: active ? "none" : `1px solid ${lit ? "rgba(255,255,255,0.6)" : "rgba(255,255,255,0.3)"}`,
         transition: "border-color 0.15s ease",
       }} />
-      <span style={{
+      <span className="brain-text" style={{
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em",
-        color: active ? INK : lit ? INK_BRIGHT : ROW_IDLE,
+        color: active ? INK : lit ? INK_BRIGHT : "#777777",
         transition: "color 0.15s ease",
       }}>
         {name}
@@ -3422,14 +3770,14 @@ function LockedRow({ name }: { name: string }) {
       {/* Padlock drawn into the same 11px slot the checkboxes occupy, so both lists keep the
           same left rhythm: a shackle arc sitting on a solid body block. */}
       <span style={{ width: 11, height: 11, flexShrink: 0, position: "relative", display: "block" }}>
-        <span style={{
+        <span className="brain-lock-arc" style={{
           position: "absolute", left: 2.5, top: 0, width: 6, height: 5, boxSizing: "border-box",
           border: `1px solid ${INK_LOCKED}`, borderBottom: "none",
           borderTopLeftRadius: 3, borderTopRightRadius: 3,
         }} />
-        <span style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
+        <span className="brain-lock-body" style={{ position: "absolute", left: 0, bottom: 0, width: 11, height: 6, background: INK_LOCKED }} />
       </span>
-      <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK_LOCKED }}>{name}</span>
+      <span className="brain-dim" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: "#666666" }}>{name}</span>
     </div>
   );
 }
@@ -3439,16 +3787,16 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
   selectedId: number | null; onSelect: (id: number) => void; arm: number; style?: React.CSSProperties;
 }) {
   return (
-    <Panel arm={arm} style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
+    <Panel arm={arm} className="brain-panel-left" style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-        <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
+        <span className="brain-text" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
           SYS_03 // NEURAL_ARCHIVE
         </span>
-        <span style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
+        <span className="brain-dot" style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
       </div>
-      <div style={{ height: 1, background: RULE_STRONG, marginTop: 14 }} />
+      <div className="brain-rule" style={{ height: 1, background: RULE_STRONG, marginTop: 14 }} />
 
-      <RuledLabel text={`ACTIVE NODES [${ACTIVE_PROJECTS.length}/${PROJECTS.length}]`} style={{ marginTop: 20 }} />
+      <RuledLabel text={`ACTIVE NEURONS [${ACTIVE_PROJECTS.length}/${PROJECTS.length}]`} style={{ marginTop: 20 }} />
       <div style={{ marginTop: 4 }}>
         {PROJECTS.map((p) => (
           <NodeRow
@@ -3460,7 +3808,7 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
         ))}
       </div>
 
-      <RuledLabel text={`CLASSIFIED NODES [${CLASSIFIED_NODES.length}]`} style={{ marginTop: 22 }} />
+      <RuledLabel text={`CLASSIFIED NEURONS [${CLASSIFIED_NODES.length}]`} style={{ marginTop: 22 }} />
       <div style={{ marginTop: 4 }}>
         {CLASSIFIED_NODES.map((n) => <LockedRow key={n} name={n} />)}
       </div>
@@ -3471,7 +3819,7 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
 // ─── Mobile node chips (horizontal scroller above the brain) ──────────────────
 function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSelect: (id: number) => void }) {
   return (
-    <div style={{
+    <div className="brain-node-chip-row" style={{
       display: "flex", gap: 8, overflowX: "auto", padding: "0 16px 2px",
       WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
     }}>
@@ -3510,25 +3858,79 @@ function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSe
 // ─── Readout pieces ───────────────────────────────────────────────────────────
 const PROGRESS_SEGMENTS = 34;
 
+// 11s fill + the 10% hold that PROGRESS_FILL_FRAC carves out of the cycle = 12222ms round trip.
+const PROGRESS_CYCLE_MS = 12222;
+// Fraction of each cycle spent filling; the remainder holds at full before snapping back to 0.
+// Mirrors the 0%/90%/100% keyframe shape — 1.8s fill, 0.2s hold.
+const PROGRESS_FILL_FRAC = 0.9;
+const SEGMENT_OFF = "rgba(255,255,255,0.1)";
+
 function SegmentedProgress({ pct }: { pct: number }) {
-  const filled = Math.round((pct / 100) * PROGRESS_SEGMENTS);
+  // Loops 0 -> 100 -> 0 for as long as a project is on screen. Two deliberate choices:
+  //
+  // rAF rather than CSS @keyframes, because the track is discrete spans with no animatable
+  // width, and the % readout has to land on each integer in step with the segments.
+  //
+  // Refs rather than state, because this never stops: setState per frame would re-render and
+  // reconcile 34 spans 60 times a second for the whole time the panel is open, competing with
+  // the Three.js scene. Mutating style.background directly skips React entirely.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const labelRef = useRef<HTMLSpanElement>(null);
+
+  // Keyed on pct so a new project restarts the cycle from zero. The parent content div is also
+  // keyed by project.id and remounts, which restarts it too — this covers both paths.
+  useEffect(() => {
+    let raf = 0;
+    let start = 0;
+    let lastFilled = -1;
+    let lastLabel = -1;
+    const tick = (now: number) => {
+      if (!start) start = now;
+      const phase = ((now - start) % PROGRESS_CYCLE_MS) / PROGRESS_CYCLE_MS;
+      const t = Math.min(phase / PROGRESS_FILL_FRAC, 1);
+      const v = 100 * (1 - Math.pow(1 - t, 3));   // ease-out cubic
+
+      const filled = Math.round((v / 100) * PROGRESS_SEGMENTS);
+      const track = trackRef.current;
+      if (track && filled !== lastFilled) {
+        // Only the segments that actually flipped are touched, so a steady frame writes nothing.
+        const lo = Math.min(filled, lastFilled < 0 ? 0 : lastFilled);
+        const hi = Math.max(filled, lastFilled);
+        for (let i = lo; i < hi && i < track.children.length; i++) {
+          (track.children[i] as HTMLElement).style.background = i < filled ? "var(--brain-seg-on)" : "var(--brain-seg-off)";
+        }
+        lastFilled = filled;
+      }
+
+      const label = Math.round(v);
+      if (labelRef.current && label !== lastLabel) {
+        labelRef.current.textContent = `${label}%`;
+        lastLabel = label;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [pct]);
+
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div style={{
+      <div ref={trackRef} className="brain-progress-track" style={{
         flex: 1, minWidth: 0, height: 18, boxSizing: "border-box",
         border: "1px solid rgba(255,255,255,0.25)", borderRadius: 2,
         display: "flex", alignItems: "center", gap: 2, padding: "0 3px",
       }}>
         {/* Segments flex to fill the track — at a fixed 3px they only reach part-way across
-            the panel, so a "full" bar would never actually look full. */}
+            the panel, so a "full" bar would never actually look full. Rendered empty; the rAF
+            loop above owns their background from the first frame onward. */}
         {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => (
           <span key={i} style={{
             flex: "1 1 0", minWidth: 0, height: 10,
-            background: i < filled ? INK : "rgba(255,255,255,0.1)",
+            background: "var(--brain-seg-off)",
           }} />
         ))}
       </div>
-      <span style={{ fontFamily: MONO, fontSize: 10, color: INK_MID, whiteSpace: "nowrap" }}>{pct}%</span>
+      <span ref={labelRef} className="brain-pct" style={{ fontFamily: MONO, fontSize: 10, color: "#aaaaaa", whiteSpace: "nowrap" }}>0%</span>
     </div>
   );
 }
@@ -3543,7 +3945,7 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
   return (
     // Height-driven rather than width-driven, so capping the height shrinks the block while
     // aspect-ratio keeps it at 16:9 (a width-driven box would just get squashed instead).
-    <div style={{
+    <div className="brain-preview" style={{
       position: "relative", height: maxHeight, width: "auto", maxWidth: "100%",
       marginInline: "auto", aspectRatio: "16 / 9",
       border: `1px solid ${PANEL_BORDER}`, borderRadius: 3, overflow: "hidden",
@@ -3552,7 +3954,7 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
     }}>
       {src
         ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <span style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
+        : <span className="brain-nosignal" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
       <CornerBracket pos="tl" arm={arm} inset={4} />
       <CornerBracket pos="tr" arm={arm} inset={4} />
       <CornerBracket pos="bl" arm={arm} inset={4} />
@@ -3562,19 +3964,25 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
 }
 
 // Shared bracket-button treatment. `compact` is the smaller BACK variant.
-function BracketButton({ href, label, onClick, compact }: {
-  href?: string; label: string; onClick?: () => void; compact?: boolean;
+// `half` makes the button an equal-width flex item so a pair fills one row; `icon` swaps the
+// text label for arbitrary content, which inherits `color` and so follows the same hover invert.
+function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel, idleColor }: {
+  href?: string; label?: string; onClick?: () => void; compact?: boolean;
+  icon?: React.ReactNode; half?: boolean; ariaLabel?: string; idleColor?: string;
 }) {
   const [hover, setHover] = useState(false);
   const style: React.CSSProperties = {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
     boxSizing: "border-box", cursor: "pointer",
     height: compact ? 34 : 52,
-    width: compact ? "fit-content" : "100%",
+    width: compact ? "fit-content" : half ? "auto" : "100%",
+    // 1 1 0 rather than 1 1 auto: a zero basis makes the pair split the row evenly regardless of
+    // how wide their labels are, so DEMO and the icon land on exactly half each.
+    flex: half ? "1 1 0" : undefined,
     padding: compact ? "0 16px" : undefined,
     border: "1px solid rgba(255,255,255,0.3)", borderRadius: 3,
     background: hover ? INK : "transparent",
-    color: hover ? VOID : INK,
+    color: hover ? VOID : (idleColor ?? INK),
     fontFamily: MONO, fontSize: compact ? 10 : 12, letterSpacing: "0.14em",
     textDecoration: "none", transition: "background 0.15s ease, color 0.15s ease",
   };
@@ -3582,9 +3990,19 @@ function BracketButton({ href, label, onClick, compact }: {
     onMouseEnter: () => setHover(true),
     onMouseLeave: () => setHover(false),
   };
+  const body = icon ?? label;
+  const cls = `brain-btn${hover ? " is-hover" : ""}`;
   return href
-    ? <a href={href} target="_blank" rel="noreferrer" style={style} {...handlers}>{label}</a>
-    : <button onClick={onClick} style={style} {...handlers}>{label}</button>;
+    ? <a href={href} target="_blank" rel="noreferrer" aria-label={ariaLabel} className={cls} style={style} {...handlers}>{body}</a>
+    : <button onClick={onClick} aria-label={ariaLabel} className={cls} style={style} {...handlers}>{body}</button>;
+}
+
+function GithubMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
+      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" />
+    </svg>
+  );
 }
 
 function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
@@ -3594,10 +4012,11 @@ function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
       onClick={onClick}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      className="brain-navlink"
       style={{
         background: "transparent", border: "none", padding: 0, cursor: "pointer",
         fontFamily: MONO, fontSize: 11, letterSpacing: "0.14em",
-        color: hover ? INK : INK_MID, transition: "color 0.15s ease",
+        color: hover ? INK : "#888888", transition: "color 0.15s ease",
       }}
     >
       {label}
@@ -3606,81 +4025,99 @@ function NavLink({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 // ─── Right panel — project readout ────────────────────────────────────────────
-function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, narrow }: {
+function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, sheet }: {
   project: Project; position: number; total: number;
   onPrev: () => void; onNext: () => void; onBack: () => void;
-  arm: number; narrow: boolean;
+  arm: number; sheet: boolean;
 }) {
   const pct = Math.round(((position + 1) / total) * 100);
-  const padX = narrow ? 24 : READOUT_PAD_X;
-  const padY = narrow ? 24 : READOUT_PAD_Y;
-  const padTop = narrow ? 24 : READOUT_PAD_TOP;
+  const padX = sheet ? 24 : READOUT_PAD_X;
+  const padY = sheet ? 24 : READOUT_PAD_Y;
+  // Breathing room between the PREV/NEXT row and the panel's bottom border and corner brackets.
+  // Because the desktop panel shrink-wraps its content, this padding IS the panel's extra height
+  // — the box grows by exactly this much. The mobile sheet keeps its own padY instead: it is
+  // anchored to the screen edge, so its padding does not affect its height.
+  const padBottom = sheet ? padY : 50.47;
+  const padTop = sheet ? 24 : READOUT_PAD_TOP;
   // Width the title has to fit inside: the panel minus its border and horizontal padding. The
-  // desktop panel is READOUT_VW of the viewport, so this is resolved from the live viewport
-  // width.
+  // desktop/tablet column panel is READOUT_VW of the viewport, so this is resolved from the live
+  // viewport width. Only the mobile sheet (<768px) measures against the full window width.
   const [avail, setAvail] = useState(360);
   useEffect(() => {
     const measure = () => {
-      const w = narrow ? window.innerWidth : (window.innerWidth * READOUT_VW) / 100;
+      const phoneDrawer = window.innerWidth < 768;
+      const w = sheet || phoneDrawer ? window.innerWidth * (phoneDrawer ? 0.82 : 1) : (window.innerWidth * READOUT_VW) / 100;
       setAvail(Math.max(160, w - padX * 2 - 2));
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [narrow, padX]);
+  }, [sheet, padX]);
 
   return (
-    <motion.div
-      initial={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
-      animate={narrow ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-      exit={narrow ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      <motion.div
+      className={`brain-readout ${sheet ? "is-sheet" : "is-column"}`}
+      initial={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
+      animate={sheet ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+      exit={sheet ? { y: 40, opacity: 0 } : { x: 40, opacity: 0 }}
       transition={{ duration: SLIDE_MS / 1000, ease: "easeOut" }}
       style={{
-        position: "absolute", zIndex: 20,
-        ...(narrow
+        position: sheet ? "fixed" : "absolute", zIndex: 20,
+        ...(sheet
           ? { left: 0, right: 0, bottom: 0, height: `${SHEET_VH}vh` }
           // Full-height column rather than a vertically-centred block. The top stops at
           // READOUT_TOP rather than 0: the site navbar is fixed, full width and z-index 100,
           // so it sits ABOVE this section — a panel starting at 0 would have its top border
           // and both top corner brackets hidden behind the navbar, and the [ BACK ] button
-          // with it. Flush to the section's bottom edge.
-          : { top: READOUT_TOP, bottom: 0, right: READOUT_RIGHT_GAP, width: `${READOUT_VW}vw` }),
+          // with it. Height is the fixed READOUT_HEIGHT rather than shrink-wrapped, so the box
+          // is identical for all five projects instead of tracking each one's content length.
+          // Now also the tablet (768-1023px) branch, not just desktop: READOUT_VW/READOUT_RIGHT_GAP
+          // are viewport-relative already, so this column just renders narrower on tablet instead
+          // of switching to the full-width sheet.
+          : { top: READOUT_TOP + READOUT_TOP_OFFSET, height: READOUT_HEIGHT, right: READOUT_RIGHT_GAP, width: `${READOUT_VW}vw` }),
       }}
     >
       <Panel
         arm={arm}
         style={{
-          height: "100%", width: "100%",
-          padding: `${padTop}px ${padX}px ${padY}px`,
+          // Desktop/tablet column is pinned to READOUT_HEIGHT on all three height properties so
+          // every project gets the same box; past that the body scrolls. The mobile sheet keeps
+          // its fixed SHEET_VH box, so it still fills its parent.
+          height: sheet ? "100%" : READOUT_HEIGHT,
+          minHeight: sheet ? "100%" : READOUT_HEIGHT,
+          maxHeight: sheet ? "100%" : READOUT_HEIGHT,
+          width: "100%",
+          padding: `${padTop}px ${padX}px ${padBottom}px`,
           display: "flex", flexDirection: "column", overflow: "hidden",
-          background: "rgba(2,0,8,0.72)", backdropFilter: "blur(6px)",
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
         }}
       >
         <div style={{ marginBottom: 24, flexShrink: 0 }}>
-          <BracketButton label="[ BACK ]" onClick={onBack} compact />
+          <BracketButton label="[ BACK ]" onClick={onBack} compact idleColor="#cccccc" />
         </div>
 
-        {/* Content cross-fades on its own (140ms out, 140ms in) while the camera keeps
-            travelling, so the text swaps mid-sweep rather than at the start of it. The exit is
-            held back by CONTENT_DELAY_S so the pair straddles the zoom-out leg's midpoint — the
-            top of the arc, where the camera is furthest out — instead of firing on the click.
-            mode="wait" means the incoming copy mounts only once the outgoing one has gone, so
-            these run strictly in sequence. A first selection has nothing to exit and so fades
-            straight in, undelayed. */}
-        <AnimatePresence mode="wait">
+        {/* Content swaps INSTANTLY on click, deliberately decoupled from the camera.
+            Deliberately NOT wrapped in <AnimatePresence mode="wait">: that holds the incoming
+            copy back until the outgoing one has finished exiting, and with the exit delayed to
+            sit mid-camera-move it meant the new text did not appear for ~1.5s after the click.
+            Keying this div on project.id remounts it the moment state changes, so React renders
+            the new title/description/tech/progress in the same commit as the click; `initial`
+            then runs a short fade-in purely for polish. Nothing here reads any camera timing. */}
           <motion.div
             key={project.id}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1, transition: { duration: CONTENT_FADE_S } }}
-            exit={{ opacity: 0, transition: { duration: CONTENT_FADE_S, delay: CONTENT_DELAY_S } }}
             className="readout-body"
-            style={{ flex: 1, minHeight: 0, overflowY: "auto" }}
+            // `0 1 auto`, not `1`: growing absorbed all the panel's spare height and pinned the
+            // PREV/NEXT footer to the bottom edge, leaving a large gap under VIEW SOURCE. Shrink
+            // and minHeight:0 are kept so long descriptions still scroll inside the panel.
+            style={{ flex: "0 1 auto", minHeight: 0, overflowY: "auto" }}
           >
             <SegmentedProgress pct={pct} />
 
-            <h3 style={{
+            <h3 className="brain-title" style={{
               margin: "20px 0 0", fontFamily: MONO, fontWeight: 700,
-              fontSize: titleSize(project.name, narrow ? 26 : 44, avail),
+              fontSize: titleSize(project.name, sheet ? 26 : 44, avail),
               color: INK, letterSpacing: "0.02em", lineHeight: 1.1, whiteSpace: "nowrap",
             }}>
               {project.name}
@@ -3689,33 +4126,32 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="PREVIEW //" />
               <div style={{ marginTop: 10 }}>
-                <PreviewFrame src={project.preview} arm={narrow ? 8 : 12} maxHeight={narrow ? 170 : 150} />
+                <PreviewFrame src={project.preview} arm={sheet ? 8 : 12} maxHeight={sheet ? 170 : 150} />
               </div>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="DESCRIPTION:" />
-              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: "#cccccc", lineHeight: 1.75 }}>
                 {project.desc}
               </p>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="TECH_STACK:" />
-              <p style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: INK_MID, lineHeight: 1.75 }}>
+              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: "#aaaaaa", lineHeight: 1.75 }}>
                 {project.tech.join(", ")}
               </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 22 }}>
-              <BracketButton href={project.demo} label="[ LAUNCH DEMO ]" />
-              <BracketButton href={project.github} label="[ VIEW SOURCE ]" />
+            <div style={{ display: "flex", flexDirection: "row", gap: 8, marginTop: 22 }}>
+              <BracketButton href={project.demo} label="DEMO" half />
+              <BracketButton href={project.github} icon={<GithubMark />} half ariaLabel="View source on GitHub" />
             </div>
           </motion.div>
-        </AnimatePresence>
 
-        <div style={{ paddingTop: 20, flexShrink: 0 }}>
-          <div style={{ height: 1, background: RULE_SOFT }} />
+        <div style={{ paddingTop: 50, flexShrink: 0 }}>
+          <div className="brain-rule" style={{ height: 1, background: RULE_SOFT }} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
             <NavLink label="‹ PREV" onClick={onPrev} />
             <NavLink label="NEXT ›" onClick={onNext} />
@@ -3727,24 +4163,85 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, n
 }
 
 // ─── Cursor-following node tooltip ────────────────────────────────────────────
-function NodeTooltip({ name, x, y }: { name: string; x: number; y: number }) {
+// The four L-shaped reticle corners of the hover label, each two borders of an 8x8 box. Hoisted
+// out of the component so the style objects are built once rather than on every render.
+const TOOLTIP_CORNER_RULE = "1.5px solid #ffffff";
+const TOOLTIP_CORNERS: { key: string; css: React.CSSProperties }[] = [
+  { key: "tl", css: { top: -1, left: -1, borderTop: TOOLTIP_CORNER_RULE, borderLeft: TOOLTIP_CORNER_RULE } },
+  { key: "tr", css: { top: -1, right: -1, borderTop: TOOLTIP_CORNER_RULE, borderRight: TOOLTIP_CORNER_RULE } },
+  { key: "bl", css: { bottom: -1, left: -1, borderBottom: TOOLTIP_CORNER_RULE, borderLeft: TOOLTIP_CORNER_RULE } },
+  { key: "br", css: { bottom: -1, right: -1, borderBottom: TOOLTIP_CORNER_RULE, borderRight: TOOLTIP_CORNER_RULE } },
+];
+
+function NodeTooltip({ name }: { name: string }) {
   return (
     <motion.div
+      // Outer element is the whole callout — box stacked over its leader line. Its bottom centre
+      // is pinned to the node every frame by CameraController (see the anchor block there), so
+      // the two always move together and the line always lands on the marker.
+      ref={(el) => {
+        tooltipElRef.current = el;
+        // Apply the last known position immediately on mount, so a recreated element never
+        // paints at the off-screen default for a frame.
+        if (el) { el.style.left = `${tooltipPos.x}px`; el.style.top = `${tooltipPos.y}px`; }
+      }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.12 }}
       style={{
-        position: "fixed", left: x + 16, top: y + 16, zIndex: 60, pointerEvents: "none",
-        background: "transparent", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 2,
-        padding: "6px 12px",
-        fontFamily: MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase",
-        color: INK, whiteSpace: "nowrap",
+        position: "fixed", zIndex: 60, pointerEvents: "none",
+        // left/top are deliberately ABSENT here and set only imperatively (ref callback + the
+        // frame loop). Listing them in the style prop would let any re-render write the stale
+        // React-side value back over the live one.
+        // `transition: none` guarantees no inherited rule can ease left/top and turn an instant
+        // reposition into a visible settle.
+        transition: "none",
+        display: "flex", flexDirection: "column", alignItems: "center",
       }}
     >
-      <CornerBracket pos="tl" arm={8} inset={-1} color="rgba(255,255,255,0.5)" />
-      <CornerBracket pos="br" arm={8} inset={-1} color="rgba(255,255,255,0.5)" />
-      {name}
+      {/* The label box */}
+      <div
+        className="brain-tip"
+        style={{
+          position: "relative",
+          // Near-opaque dark fill rather than a tint: the label can land over the bright brain
+          // surface, a glowing node or the starfield, and a translucent background left the text
+          // fighting whatever was behind it. Solid ground plus a full-white hairline means the
+          // contrast is the same wherever it appears.
+          background: "rgba(10,12,16,0.92)", border: "1px solid #ffffff",
+          borderRadius: 2,
+          padding: "8px 14px",
+          fontFamily: MONO, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          // nowrap keeps it a single line whatever the project name's length — the callout is
+          // measured every frame to centre it, so it must not reflow.
+          color: "#ffffff", whiteSpace: "nowrap",
+        }}
+      >
+        {/* Reticle corners on all four corners. Written locally rather than with the shared
+            <CornerBracket>: that component draws a 1px arm and is used by the readout and index
+            panels, so thickening it there to get the heavier 1.5px reticle wanted here would
+            have changed the panels too. The box above is position:relative, which is what these
+            anchor against. */}
+        {TOOLTIP_CORNERS.map(({ key, css }) => (
+          <span
+            key={key}
+            className="brain-tip-corner"
+            style={{ position: "absolute", width: 8, height: 8, pointerEvents: "none", ...css }}
+          />
+        ))}
+        {name}
+      </div>
+
+      {/* Leader line — drops from the box's bottom centre onto the node it labels. Sits below
+          the box in the same column, so centring the column centres the line on the marker. */}
+      <div
+        style={{
+          width: 1, height: TOOLTIP_LEADER_H,
+          background: "rgba(255,255,255,0.7)",
+        }}
+      />
     </motion.div>
   );
 }
@@ -3752,12 +4249,36 @@ function NodeTooltip({ name, x, y }: { name: string; x: number; y: number }) {
 // ─── Main Export ──────────────────────────────────────────────────────────────
 export default function ProjectsSection() {
   const narrow = useNarrowLayout();
+  const sheet = useSheetLayout();
+  // Read here, OUTSIDE the Canvas, and passed down as a prop: React context does
+  // not cross the react-three-fiber reconciler boundary.
+  const isLight = useTheme().theme === "light";
   // null = default state: no readout panel, camera at the external shot.
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [tip, setTip] = useState<{ name: string; x: number; y: number } | null>(null);
+  const [tip, setTip] = useState<{ name: string } | null>(null);
 
   const project = selectedId === null ? null : PROJECTS[selectedId];
   const position = selectedId === null ? -1 : ACTIVE_PROJECTS.findIndex((p) => p.id === selectedId);
+
+  // Brain canvas fade-in when the projects section scrolls into view.
+  const sectionRootRef = useRef<HTMLElement>(null);
+  const canvasWrapperRef = useRef<HTMLDivElement>(null);
+  const [brainVisible, setBrainVisible] = useState(false);
+  useEffect(() => {
+    const el = sectionRootRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setBrainVisible(true);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.2 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const step = useCallback((delta: number) => {
     setSelectedId((cur) => {
@@ -3770,11 +4291,21 @@ export default function ProjectsSection() {
   }, []);
   const prev = useCallback(() => step(-1), [step]);
   const next = useCallback(() => step(1), [step]);
-  const back = useCallback(() => { setSelectedId(null); setTip(null); }, []);
+  const back = useCallback(() => { setSelectedId(null); hoveredNode.index = null; setTip(null); }, []);
 
   const handleHotspot = useCallback((p: Project) => setSelectedId(p.id), []);
-  const handleHover = useCallback((name: string | null, x: number, y: number) => {
-    setTip(name ? { name, x, y } : null);
+  const handleHover = useCallback((index: number | null) => {
+    // Ignore repeats for the node already hovered. R3F re-dispatches pointerover as the cursor
+    // crosses a node's overlapping meshes — the outer glow spheres are r=0.092 (0.115 when the
+    // marker scales up on hover) against the r=0.057 hitbox, so the intersection set changes
+    // constantly while the cursor moves over one node. Each fire previously built a fresh
+    // { name } object, re-rendering the panel and, when it briefly toggled through null,
+    // remounting the tooltip via AnimatePresence — which restored its off-screen default
+    // position and restarted the fade. That is what read as the label twitching with the cursor.
+    if (hoveredNode.index === index) return;
+    hoveredNode.index = index;
+    hoveredNode.place = true;
+    setTip(index === null ? null : { name: PROJECTS[index].name });
   }, []);
 
   useEffect(() => {
@@ -3791,11 +4322,19 @@ export default function ProjectsSection() {
   const open = project !== null;
 
   return (
-    <section id="projects" style={{
+    <section id="projects" className={`projects-section${open ? " is-project-open" : ""}`} ref={sectionRootRef as React.RefObject<HTMLElement>} style={{
       // Transparent, not the palette's #020008, so the page starfield still reads through
       // the near-transparent panels and behind the free-floating brain.
       background: BG, position: "relative",
-      height: "100vh", overflow: "hidden",
+      // min-height:100vh set unconditionally, on all sizes. Desktop's own
+      // height:115vh already exceeds 100vh, so this doesn't change desktop's
+      // rendered size at all. Mobile/tablet: no fixed 115vh + 96px top/bottom
+      // padding on top of that — that combination left ~15vh of empty space
+      // below the canvas, so narrow gets nothing beyond the 100vh minimum.
+      minHeight: "100vh",
+      ...(narrow
+        ? { overflow: "visible" }
+        : { height: "115vh", overflow: "hidden", paddingTop: "96px", paddingBottom: "96px" }),
     }}>
       {/* The readout body scrolls when its content exceeds the shortened panel, but the
           scrollbar itself stays hidden — a visible one cuts across the panel border and its
@@ -3804,11 +4343,214 @@ export default function ProjectsSection() {
       <style>{`
         .readout-body { scrollbar-width: none; -ms-overflow-style: none; }
         .readout-body::-webkit-scrollbar { display: none; }
+
+        /* Progress-bar segment colours. Declared as custom properties because the
+           rAF loop writes one string per segment 60x/sec — it stays theme-blind
+           and the cascade resolves the actual colour. */
+        :root { --brain-seg-on: #ffffff; --brain-seg-off: rgba(255,255,255,0.16); --brain-ink: #ffffff; }
+        .light { --brain-seg-on: #000000; --brain-seg-off: rgba(0,0,0,0.15); --brain-ink: #000000; }
+
+        /* ── Light mode ──────────────────────────────────────────────────────
+           Every colour in these panels is an inline style, so overrides need
+           !important. Dark mode keeps the inline value untouched. */
+        .light .brain-panel {
+          background: rgba(255,255,255,0.3) !important;
+          border: 1px solid rgba(0,0,0,0.12) !important;
+          backdrop-filter: blur(10px) !important;
+          -webkit-backdrop-filter: blur(10px) !important;
+        }
+        /* Left panel only — the right readout keeps the 0.3 and blur(10px) above.
+           Fully see-through in BOTH themes: just a hairline border, the corner
+           brackets and the text over the starfield. ThemeContext stamps "dark"
+           or "light" on <html>, so each theme gets its own rule. */
+        .light .brain-section-label { color: #000000 !important; }
+
+        .light .brain-panel-left {
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: 1px solid rgba(0,0,0,0.2) !important;
+        }
+        .dark .brain-panel-left {
+          background: transparent !important;
+          backdrop-filter: none !important;
+          -webkit-backdrop-filter: none !important;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+        }
+
+        /* Brackets are 1px-tall/wide divs coloured by background, not border. */
+        .light .brain-bracket-arm { background: #000000 !important; }
+
+        .light .brain-title    { color: #000000 !important; }
+        .light .brain-text     { color: #000000 !important; }
+        .light .brain-panel > div > .brain-text { font-weight: 600 !important; }
+        .light .brain-body     { color: #111111 !important; }
+        .light .brain-dim      { color: rgba(0,0,0,0.5) !important; }
+        .light .brain-rule     { background: rgba(0,0,0,0.15) !important; }
+        .light .brain-pct      { color: #000000 !important; }
+        .light .brain-navlink  { color: #000000 !important; }
+
+        .light .brain-progress-track { border-color: rgba(0,0,0,0.25) !important; }
+
+        /* Buttons keep their hover invert: is-hover is set by the component, so
+           the resting and hovered states stay distinct under !important. */
+        .light .brain-btn {
+          background: transparent !important;
+          border: 1px solid rgba(0,0,0,0.3) !important;
+          color: #000000 !important;
+        }
+        .light .brain-btn.is-hover {
+          background: #000000 !important;
+          color: #ffffff !important;
+        }
+
+        .light .brain-preview {
+          border: 1px solid rgba(0,0,0,0.2) !important;
+          background: rgba(0,0,0,0.05) !important;
+        }
+        .light .brain-nosignal { color: rgba(0,0,0,0.3) !important; }
+
+        /* Colour only — never border-width. Tailwind preflight leaves every side
+           "solid" at width 0, so a width here would fill the box in. */
+        .light .brain-checkbox { border-color: rgba(0,0,0,0.5) !important; }
+
+        /* Hover label. Corners set only two borders each (inline), so the rule
+           touches border-color alone — a width here would fill them into squares. */
+        .light .brain-tip {
+          background: rgba(255,255,255,0.85) !important;
+          border: 1px solid rgba(0,0,0,0.2) !important;
+          color: #000000 !important;
+          backdrop-filter: blur(4px) !important;
+          -webkit-backdrop-filter: blur(4px) !important;
+        }
+        .light .brain-tip-corner { border-color: #000000 !important; }
+        /* Small square beside SYS_03, and the section headings above each list. */
+        .light .brain-dot          { background: #000000 !important; }
+        .light .brain-ruled-label  { color: #000000 !important; }
+        /* Padlock: arc is a border, body is a fill — both follow the dim tone. */
+        .light .brain-lock-arc     { border-color: rgba(0,0,0,0.5) !important; }
+        .light .brain-lock-body    { background: rgba(0,0,0,0.5) !important; }
+
+        /* Ensure R3F's internal canvas always fills the stage. Without this rule the canvas
+           can retain its intrinsic 300×150 size after a viewport resize, causing the rendered
+           brain to appear offset and clipped inside a correctly sized wrapper. */
+        #projects .brain-canvas-wrapper canvas {
+          display: block !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+
+        /* Responsive Projects stage. The narrow layout uses one deliberately centred
+           100vw canvas stage. This avoids the earlier conflict between absolute inset positioning
+           and a responsive height, which made the renderer appear to drift right on resize. */
+        /* Keep one continuous scale model across laptop and tablet widths. The previous
+           0.9 scale at the breakpoint caused the visible brain-size jump during resizing. */
+        #projects .brain-canvas-wrapper {
+          transition: left 1500ms cubic-bezier(.22,.61,.36,1), transform 1500ms cubic-bezier(.22,.61,.36,1), width 420ms ease-out, height 420ms ease-out !important;
+        }
+        /* Tablet and phone: no archive box and no chip bar above the brain. The default
+           scene remains centred; only an open tablet project shifts the stage left to make
+           room for the expanded right-side readout. */
+        @media (max-width: 1023px) {
+          #projects.projects-section {
+            height: 100svh !important;
+            min-height: max(100svh, 760px) !important;
+          }
+          #projects .brain-canvas-wrapper {
+            top: clamp(116px, 12svh, 156px) !important;
+            right: auto !important;
+            bottom: auto !important;
+            left: 50% !important;
+            width: 100vw !important;
+            height: min(84svh, 860px) !important;
+            transform: translateX(-50%) !important;
+            transform-origin: center center !important;
+          }
+          #projects.projects-section.is-project-open .brain-canvas-wrapper {
+            left: calc(50% - 18vw) !important;
+            transform: translateX(-50%) scale(0.97) !important;
+          }
+          #projects .projects-chip-overlay {
+            display: none !important;
+          }
+          #projects .projects-title-block {
+            top: 96px !important;
+            left: clamp(20px, 6vw, 54px) !important;
+          }
+        }
+        /* Tablet project readout: large right-side half panel, never a centred sheet. */
+        @media (min-width: 768px) and (max-width: 1023px) {
+          #projects .brain-readout.is-column {
+            top: 20svh !important;
+            right: 3vw !important;
+            width: 57.5vw !important;
+            height: min(78svh, 800px) !important;
+          }
+          #projects .brain-readout.is-column .brain-panel {
+            height: min(78svh, 800px) !important;
+            min-height: min(78svh, 800px) !important;
+            max-height: min(78svh, 800px) !important;
+            padding-inline: clamp(24px, 4vw, 44px) !important;
+          }
+        }
+        /* Phone: clean centred brain; detail stays in a bottom sheet and no project bar is shown. */
+        /* The archive stays mounted, so this CSS rule—not a React remount—controls
+           whether it is visible. It therefore returns instantly and reliably after
+           resizing a phone/tablet view back to laptop or desktop width. */
+        @media (max-width: 1023px) {
+          #projects .projects-archive-overlay { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          #projects.projects-section {
+            height: 100svh !important;
+            min-height: max(100svh, 720px) !important;
+          }
+          #projects .brain-canvas-wrapper {
+            top: clamp(118px, 15svh, 160px) !important;
+            height: min(80svh, 700px) !important;
+          }
+          #projects.projects-section.is-project-open .brain-canvas-wrapper {
+            left: calc(50% - 17vw) !important;
+            transform: translateX(-50%) scale(0.90) !important;
+          }
+          #projects .projects-title-block {
+            top: 96px !important;
+          }
+          #projects .brain-readout.is-column {
+            position: absolute !important;
+            top: 22svh !important;
+            right: 0 !important;
+            left: auto !important;
+            width: 63.333vw !important;
+            height: min(74svh, 620px) !important;
+          }
+          #projects .brain-readout.is-column .brain-panel {
+            height: min(74svh, 620px) !important;
+            min-height: min(74svh, 620px) !important;
+            max-height: min(74svh, 620px) !important;
+            padding: 20px 18px 24px !important;
+          }
+        }
+        /* Only compact phones use the wider 2.1/3 readout. Wider phone layouts retain the prior proportion. */
+        @media (max-width: 600px) {
+          #projects .brain-readout.is-column { width: 70vw !important; }
+        }
       `}</style>
 
       {/* Brain — no frame, no border, no brackets: it floats directly on the starfield.
-          Both panels overlay this layer rather than displacing it. */}
-      <div style={{
+          Both panels overlay this layer rather than displacing it.
+          Fade+rise driven by brainVisible (IntersectionObserver on the section root).
+          Wrapped in a plain, non-animated div purely so responsive breakpoints below
+          can apply a CSS `transform: scale(...)` without colliding with the fade/rise
+          transform on the inner div — camera/distance/FOV constants are untouched. */}
+      <div className="brain-canvas-scale-wrap brain-canvas-wrapper" style={{ position: "absolute", inset: 0 }}>
+      <div
+        ref={canvasWrapperRef}
+        style={{
+        opacity: brainVisible ? 1 : 0,
+        transform: brainVisible ? 'translateY(0px)' : 'translateY(40px)',
+        transition: 'opacity 1s ease-out, transform 1s ease-out',
+        transitionDelay: '0.3s',
         position: "absolute",
         top: 0,
         // Full-width layer sitting BEHIND both panels, spanning the whole viewport, so the
@@ -3823,30 +4565,58 @@ export default function ProjectsSection() {
         zIndex: 1,
       }}>
         <Canvas
+          // Keep local canvas coordinates: offset-based pointer data is measured against the
+          // actual WebGL canvas and remains correct when its responsive parent is transformed.
+          // Keep taps responsive on touch devices without allowing browser gesture delays.
+          style={{ background: "transparent", position: "absolute", inset: 0, touchAction: "manipulation" }}
           // near is driven per-frame by CameraController: 0.1 outside, 0.004 once the camera
           // is inside the brain, where the default would slice through the surrounding mesh.
           camera={{ position: [0, 0, 1.25], fov: 45, near: 0.1, far: 20 }}
           gl={{ antialias: true, alpha: true, logarithmicDepthBuffer: true }}
-          style={{ background: "transparent", position: "absolute", inset: 0 }}
         >
-          <BrainScene selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
+          <BrainScene light={isLight} selected={project} onHotspotSelect={handleHotspot} onHotspotHover={handleHover} />
         </Canvas>
       </div>
+      </div>
 
-      {/* Left: node index — desktop column, vertically centred and only as tall as its
-          content; mobile a horizontal chip scroller above the brain. */}
-      {narrow ? (
-        <div style={{ position: "absolute", top: NAV_CLEARANCE, left: 0, right: 0, zIndex: 10 }}>
-          <NodeChipRow selectedId={selectedId} onSelect={setSelectedId} />
+      {/* Section label + strapline. Absolutely positioned rather than in flow:
+          this section is a fixed-height 130vh canvas stage with no document flow
+          to insert into, so a normal block would displace the brain. Sits at the
+          same NAV_CLEARANCE / EDGE_PAD the rest of the section uses.
+
+          Now shown on all sizes (was desktop-only) — NodeChipRow's own top
+          offset below is pushed down to clear it on narrow. */}
+      <div className="projects-title-block" style={{ position: "absolute", top: "53px", left: EDGE_PAD, zIndex: 10, marginBottom: "240px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
+          <span className="brain-section-label" style={{
+            fontFamily: MONO, fontSize: "0.68rem", letterSpacing: "0.2em",
+            textTransform: "uppercase", color: INK,
+          }}>
+            03 — Projects
+          </span>
         </div>
-      ) : (
         <div style={{
-          position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
-          width: LEFT_W, zIndex: 10,
+          fontFamily: MONO, fontSize: "0.5875rem", fontWeight: 400,
+          letterSpacing: "0.05em", color: "rgba(226,232,240,0.6)",
+          marginTop: 0, marginBottom: "0.5rem",
         }}>
-          <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={arm} />
+          // select a neuron to explore each project
         </div>
-      )}
+        {!narrow && <div style={{ height: '320px' }} />}
+      </div>
+
+      {/* Left archive stays mounted while resizing. CSS hides it below tablet width,
+          avoiding the stale responsive state that previously left the panel missing after
+          a phone or tablet view was expanded again. */}
+      <div className="projects-archive-overlay" style={{
+        position: "absolute", left: EDGE_PAD, top: "50%", transform: "translateY(-50%)",
+        width: LEFT_W, zIndex: 10,
+      }}>
+        <div className="reveal-left">
+          <NodeIndexPanel selectedId={selectedId} onSelect={setSelectedId} arm={18} />
+        </div>
+      </div>
 
       {/* Right: readout — absent entirely until a project is selected */}
       <AnimatePresence>
@@ -3857,13 +4627,18 @@ export default function ProjectsSection() {
             position={position}
             total={ACTIVE_PROJECTS.length}
             onPrev={prev} onNext={next} onBack={back}
-            arm={arm} narrow={narrow}
+            arm={arm} sheet={sheet}
           />
         )}
       </AnimatePresence>
 
+      {/* Node name labels — idle state only. Once a project is open its name is already the
+          heading of the readout panel, so the floating tag is redundant there, and at the zoomed
+          distance it tends to sit over the brain itself. Gated on selectedId rather than on the
+          hover state, so hovering still works normally the moment BACK returns to the default
+          view. AnimatePresence gives it the usual fade-out rather than a hard cut. */}
       <AnimatePresence>
-        {tip && <NodeTooltip key="tip" name={tip.name} x={tip.x} y={tip.y} />}
+        {tip && selectedId === null && <NodeTooltip key="tip" name={tip.name} />}
       </AnimatePresence>
     </section>
   );

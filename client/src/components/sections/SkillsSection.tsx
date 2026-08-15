@@ -64,6 +64,30 @@ function chunkIntoRows<T>(items: T[], rows: number): T[][] {
 
 const MARQUEE_ROWS = chunkIntoRows(ALL_SKILLS, 4);
 
+// ── Badge corner brackets ─────────────────────────────────────────────────────
+// Each span sets borders INLINE on exactly the two sides it needs. Tailwind's
+// preflight puts "border: 0 solid" on every element, so all four sides already
+// carry a solid style at width 0 — a blanket border-width would arm all four and
+// draw a filled square instead of an L. The light-mode rules override
+// border-color only, never the widths, so the L survives the theme switch.
+function PillCorners({ hovered }: { hovered: boolean }) {
+  const c = hovered ? "rgba(255,255,255,1)" : "rgba(255,255,255,0.25)";
+  const w = "1px";
+  const base: React.CSSProperties = {
+    position: "absolute", width: 6, height: 6,
+    background: "transparent", pointerEvents: "none",
+  };
+  const cls = `skills-corner${hovered ? " is-hover" : ""}`;
+  return (
+    <>
+      <span className={cls} style={{ ...base, top: -1, left: -1, borderTop: `${w} solid ${c}`, borderLeft: `${w} solid ${c}` }} />
+      <span className={cls} style={{ ...base, top: -1, right: -1, borderTop: `${w} solid ${c}`, borderRight: `${w} solid ${c}` }} />
+      <span className={cls} style={{ ...base, bottom: -1, left: -1, borderBottom: `${w} solid ${c}`, borderLeft: `${w} solid ${c}` }} />
+      <span className={cls} style={{ ...base, bottom: -1, right: -1, borderBottom: `${w} solid ${c}`, borderRight: `${w} solid ${c}` }} />
+    </>
+  );
+}
+
 // ── Pill ──────────────────────────────────────────────────────────────────────
 function Pill({ name, icon }: { name: string; icon: string }) {
   const [hovered, setHovered] = useState(false);
@@ -75,17 +99,22 @@ function Pill({ name, icon }: { name: string; icon: string }) {
       onMouseLeave={() => setHovered(false)}
       className="skills-pill"
       style={{
+        position: "relative",
         display: "inline-flex",
         alignItems: "center",
         gap: "0.5rem",
-        padding: "0.45rem 1rem",
-        borderRadius: "999px",
+        padding: "0.4rem 1rem",
+        // Fully square.
+        borderRadius: "0px",
         border: hovered
-          ? "1px solid rgba(0,212,255,0.5)"
+          ? "1px solid rgba(255,255,255,0.6)"
           : "1px solid rgba(255,255,255,0.13)",
         background: hovered
-          ? "rgba(0,212,255,0.06)"
+          ? "rgba(255,255,255,0.05)"
           : "rgba(255,255,255,0.04)",
+        // Only set on hover; the resting badge keeps inheriting its colour so
+        // the default is untouched (and light mode still works).
+        color: hovered ? "#ffffff" : "inherit",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: "0.78rem",
         fontWeight: 500,
@@ -97,6 +126,7 @@ function Pill({ name, icon }: { name: string; icon: string }) {
         flexShrink: 0,
       }}
     >
+      <PillCorners hovered={hovered} />
       {!imgError ? (
         <img
           src={icon}
@@ -124,23 +154,63 @@ function MarqueeRow({
   direction?: "left" | "right";
   speed?: number;
 }) {
-  const [paused, setPaused] = useState(false);
   const doubled = [...items, ...items, ...items];
+
+  // requestAnimationFrame transform loop.
+  //
+  // Speed is a hard switch: the row runs at full rate or not at all, flipped on
+  // the frame the pointer crosses the row boundary. No lerp, no tween — the
+  // multiplier is written directly by the handlers below.
+  //
+  // A ref rather than state: it is read every frame, and re-rendering ~30 pills
+  // per row on hover would be pointless work.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const isHovered = useRef(false);     // pointer currently over this row
+  const speedMul = useRef(1);          // 1 = full speed, 0 = stopped
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+
+    let x = 0;
+    let last = 0;
+    let raf = 0;
+
+    const step = (now: number) => {
+      if (!last) last = now;
+      const dt = Math.min((now - last) / 1000, 0.1);   // clamp after a tab switch
+      last = now;
+
+      // One lap covers a third of the track (items are tripled) and `speed` is
+      // the seconds that lap should take — same pacing as before.
+      const lap = el.scrollWidth / 3;
+      if (lap > 0) {
+        x += (dt / speed) * lap * speedMul.current * (direction === "left" ? -1 : 1);
+        // Wrap into (-lap, 0]: with three copies laid out, shifting by exactly
+        // one lap is invisible.
+        x = ((x % lap) - lap) % lap;
+        el.style.transform = `translate3d(${x}px, 0, 0)`;
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [direction, speed]);
 
   return (
     <div
       style={{ overflow: "hidden", width: "100%", maskImage: "linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)" }}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => { isHovered.current = true; speedMul.current = 0; }}
+      onMouseLeave={() => { isHovered.current = false; speedMul.current = 1; }}
     >
       <div
+        ref={trackRef}
         style={{
           display: "flex",
           gap: "0.6rem",
           width: "max-content",
-          animation: `hhp-marquee-${direction} ${speed}s linear infinite`,
-          animationPlayState: paused ? "paused" : "running",
           paddingBottom: "2px",
+          willChange: "transform",
         }}
       >
         {doubled.map((skill, i) => (
@@ -187,7 +257,7 @@ export default function SkillsSection() {
       id="skills"
       ref={sectionRef}
       style={{
-        padding: "6rem 8vw 4rem",
+        padding: "96px 8vw",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
@@ -195,6 +265,7 @@ export default function SkillsSection() {
         zIndex: 1,
       }}
     >
+    <div className="reveal">
       <style>{`
         /* Light mode overrides */
         .light .skills-pill {
@@ -217,6 +288,9 @@ export default function SkillsSection() {
         .light .skills-category {
           color: rgba(0,0,0,0.4) !important;
         }
+        .light .skills-corner { border-color: rgba(0,0,0,0.2) !important; }
+        .light .skills-corner.is-hover { border-color: rgba(0,0,0,0.9) !important; }
+
         @keyframes hhp-marquee-left {
           0% { transform: translateX(0); }
           100% { transform: translateX(-33.333%); }
@@ -224,6 +298,19 @@ export default function SkillsSection() {
         @keyframes hhp-marquee-right {
           0% { transform: translateX(-33.333%); }
           100% { transform: translateX(0); }
+        }
+        /* Tablet/mobile: smaller pills, wrapping already handled by flex-wrap. */
+        @media (max-width: 1023px) {
+          .skills-pill {
+            padding: 0.32rem 0.8rem !important;
+            font-size: 0.85rem !important;
+          }
+        }
+        @media (max-width: 767px) {
+          .skills-pill {
+            padding: 0.28rem 0.7rem !important;
+            font-size: 0.78rem !important;
+          }
         }
       `}</style>
 
@@ -233,7 +320,7 @@ export default function SkillsSection() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          marginBottom: "2.5rem",
+          marginBottom: "3.75rem",
           opacity: inView ? 1 : 0,
           transform: inView ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
@@ -242,8 +329,8 @@ export default function SkillsSection() {
         {/* Section label */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem" }}>
           <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#84cc16", flexShrink: 0, display: "inline-block" }} />
-          <span className="skills-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", opacity: 0.55 }}>
-            04 — Skills
+          <span className="skills-label" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "0.68rem", letterSpacing: "0.22em", textTransform: "uppercase", color: "#ffffff" }}>
+            02 — Skills
           </span>
         </div>
 
@@ -312,6 +399,7 @@ export default function SkillsSection() {
           </div>
         )}
       </div>
+    </div>
     </section>
   );
 }

@@ -39,7 +39,7 @@ export default function AboutSection() {
       ref={sectionRef}
       style={{
         minHeight: "100vh",
-        padding: "6rem 8vw",
+        padding: "96px 8vw",
         display: "flex",
         flexDirection: "column",
         justifyContent: "center",
@@ -47,13 +47,14 @@ export default function AboutSection() {
         zIndex: 1,
       }}
     >
+    <div className="reveal">
       {/* Section label — Motionfolio style: dot + text + full-width line */}
       <div
         style={{
           opacity: inView ? 1 : 0,
           transform: inView ? "translateY(0)" : "translateY(16px)",
           transition: "opacity 0.6s ease, transform 0.6s ease",
-          marginBottom: "3rem",
+          marginBottom: "4.25rem",
           display: "flex",
           alignItems: "center",
           gap: "0.6rem",
@@ -72,16 +73,17 @@ export default function AboutSection() {
         />
         {/* Label text */}
         <span
+          className="about-section-label"
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.68rem",
             letterSpacing: "0.22em",
             textTransform: "uppercase",
-            opacity: 0.55,
+            color: "#ffffff",
             flexShrink: 0,
           }}
         >
-          01 — About
+          01 — About Me
         </span>
 
       </div>
@@ -131,6 +133,7 @@ export default function AboutSection() {
             ].map((style, i) => (
               <div
                 key={i}
+                className="about-photo-bracket"
                 style={{
                   position: "absolute",
                   width: "24px",
@@ -199,7 +202,7 @@ export default function AboutSection() {
           </div>
 
           {/* Status + Location cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+          <div className="about-status-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
             {[
               {
                 label: "STATUS",
@@ -222,6 +225,7 @@ export default function AboutSection() {
             ].map((card, i) => (
               <div
                 key={i}
+                className="about-info-box"
                 style={{
                   padding: "0.9rem 1rem",
                   border: "1px solid rgba(255,255,255,0.12)",
@@ -250,7 +254,7 @@ export default function AboutSection() {
           </div>
 
           {/* Three keyword blocks */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.6rem" }}>
+          <div className="about-keyword-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.6rem" }}>
             {[
               { bold: "BUILD", sub: "HANDS-ON\nAPPROACH" },
               { bold: "AI+DATA", sub: "CORE\nFOCUS" },
@@ -258,6 +262,7 @@ export default function AboutSection() {
             ].map((item, i) => (
               <div
                 key={i}
+                className="about-keyword-box"
                 style={{
                   padding: "0.85rem 0.8rem",
                   border: "1px solid rgba(255,255,255,0.12)",
@@ -357,12 +362,12 @@ export default function AboutSection() {
 
           {/* Bio */}
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <p style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.85, margin: 0 }}>
+            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.85, margin: 0 }}>
               I'm <strong>Hein Htet Phyo</strong>, a Data Science & AI student at UWE Bristol
               with a genuine passion for building intelligent systems that solve real problems.
               I thrive at the intersection of machine learning, software engineering, and data.
             </p>
-            <p style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.6, margin: 0 }}>
+            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.6, margin: 0 }}>
               Whether it's training deep learning models, building full-stack applications,
               or diving into data pipelines — I love turning complex ideas into clean,
               working solutions. Currently based in London and actively seeking full-time
@@ -388,6 +393,7 @@ export default function AboutSection() {
               {SKILL_TAGS.map((tag, i) => (
                 <span
                   key={i}
+                  className="about-skill-tag"
                   style={{
                     padding: "0.45rem 0.9rem",
                     border: "1px solid rgba(255,255,255,0.2)",
@@ -412,6 +418,7 @@ export default function AboutSection() {
           <div>
             <a
               href="#"
+              className="about-cv-btn"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -445,13 +452,37 @@ export default function AboutSection() {
       </div>
 
       <style>{`
-        @media (max-width: 768px) {
+        /* Tablet and below: stack photo above text; photo naturally goes full-width
+           once the grid collapses to a single column. */
+        @media (max-width: 1023px) {
           .about-main-grid {
             grid-template-columns: 1fr !important;
             gap: 3rem !important;
           }
         }
+        /* Mobile: tighten the stacked gap and bio text size a touch further,
+           stack the status boxes, wrap keyword boxes to 2 columns, full-width CV button. */
+        @media (max-width: 767px) {
+          .about-main-grid {
+            gap: 2.25rem !important;
+          }
+          .about-bio-text {
+            font-size: 0.92rem !important;
+          }
+          .about-status-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .about-keyword-grid {
+            grid-template-columns: 1fr 1fr !important;
+          }
+          .about-cv-btn {
+            width: 100% !important;
+            justify-content: center !important;
+            box-sizing: border-box;
+          }
+        }
       `}</style>
+    </div>
     </section>
   );
 }
