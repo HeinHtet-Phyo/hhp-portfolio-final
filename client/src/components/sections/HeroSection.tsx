@@ -3,11 +3,11 @@
 // Right has a macOS-style terminal window showing developer info as JS object
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowUpRight, Mail, Github, Linkedin, Twitter, Download } from "lucide-react";
+import { ArrowUpRight, Mail, Github, Linkedin, Instagram, Download } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
 
 // ── Typing Role ──
-const ROLES = ["Data Scientist", "AI Engineer", "ML Engineer", "Software Engineer"];
+const ROLES = ["Data Analyst", "Data Scientist", "AI Software Engineer"];
 
 function TypingRole({ isDark }: { isDark: boolean }) {
   const [roleIdx, setRoleIdx] = useState(0);
@@ -82,7 +82,7 @@ function TerminalWindow({ isDark, revealed, animated }: { isDark: boolean; revea
     ]},
     { spans: [
       { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
-      { text: '"AI Engineer"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: '"Data Analyst"', color: isDark ? "#4ade80" : "#22c55e" },
       { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
@@ -92,7 +92,7 @@ function TerminalWindow({ isDark, revealed, animated }: { isDark: boolean; revea
     ]},
     { spans: [
       { text: "        ", color: isDark ? "rgba(255,255,255,0.90)" : "rgba(10,10,10,0.92)" },
-      { text: '"ML Engineer"', color: isDark ? "#4ade80" : "#22c55e" },
+      { text: '"AI Software Engineer"', color: isDark ? "#4ade80" : "#22c55e" },
       { text: ",", color: isDark ? "rgba(255,255,255,0.40)" : "rgba(10,10,10,0.55)" },
     ]},
     { spans: [
@@ -320,8 +320,8 @@ export default function HeroSection() {
             color: isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.55)",
             maxWidth: 520,
           }}>
-            BSc Data Science & AI — UWE Bristol. Specialising in machine learning,
-            deep learning, and building intelligent systems that solve real problems.
+            First Class Graduate · BSc Data Science & AI · UWE Bristol. Data analysis,
+            AI software engineering, and ML systems — fast, precise, delivery-focused.
           </motion.p>
 
           {/* CTA Buttons */}
@@ -347,8 +347,10 @@ export default function HeroSection() {
 
             <motion.a
               className="hero-cta-btn"
-              href="/Hein_Htet_Phyo_CV.pdf"
-              download
+              href="/HHP_CV.pdf"
+              download="Hein_Htet_Phyo_CV.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               style={{
@@ -370,10 +372,10 @@ export default function HeroSection() {
           {/* Social Links */}
           <motion.div className="hero-social-row" {...fadeUp(0.60)} style={{ display: "flex", gap: "0.75rem", marginTop: "0.25rem" }}>
             {[
-              { icon: Github, href: "https://github.com/heinhtetphyo", label: "GitHub" },
-              { icon: Linkedin, href: "https://linkedin.com/in/heinhtetphyo", label: "LinkedIn" },
-              { icon: Twitter, href: "https://twitter.com/heinhtetphyo", label: "Twitter" },
-              { icon: Mail, href: "mailto:heinhtetphyo@email.com", label: "Email" },
+              { icon: Github, href: "https://github.com/HeinHtet-Phyo", label: "GitHub" },
+              { icon: Linkedin, href: "https://www.linkedin.com/in/hein-htet-phyo", label: "LinkedIn" },
+              { icon: Mail, href: "mailto:heinhtetphyo56@gmail.com", label: "Email" },
+              { icon: Instagram, href: "https://www.instagram.com/hein__htetphyo/", label: "Instagram" },
             ].map(({ icon: Icon, href, label }) => (
               <motion.a
                 key={label}

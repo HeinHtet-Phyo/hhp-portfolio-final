@@ -7,49 +7,54 @@ import { useState, useEffect, useRef } from "react";
 // ── Skill data ────────────────────────────────────────────────────────────────
 const DEVICON = "https://cdn.jsdelivr.net/gh/devicons/devicon/icons";
 
+// Icon-less concepts fall back to the "◆" glyph in Pill (see onError handler)
+// via a deliberately unresolvable path, since devicon has no icon for them.
+const NO_ICON = `${DEVICON}/_none/_none.svg`;
+
 const SKILLS: Record<string, { name: string; icon: string }[]> = {
-  "Frontend": [
-    { name: "React", icon: `${DEVICON}/react/react-original.svg` },
-    { name: "TypeScript", icon: `${DEVICON}/typescript/typescript-original.svg` },
-    { name: "JavaScript", icon: `${DEVICON}/javascript/javascript-original.svg` },
-    { name: "Tailwind CSS", icon: `${DEVICON}/tailwindcss/tailwindcss-original.svg` },
-    { name: "HTML5", icon: `${DEVICON}/html5/html5-original.svg` },
-    { name: "CSS3", icon: `${DEVICON}/css3/css3-original.svg` },
-    { name: "Vite", icon: `${DEVICON}/vitejs/vitejs-original.svg` },
-    { name: "Next.js", icon: `${DEVICON}/nextjs/nextjs-original.svg` },
-  ],
-  "AI / ML": [
+  "PROGRAMMING": [
     { name: "Python", icon: `${DEVICON}/python/python-original.svg` },
-    { name: "PyTorch", icon: `${DEVICON}/pytorch/pytorch-original.svg` },
-    { name: "TensorFlow", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
-    { name: "scikit-learn", icon: `${DEVICON}/scikitlearn/scikitlearn-original.svg` },
+    { name: "SQL", icon: `${DEVICON}/postgresql/postgresql-original.svg` },
+    { name: "Java", icon: `${DEVICON}/java/java-original.svg` },
+    { name: "JavaScript", icon: `${DEVICON}/javascript/javascript-original.svg` },
+    { name: "HTML", icon: `${DEVICON}/html5/html5-original.svg` },
+    { name: "CSS", icon: `${DEVICON}/css3/css3-original.svg` },
+    { name: "TypeScript", icon: `${DEVICON}/typescript/typescript-original.svg` },
+  ],
+  "ML & AI": [
+    { name: "Machine Learning", icon: `${DEVICON}/pytorch/pytorch-original.svg` },
+    { name: "Deep Learning", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
+    { name: "Neural Networks", icon: `${DEVICON}/keras/keras-original.svg` },
+    { name: "NLP", icon: `${DEVICON}/python/python-original.svg` },
+    { name: "Predictive Modelling", icon: `${DEVICON}/scikitlearn/scikitlearn-original.svg` },
+    { name: "Feature Engineering", icon: `${DEVICON}/numpy/numpy-original.svg` },
+    { name: "Data Cleaning", icon: `${DEVICON}/pandas/pandas-original.svg` },
+    { name: "Statistical Analysis", icon: `${DEVICON}/r/r-original.svg` },
+    { name: "Recommendation Systems", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
+    { name: "End-to-End ML Pipelines", icon: `${DEVICON}/apacheairflow/apacheairflow-original.svg` },
+  ],
+  "TOOLS & LIBRARIES": [
     { name: "Pandas", icon: `${DEVICON}/pandas/pandas-original.svg` },
     { name: "NumPy", icon: `${DEVICON}/numpy/numpy-original.svg` },
-    { name: "Jupyter", icon: `${DEVICON}/jupyter/jupyter-original.svg` },
-    { name: "Matplotlib", icon: `${DEVICON}/matplotlib/matplotlib-original.svg` },
-  ],
-  "Backend": [
-    { name: "Node.js", icon: `${DEVICON}/nodejs/nodejs-original.svg` },
-    { name: "FastAPI", icon: `${DEVICON}/fastapi/fastapi-original.svg` },
-    { name: "Flask", icon: `${DEVICON}/flask/flask-original.svg` },
-    { name: "Java", icon: `${DEVICON}/java/java-original.svg` },
-    { name: "Spring Boot", icon: `${DEVICON}/spring/spring-original.svg` },
-    { name: "Express.js", icon: `${DEVICON}/express/express-original.svg` },
-    { name: "GraphQL", icon: `${DEVICON}/graphql/graphql-plain.svg` },
-  ],
-  "Databases & Tools": [
-    { name: "PostgreSQL", icon: `${DEVICON}/postgresql/postgresql-original.svg` },
+    { name: "Scikit-learn", icon: "https://cdn.simpleicons.org/scikitlearn/F7931E" },
+    { name: "TensorFlow", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
+    { name: "PyTorch", icon: `${DEVICON}/pytorch/pytorch-original.svg` },
+    { name: "Jupyter Notebook", icon: `${DEVICON}/jupyter/jupyter-original.svg` },
+    { name: "Git", icon: `${DEVICON}/git/git-original.svg` },
+    { name: "GitHub", icon: "https://cdn.simpleicons.org/github/ffffff" },
+    { name: "Google Colab", icon: "https://cdn.simpleicons.org/googlecolab/F9AB00" },
     { name: "MySQL", icon: `${DEVICON}/mysql/mysql-original.svg` },
     { name: "MongoDB", icon: `${DEVICON}/mongodb/mongodb-original.svg` },
-    { name: "Redis", icon: `${DEVICON}/redis/redis-original.svg` },
+    { name: "AWS", icon: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/amazonwebservices/amazonwebservices-plain-wordmark.svg" },
     { name: "Docker", icon: `${DEVICON}/docker/docker-original.svg` },
-    { name: "Git", icon: `${DEVICON}/git/git-original.svg` },
-    { name: "GitHub", icon: `${DEVICON}/github/github-original.svg` },
-    { name: "AWS", icon: `${DEVICON}/amazonwebservices/amazonwebservices-plain-wordmark.svg` },
-    { name: "Linux", icon: `${DEVICON}/linux/linux-original.svg` },
-    { name: "Supabase", icon: `${DEVICON}/supabase/supabase-original.svg` },
-    { name: "Maven", icon: `${DEVICON}/maven/maven-original.svg` },
-    { name: "Vercel", icon: `${DEVICON}/vercel/vercel-original.svg` },
+  ],
+  "ANALYSIS & VISUALISATION": [
+    { name: "Power BI", icon: `${DEVICON}/microsoftsqlserver/microsoftsqlserver-plain.svg` },
+    { name: "R", icon: `${DEVICON}/r/r-original.svg` },
+    { name: "Matplotlib", icon: `${DEVICON}/matplotlib/matplotlib-original.svg` },
+    { name: "Data Visualisation", icon: `${DEVICON}/plotly/plotly-original.svg` },
+    { name: "Business Intelligence", icon: "https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/microsoftsqlserver/microsoftsqlserver-original.svg" },
+    { name: "Statistical Analysis", icon: `${DEVICON}/r/r-original.svg` },
   ],
 };
 

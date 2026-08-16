@@ -50,6 +50,8 @@ type EduEntry = {
   id: string;
   institution: string;
   monogram: string;
+  logo?: string;
+  badge?: string;
   location: string;
   programme: string;
   period: string;
@@ -90,10 +92,11 @@ const EDUCATION: EduEntry[] = [
     id: "gusto-foundation",
     institution: "GUSTO College Myanmar",
     monogram: "GC",
+    logo: "/education/gusto_logo.jpeg",
     location: "Yangon, Myanmar",
     programme: "Foundation Diploma in IT",
     period: "Jul 2022 – Oct 2022",
-    url: "https://gustocollege.com",
+    url: "https://www.facebook.com/GUSTOCollege/",
     coords: YANGON, side: "right", topPct: 0.62,
     exit: "top", exitFrac: 0.68, pinDx: 0, pinDy: 0, endDx: 0, endDy: 3,
   },
@@ -101,10 +104,11 @@ const EDUCATION: EduEntry[] = [
     id: "gusto-hnd",
     institution: "GUSTO College Myanmar",
     monogram: "GC",
+    logo: "/education/gusto_logo.jpeg",
     location: "Yangon, Myanmar",
     programme: "Higher National Diploma in Computing",
     period: "Nov 2022 – Nov 2024",
-    url: "https://gustocollege.com",
+    url: "https://www.facebook.com/GUSTOCollege/",
     coords: YANGON, side: "right", topPct: 0.04,
     exit: "bottom", exitFrac: 0.45, pinDx: 0, pinDy: 0, endDx: 0, endDy: -3,
   },
@@ -112,6 +116,8 @@ const EDUCATION: EduEntry[] = [
     id: "uwe-bristol",
     institution: "UWE Bristol",
     monogram: "UWE",
+    logo: "/education/uwe_logo.png",
+    badge: "First Class",
     location: "Bristol, UK",
     programme: "BSc Data Science & Artificial Intelligence",
     period: "Sep 2023 – Jun 2026",
@@ -212,8 +218,17 @@ function EduCard({
           display: "flex", alignItems: "center", justifyContent: "center",
           fontFamily: "'Space Grotesk', sans-serif",
           fontSize: 11, fontWeight: 600, color: "#ffffff", flexShrink: 0,
+          overflow: "hidden",
         }}>
-          {entry.monogram}
+          {entry.logo ? (
+            <img
+              src={entry.logo}
+              alt={`${entry.institution} logo`}
+              style={{ width: "100%", height: "100%", objectFit: "contain", borderRadius: 4 }}
+            />
+          ) : (
+            entry.monogram
+          )}
         </div>
         <span style={{ fontSize: 13, color: "#6b7280", lineHeight: 1 }} aria-hidden>↗</span>
       </div>
@@ -226,12 +241,31 @@ function EduCard({
         {entry.location}
       </div>
 
-      <div className="edu-institution" style={{
-        fontFamily: "'Space Grotesk', sans-serif",
-        fontSize: 15, fontWeight: 500, color: "#ffffff",
-        lineHeight: 1.3, marginBottom: 12,
-      }}>
-        {entry.institution}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <div className="edu-institution" style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: 15, fontWeight: 500, color: "#ffffff",
+          lineHeight: 1.3,
+        }}>
+          {entry.institution}
+        </div>
+        {entry.badge && (
+          <span className="edu-badge" style={{
+            display: "inline-flex",
+            alignItems: "center",
+            fontFamily: "'Inter', sans-serif",
+            fontSize: "9px",
+            padding: "0 0.25rem",
+            color: "#FFD700",
+            background: "transparent",
+            border: "1px solid #FFD700",
+            borderRadius: 0,
+            lineHeight: 1.3,
+            flexShrink: 0,
+          }}>
+            {entry.badge}
+          </span>
+        )}
       </div>
 
       <div className="edu-divider" style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginBottom: 12 }} />

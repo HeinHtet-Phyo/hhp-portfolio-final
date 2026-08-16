@@ -3,14 +3,15 @@
 // Status/location cards below photo, bio + skill tags on right
 // Black & white only (no green accents in this section)
 import { useState, useEffect, useRef } from "react";
+import { ArrowUpRight } from "lucide-react";
 
 const SKILL_TAGS = [
-  "MACHINE LEARNING",
+  "DATA ANALYSIS",
   "DATA SCIENCE",
-  "AI ENGINEERING",
   "FULL-STACK DEV",
+  "MACHINE LEARNING",
+  "AI ENGINEERING",
   "DEEP LEARNING",
-  "DATA ENGINEERING",
 ];
 
 function useInView(threshold = 0.1) {
@@ -27,6 +28,11 @@ function useInView(threshold = 0.1) {
     return () => obs.disconnect();
   }, [threshold]);
   return { ref, inView };
+}
+
+function handleContactMe(e: React.MouseEvent) {
+  e.preventDefault();
+  document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
 }
 
 export default function AboutSection() {
@@ -106,7 +112,7 @@ export default function AboutSection() {
             transition: "opacity 0.8s ease 0.1s, transform 0.8s ease 0.1s",
             display: "flex",
             flexDirection: "column",
-            gap: "0.75rem",
+            gap: "0.5rem",
           }}
         >
           {/* Photo with corner brackets */}
@@ -146,6 +152,7 @@ export default function AboutSection() {
               <img
                 src="/images/hein-photo.jpg"
                 alt="Hein Htet Phyo"
+                className="about-photo-img"
                 style={{
                   width: "100%",
                   height: "auto",
@@ -351,9 +358,12 @@ export default function AboutSection() {
               fontSize: "0.65rem",
               letterSpacing: "0.12em",
               opacity: 0.45,
+              // Offsets the shared right-column gap (2.2rem) down to ~0.75rem
+              // net, without touching the heading-to-tags gap above it.
+              marginBottom: "-0.95rem",
             }}
           >
-            {["MACHINE LEARNING", "AI SYSTEMS", "FULL-STACK DEV"].map((t, i) => (
+            {["DATA ANALYSIS", "ML SYSTEMS", "FULL-STACK DEV"].map((t, i) => (
               <span key={i}>
                 {t}{i < 2 ? " · " : ""}
               </span>
@@ -361,19 +371,22 @@ export default function AboutSection() {
           </div>
 
           {/* Bio */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.85, margin: 0 }}>
-              I'm <strong>Hein Htet Phyo</strong>, a Data Science & AI student at UWE Bristol
-              with a genuine passion for building intelligent systems that solve real problems.
-              I thrive at the intersection of machine learning, software engineering, and data.
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.9, opacity: 0.85, margin: 0 }}>
+              I'm <strong>Hein Htet Phyo</strong>, a fresh Data Science & AI graduate from UWE Bristol
+              with First Class Honours and a genuine passion for building intelligent systems that
+              solve real problems. A growth mindset drives everything — always learning, always improving.
             </p>
-            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.78, opacity: 0.6, margin: 0 }}>
-              Whether it's training deep learning models, building full-stack applications,
-              or diving into data pipelines — I love turning complex ideas into clean,
-              working solutions. Currently based in London and actively seeking full-time
-              roles in AI, Data Science, and Software Engineering.
+            <p className="about-bio-text" style={{ fontSize: "1.05rem", lineHeight: 1.9, opacity: 0.6, margin: 0 }}>
+              Whether it's training deep learning models, crafting data analysis pipelines,
+              or building full-stack applications — collaboration and curiosity fuel every
+              project. Currently based in London and actively seeking graduate roles in AI,
+              Data Science, and Software Engineering.
             </p>
           </div>
+
+          {/* Divider between bio and Core Focus & Skills */}
+          <div className="about-divider" style={{ width: "100%", borderTop: "1px solid rgba(255,255,255,0.15)", margin: "0.75rem 0" }} />
 
           {/* Core focus skill tags */}
           <div>
@@ -414,11 +427,12 @@ export default function AboutSection() {
             </div>
           </div>
 
-          {/* Download CV */}
+          {/* Contact Me */}
           <div>
             <a
-              href="#"
+              href="#contact"
               className="about-cv-btn"
+              onClick={handleContactMe}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -444,14 +458,15 @@ export default function AboutSection() {
                 el.style.background = "transparent";
               }}
             >
-              <span>↓</span>
-              <span>Download CV</span>
+              <span>CONTACT ME</span>
+              <ArrowUpRight size={16} />
             </a>
           </div>
         </div>
       </div>
 
       <style>{`
+        .light .about-divider { border-top-color: rgba(0,0,0,0.15) !important; }
         /* Tablet and below: stack photo above text; photo naturally goes full-width
            once the grid collapses to a single column. */
         @media (max-width: 1023px) {
@@ -465,6 +480,12 @@ export default function AboutSection() {
         @media (max-width: 767px) {
           .about-main-grid {
             gap: 2.25rem !important;
+          }
+          .about-photo-img {
+            height: 300px !important;
+            max-height: 300px !important;
+            object-fit: cover !important;
+            object-position: top !important;
           }
           .about-bio-text {
             font-size: 0.92rem !important;
