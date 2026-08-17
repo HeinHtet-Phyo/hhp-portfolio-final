@@ -27,6 +27,7 @@ import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import gsap from "gsap";
 import { useTheme } from "../../contexts/ThemeContext";
+import { ArrowUpRight } from "lucide-react";
 
 // Force full page reload on HMR to prevent R3F reconciler crash
 if (import.meta.hot) {
@@ -36,18 +37,19 @@ if (import.meta.hot) {
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
-// `name` is the archive display form (uppercase, underscores). `active` marks the four
-// documented projects that the readout panel and PREV/NEXT cycle through — NEURAL_05 is
-// listed in the node index but has no readout content yet, so it is inert. `preview` is a
+// `name` is the archive display form (uppercase, underscores). `active` marks the five
+// documented projects that the readout panel and PREV/NEXT cycle through. `preview` is a
 // screenshot path for the readout's preview frame; null renders the NO_SIGNAL placeholder.
 type Project = {
   id: number;
   name: string;
   desc: string;
+  descSections?: { heading: string; bullets: string[] }[];
   tech: string[];
   github: string;
   demo: string;
   preview: string | null;
+  previewBracketColor?: string;
   active: boolean;
 };
 
@@ -55,51 +57,144 @@ const PROJECTS: Project[] = [
   {
     id: 0,
     name: "MOODTUNES_AI",
-    desc: "LightGBM mood classifier trained on 114K+ Spotify tracks. Five-class output at F1 0.5652, served behind a real-time recommendation API.",
-    tech: ["PYTHON", "LIGHTGBM", "SPOTIFY_API", "SCIKIT-LEARN", "PANDAS"],
+    desc: "LightGBM mood classifier trained on 114K+ Spotify tracks, collapsing 114 genre labels into 6 mood super-genres with 0.90 macro ROC-AUC. Engineers 42 features from 15 raw Spotify audio attributes via a custom sklearn pipeline. Trained with Optuna TPE hyperparameter tuning for optimal performance. Ships as a live Streamlit app with four recommendation modes.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "Collapses 114 Spotify genres → 6 mood super-genres via audio taxonomy",
+          "Engineers 42 features from 15 raw audio attributes via sklearn pipeline",
+          "Four modes: by mood, song, audio sliders, or super-genre",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "69% test accuracy, 0.90 macro ROC-AUC — near feature-space ceiling",
+          "Top-5 cosine similarity recommender — individual tracks, not playlists",
+          "Live Streamlit app; Hein led concept, baseline, recommender, and UI",
+        ],
+      },
+    ],
+    tech: ["PYTHON", "LIGHTGBM", "OPTUNA", "SCIKIT-LEARN", "STREAMLIT", "PANDAS", "NUMPY"],
     github: "https://github.com/HeinHtet-Phyo/moodtunes-ai-group3",
-    demo: "#",
-    preview: null,
+    demo: "https://moodtunes-ai-group3-qt6evwwvsz8rehhbhknxm7.streamlit.app",
+    preview: "/previews/moodtunes-preview.png",
+    previewBracketColor: "#222222",
     active: true,
   },
   {
     id: 1,
-    name: "IT_CAREER_PLANNER",
-    desc: "XGBoost classifier reaching 99.75% accuracy across 6,000 samples. Maps SFIA framework skills onto career paths and reports the gaps.",
-    tech: ["PYTHON", "XGBOOST", "SFIA", "SCIKIT-LEARN", "STREAMLIT"],
+    name: "IT_PLANNER",
+    desc: "XGBoost classifier predicting optimal IT career paths from skills, education, and experience data. Achieves 99.75% accuracy across 10 job role categories. Trained on structured survey data with feature importance analysis to reveal the top drivers of career fit. Ships with an interactive Streamlit interface for real-time role prediction.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "XGBoost multi-class classifier across 10 IT career roles with GridSearchCV tuning",
+          "Feature importance ranking reveals top skills and traits driving each career prediction",
+          "Real-time prediction via Streamlit — input skills and background, get ranked role matches",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "99.75% test accuracy — top-tier performance for structured tabular career classification",
+          "Actionable skill gap analysis helps users understand what to learn for their target role",
+          "Demonstrates end-to-end ML pipeline: data cleaning, feature engineering, model deployment",
+        ],
+      },
+    ],
+    tech: ["PYTHON", "XGBOOST", "SCIKIT-LEARN", "STREAMLIT", "PANDAS", "NUMPY", "MATPLOTLIB", "SEABORN"],
     github: "https://github.com/HeinHtet-Phyo/it-career-planner",
     demo: "#",
-    preview: null,
+    preview: "/previews/itplanner-preview.png",
+    previewBracketColor: "#222222",
     active: true,
   },
   {
     id: 2,
     name: "CITYPULSE",
-    desc: "Urban analytics platform aggregating transport, demographic and infrastructure feeds into a single city-level intelligence view.",
-    tech: ["PYTHON", "PANDAS", "PLOTLY", "GEOPANDAS", "STREAMLIT"],
-    github: "https://github.com/HeinHtet-Phyo",
+    desc: "Urban infrastructure risk intelligence platform mapping real-time flood, power grid, transport, and air quality hazards across London. Zones are colour-coded by risk score and tappable for AI-generated threat assessments. Built with React, live data overlays, and an LLM-powered analysis sidebar.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "Four risk layers — flooding, power grid, transport, air quality — toggled live on an interactive London map",
+          "Zone-level risk scoring (Critical ≥0.8 / High ≥0.6 / Medium ≥0.3 / Low <0.3) with colour-coded overlays",
+          "AI-powered sidebar generates zone-specific threat assessments and cites real infrastructure data on click",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "Demonstrates full-stack geospatial engineering: risk modelling, map rendering, and LLM integration in one app",
+          "London-focused urban analytics surface actionable insights on flood plains, rail hubs, and power substations",
+          "Showcases applied AI in smart city context — bridging data science and civic infrastructure decision-making",
+        ],
+      },
+    ],
+    tech: ["REACT", "NEXT.JS", "TYPESCRIPT", "MAPBOX", "PYTHON", "OPENAI_API", "TAILWIND_CSS", "GEOSPATIAL_DATA"],
+    github: "https://github.com/HeinHtet-Phyo/citypulse-app",
     demo: "#",
-    preview: null,
+    preview: "/previews/citypulse-preview.jpg",
     active: true,
   },
   {
     id: 3,
     name: "PREVENTPATH",
-    desc: "Health-risk prediction pipeline scoring patient records and generating personalised prevention plans from the resulting risk profile.",
-    tech: ["PYTHON", "SCIKIT-LEARN", "FLASK", "HEALTHCARE_ML", "RISK_SCORING"],
-    github: "https://github.com/HeinHtet-Phyo",
+    desc: "NHS-integrated health risk platform generating personalised prevention plans from patient biometrics, postcode data, and wearable inputs. Connects to NHS login, smartwatches, and uploaded records to score cardiovascular, metabolic, and lifestyle risks in real time.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "NHS login integration pulls patient records directly — no manual data entry required",
+          "Postcode-to-NHS-area mapping via postcodes.io identifies local ICB, authority, and NHS region",
+          "Wearable sync (connected watch) ingests resting heart rate, activity, and sleep alongside uploaded PDFs",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "Surfaces actionable risk flags — BMI, blood pressure, cholesterol, waist — with severity indicators",
+          "Prevention journey guides users through 3 steps: connect data → your report → local care options",
+          "Demonstrates full-stack health tech: NHS API integration, geolocation, wearable data, and AI risk scoring",
+        ],
+      },
+    ],
+    tech: ["REACT", "NEXT.JS", "TYPESCRIPT", "NHS_API", "POSTCODES_IO", "TAILWIND_CSS", "PYTHON", "OPENAI_API"],
+    github: "https://github.com/HeinHtet-Phyo/preventpath-healthcare-app",
     demo: "#",
-    preview: null,
+    preview: "/previews/preventpath-preview.png",
     active: true,
   },
   {
     id: 4,
-    name: "NEURAL_05",
-    desc: "Details pending — write-up to follow.",
-    tech: ["CLASSIFIED"],
-    github: "#",
+    name: "DATA_CHAIN",
+    desc: "Three-echelon supply chain optimisation over a 12-month horizon combining SARIMA and Linear Regression forecasting with Gurobi ILP. Maximises profit across 2 factories, 4 depots, and 10 UK retailers — achieving £7,402,632 optimal profit.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "SARIMA wins demand forecasting for 8/10 retailers; Linear Regression wins all 10 price forecasts",
+          "Gurobi ILP solves factory production, depot selection, and routing simultaneously across 12 months",
+          "Task 4.4 adds Big-M logical constraints — exclusive supplier rules and single-source requirements",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "£7,402,632 maximum profit achieved from full 12-month optimisation run",
+          "23,901 units forecasted across 10 UK retailers with prices ranging £369–£753 per unit",
+          "End-to-end pipeline from raw CSV data → forecasting → ILP solver → optimal supply chain decisions",
+        ],
+      },
+    ],
+    tech: ["PYTHON", "GUROBI", "SARIMA", "SCIKIT-LEARN", "PANDAS", "NUMPY", "MATPLOTLIB", "JUPYTER"],
+    github: "https://github.com/HeinHtet-Phyo/data-chain",
     demo: "#",
-    preview: null,
+    preview: "/previews/datachain-preview.png",
+    previewBracketColor: "#222222",
     // Live like the other four. `active` is the single switch behind every interaction: it
     // becomes HotspotDot's `interactive` prop (which gates onClick, onPointerOver and
     // onPointerOut alike), decides whether the rail row gets an onSelect, filters the mobile
@@ -113,7 +208,7 @@ const PROJECTS: Project[] = [
 const ACTIVE_PROJECTS = PROJECTS.filter((p) => p.active);
 
 // ─── Classified nodes (inert index rows) ──────────────────────────────────────
-const CLASSIFIED_NODES = ["NEURAL_BLACKSITE", "PROJECT_OMEGA"];
+const CLASSIFIED_NODES = ["IN_PROGRESS", "IN_PROGRESS"];
 
 // ─── Colours ──────────────────────────────────────────────────────────────────
 const TEAL       = "#ffffff";
@@ -3676,8 +3771,8 @@ function useSheetLayout() {
 }
 
 // ─── Corner bracket accent ────────────────────────────────────────────────────
-function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL }: {
-  pos: "tl" | "tr" | "bl" | "br"; arm: number; inset?: number; color?: string;
+function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL, dropShadow }: {
+  pos: "tl" | "tr" | "bl" | "br"; arm: number; inset?: number; color?: string; dropShadow?: string;
 }) {
   const isLeft = pos === "tl" || pos === "bl";
   const isTop  = pos === "tl" || pos === "tr";
@@ -3685,6 +3780,7 @@ function CornerBracket({ pos, arm, inset = 6, color = BRACKET_COL }: {
     position: "absolute", width: arm, height: arm, pointerEvents: "none", zIndex: 2,
     ...(isLeft ? { left: inset } : { right: inset }),
     ...(isTop  ? { top: inset }  : { bottom: inset }),
+    ...(dropShadow ? { filter: dropShadow } : {}),
   };
   const h: React.CSSProperties = {
     position: "absolute", background: color, height: 1, width: arm,
@@ -3790,7 +3886,7 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
     <Panel arm={arm} className="brain-panel-left" style={{ padding: "20px 18px 28px", display: "flex", flexDirection: "column", ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
         <span className="brain-text" style={{ fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em", color: INK }}>
-          SYS_03 // NEURAL_ARCHIVE
+          SYS_03 // BUILD_LOG
         </span>
         <span className="brain-dot" style={{ width: 7, height: 7, background: INK, flexShrink: 0 }} />
       </div>
@@ -3808,9 +3904,9 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
         ))}
       </div>
 
-      <RuledLabel text={`CLASSIFIED NEURONS [${CLASSIFIED_NODES.length}]`} style={{ marginTop: 22 }} />
+      <RuledLabel text={`UPCOMING NEURONS [${CLASSIFIED_NODES.length}]`} style={{ marginTop: 22 }} />
       <div style={{ marginTop: 4 }}>
-        {CLASSIFIED_NODES.map((n) => <LockedRow key={n} name={n} />)}
+        {CLASSIFIED_NODES.map((n, i) => <LockedRow key={i} name={n} />)}
       </div>
     </Panel>
   );
@@ -3842,8 +3938,8 @@ function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSe
           </button>
         );
       })}
-      {CLASSIFIED_NODES.map((n) => (
-        <span key={n} style={{
+      {CLASSIFIED_NODES.map((n, i) => (
+        <span key={i} style={{
           flexShrink: 0, border: "1px solid rgba(255,255,255,0.1)", borderRadius: 3,
           padding: "8px 14px", fontFamily: MONO, fontSize: 10, letterSpacing: "0.12em",
           color: INK_LOCKED, whiteSpace: "nowrap",
@@ -3856,81 +3952,68 @@ function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSe
 }
 
 // ─── Readout pieces ───────────────────────────────────────────────────────────
-const PROGRESS_SEGMENTS = 34;
-
-// 11s fill + the 10% hold that PROGRESS_FILL_FRAC carves out of the cycle = 12222ms round trip.
-const PROGRESS_CYCLE_MS = 12222;
-// Fraction of each cycle spent filling; the remainder holds at full before snapping back to 0.
-// Mirrors the 0%/90%/100% keyframe shape — 1.8s fill, 0.2s hold.
-const PROGRESS_FILL_FRAC = 0.9;
-const SEGMENT_OFF = "rgba(255,255,255,0.1)";
-
-function SegmentedProgress({ pct }: { pct: number }) {
-  // Loops 0 -> 100 -> 0 for as long as a project is on screen. Two deliberate choices:
-  //
-  // rAF rather than CSS @keyframes, because the track is discrete spans with no animatable
-  // width, and the % readout has to land on each integer in step with the segments.
-  //
-  // Refs rather than state, because this never stops: setState per frame would re-render and
-  // reconcile 34 spans 60 times a second for the whole time the panel is open, competing with
-  // the Three.js scene. Mutating style.background directly skips React entirely.
-  const trackRef = useRef<HTMLDivElement>(null);
-  const labelRef = useRef<HTMLSpanElement>(null);
-
-  // Keyed on pct so a new project restarts the cycle from zero. The parent content div is also
-  // keyed by project.id and remounts, which restarts it too — this covers both paths.
-  useEffect(() => {
-    let raf = 0;
-    let start = 0;
-    let lastFilled = -1;
-    let lastLabel = -1;
-    const tick = (now: number) => {
-      if (!start) start = now;
-      const phase = ((now - start) % PROGRESS_CYCLE_MS) / PROGRESS_CYCLE_MS;
-      const t = Math.min(phase / PROGRESS_FILL_FRAC, 1);
-      const v = 100 * (1 - Math.pow(1 - t, 3));   // ease-out cubic
-
-      const filled = Math.round((v / 100) * PROGRESS_SEGMENTS);
-      const track = trackRef.current;
-      if (track && filled !== lastFilled) {
-        // Only the segments that actually flipped are touched, so a steady frame writes nothing.
-        const lo = Math.min(filled, lastFilled < 0 ? 0 : lastFilled);
-        const hi = Math.max(filled, lastFilled);
-        for (let i = lo; i < hi && i < track.children.length; i++) {
-          (track.children[i] as HTMLElement).style.background = i < filled ? "var(--brain-seg-on)" : "var(--brain-seg-off)";
-        }
-        lastFilled = filled;
-      }
-
-      const label = Math.round(v);
-      if (labelRef.current && label !== lastLabel) {
-        labelRef.current.textContent = `${label}%`;
-        lastLabel = label;
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [pct]);
-
+// Collapsed by default to `desc`, its last line fading out under a mask; `sections`
+// (subheading + bullets groups) reveal behind a plain-text READ MORE/SHOW LESS toggle.
+// Projects with no `sections` render as a plain line, no fade, no button.
+function ExpandableDesc({ desc, sections }: { desc: string; sections?: { heading: string; bullets: string[] }[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasSections = sections && sections.length > 0;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <div ref={trackRef} className="brain-progress-track" style={{
-        flex: 1, minWidth: 0, height: 18, boxSizing: "border-box",
-        border: "1px solid rgba(255,255,255,0.25)", borderRadius: 2,
-        display: "flex", alignItems: "center", gap: 2, padding: "0 3px",
-      }}>
-        {/* Segments flex to fill the track — at a fixed 3px they only reach part-way across
-            the panel, so a "full" bar would never actually look full. Rendered empty; the rAF
-            loop above owns their background from the first frame onward. */}
-        {Array.from({ length: PROGRESS_SEGMENTS }).map((_, i) => (
-          <span key={i} style={{
-            flex: "1 1 0", minWidth: 0, height: 10,
-            background: "var(--brain-seg-off)",
-          }} />
-        ))}
-      </div>
-      <span ref={labelRef} className="brain-pct" style={{ fontFamily: MONO, fontSize: 10, color: "#aaaaaa", whiteSpace: "nowrap" }}>0%</span>
+    <div className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: "#cccccc", lineHeight: 1.75 }}>
+      {hasSections && !expanded ? (
+        <div style={{
+          maxHeight: "4.5em", overflow: "hidden",
+          maskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",
+          WebkitMaskImage: "linear-gradient(to bottom, black 40%, transparent 100%)",
+        }}>
+          {desc}
+        </div>
+      ) : (
+        desc
+      )}
+      {hasSections && !expanded && (
+        <button
+          className="brain-readmore-btn"
+          onClick={() => setExpanded(true)}
+          style={{
+            display: "block", background: "none", border: "none", color: "#ffffff",
+            fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.12em",
+            cursor: "pointer", padding: "2px 0", opacity: 1,
+          }}
+        >
+          READ MORE ▼
+        </button>
+      )}
+      {hasSections && expanded && (
+        <>
+          {sections!.map((section, i) => (
+            <div key={i} style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 10.5, letterSpacing: "0.14em", textTransform: "uppercase", color: "#888888" }}>
+                {`— ${section.heading}`}
+              </div>
+              <ul style={{ margin: "8px 0 0", padding: 0, listStyle: "none" }}>
+                {section.bullets.map((bullet, j) => (
+                  <li key={j} style={{ display: "flex", gap: 8, marginTop: j === 0 ? 0 : 6 }}>
+                    <span style={{ flexShrink: 0, color: "#888888" }}>•</span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <button
+            className="brain-readmore-btn"
+            onClick={() => setExpanded(false)}
+            style={{
+              display: "block", background: "none", border: "none", color: "#ffffff",
+              fontFamily: MONO, fontSize: "0.6rem", letterSpacing: "0.12em",
+              cursor: "pointer", padding: "2px 0", marginTop: 16, opacity: 1,
+            }}
+          >
+            SHOW LESS ▲
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -3941,7 +4024,10 @@ function titleSize(name: string, max: number, avail: number) {
   return Math.max(14, Math.min(max, Math.floor(avail / (name.length * 0.62))));
 }
 
-function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number; maxHeight: number }) {
+function PreviewFrame({ src, link, arm, maxHeight, bracketColor = "#ffffff" }: { src: string | null; link?: string; arm: number; maxHeight: number; bracketColor?: string }) {
+  const image = src
+    ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+    : <span className="brain-nosignal" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>;
   return (
     // Height-driven rather than width-driven, so capping the height shrinks the block while
     // aspect-ratio keeps it at 16:9 (a width-driven box would just get squashed instead).
@@ -3952,13 +4038,13 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
       background: "rgba(255,255,255,0.04)",
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
-      {src
-        ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-        : <span className="brain-nosignal" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>}
-      <CornerBracket pos="tl" arm={arm} inset={4} />
-      <CornerBracket pos="tr" arm={arm} inset={4} />
-      <CornerBracket pos="bl" arm={arm} inset={4} />
-      <CornerBracket pos="br" arm={arm} inset={4} />
+      {src && link
+        ? <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "block", width: "100%", height: "100%" }}>{image}</a>
+        : image}
+      <CornerBracket pos="tl" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
+      <CornerBracket pos="tr" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
+      <CornerBracket pos="bl" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
+      <CornerBracket pos="br" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
     </div>
   );
 }
@@ -3966,14 +4052,14 @@ function PreviewFrame({ src, arm, maxHeight }: { src: string | null; arm: number
 // Shared bracket-button treatment. `compact` is the smaller BACK variant.
 // `half` makes the button an equal-width flex item so a pair fills one row; `icon` swaps the
 // text label for arbitrary content, which inherits `color` and so follows the same hover invert.
-function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel, idleColor }: {
-  href?: string; label?: string; onClick?: () => void; compact?: boolean;
-  icon?: React.ReactNode; half?: boolean; ariaLabel?: string; idleColor?: string;
+function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel, idleColor, arrowBadge }: {
+  href?: string; label?: React.ReactNode; onClick?: () => void; compact?: boolean;
+  icon?: React.ReactNode; half?: boolean; ariaLabel?: string; idleColor?: string; arrowBadge?: boolean;
 }) {
   const [hover, setHover] = useState(false);
   const style: React.CSSProperties = {
     display: "inline-flex", alignItems: "center", justifyContent: "center",
-    boxSizing: "border-box", cursor: "pointer",
+    boxSizing: "border-box", cursor: "pointer", gap: arrowBadge ? 8 : undefined,
     height: compact ? 34 : 52,
     width: compact ? "fit-content" : half ? "auto" : "100%",
     // 1 1 0 rather than 1 1 auto: a zero basis makes the pair split the row evenly regardless of
@@ -3990,7 +4076,21 @@ function BracketButton({ href, label, onClick, compact, icon, half, ariaLabel, i
     onMouseEnter: () => setHover(true),
     onMouseLeave: () => setHover(false),
   };
-  const body = icon ?? label;
+  // Matches .lets-talk-icon in the navbar: a 26px circle badge, inverted relative to the
+  // button's own resting/hover colors, that scales + rotates 45deg on hover.
+  const body = arrowBadge
+    ? (
+      <>
+        <span>{label}</span>
+        <span style={{
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          transform: hover ? "scale(1.1) rotate(45deg)" : undefined, transition: "transform 0.25s",
+        }}>
+          <ArrowUpRight size={16} strokeWidth={2.5} />
+        </span>
+      </>
+    )
+    : (icon ?? label);
   const cls = `brain-btn${hover ? " is-hover" : ""}`;
   return href
     ? <a href={href} target="_blank" rel="noreferrer" aria-label={ariaLabel} className={cls} style={style} {...handlers}>{body}</a>
@@ -4030,7 +4130,6 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
   onPrev: () => void; onNext: () => void; onBack: () => void;
   arm: number; sheet: boolean;
 }) {
-  const pct = Math.round(((position + 1) / total) * 100);
   const padX = sheet ? 24 : READOUT_PAD_X;
   const padY = sheet ? 24 : READOUT_PAD_Y;
   // Breathing room between the PREV/NEXT row and the panel's bottom border and corner brackets.
@@ -4111,46 +4210,59 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
             // `0 1 auto`, not `1`: growing absorbed all the panel's spare height and pinned the
             // PREV/NEXT footer to the bottom edge, leaving a large gap under VIEW SOURCE. Shrink
             // and minHeight:0 are kept so long descriptions still scroll inside the panel.
-            style={{ flex: "0 1 auto", minHeight: 0, overflowY: "auto" }}
+            style={{
+              flex: "0 1 auto", minHeight: 0, overflowY: "auto", paddingBottom: "16px",
+              scrollbarWidth: "none", msOverflowStyle: "none",
+            }}
           >
-            <SegmentedProgress pct={pct} />
-
             <h3 className="brain-title" style={{
-              margin: "20px 0 0", fontFamily: MONO, fontWeight: 700,
-              fontSize: titleSize(project.name, sheet ? 26 : 44, avail),
-              color: INK, letterSpacing: "0.02em", lineHeight: 1.1, whiteSpace: "nowrap",
+              margin: "4px 0 0", fontFamily: MONO, fontWeight: 700,
+              fontSize: sheet ? 26 : 44,
+              color: INK, letterSpacing: "-0.02em", wordSpacing: "normal", lineHeight: 1.1, whiteSpace: "nowrap",
             }}>
               {project.name}
             </h3>
+            <div className="brain-title-accent" style={{
+              width: 80, height: 3, background: "#ffffff", borderRadius: 999,
+              marginTop: 10, marginBottom: 10,
+              animation: "lineGrow 0.6s ease-out forwards", transformOrigin: "left center",
+            }} />
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="PREVIEW //" />
               <div style={{ marginTop: 10 }}>
-                <PreviewFrame src={project.preview} arm={sheet ? 8 : 12} maxHeight={sheet ? 170 : 150} />
+                <PreviewFrame
+                  src={project.preview}
+                  link={project.demo !== "#" ? project.demo : project.github !== "#" ? project.github : undefined}
+                  arm={sheet ? 8 : 12}
+                  maxHeight={sheet ? 204 : 180}
+                  bracketColor={project.previewBracketColor ?? "#ffffff"}
+                />
               </div>
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="DESCRIPTION:" />
-              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 12, color: "#cccccc", lineHeight: 1.75 }}>
-                {project.desc}
-              </p>
+              <ExpandableDesc desc={project.desc} sections={project.descSections} />
             </div>
 
             <div style={{ marginTop: 22 }}>
               <FieldLabel text="TECH_STACK:" />
-              <p className="brain-body" style={{ margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: "#aaaaaa", lineHeight: 1.75 }}>
+              <p className="brain-body" style={{
+                margin: "10px 0 0", fontFamily: MONO, fontSize: 11, color: "#aaaaaa", lineHeight: 1.75,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>
                 {project.tech.join(", ")}
               </p>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "row", gap: 8, marginTop: 22 }}>
-              <BracketButton href={project.demo} label="DEMO" half />
+            <div style={{ display: "flex", flexDirection: "row", gap: 8, marginTop: 22, marginBottom: "0px" }}>
+              <BracketButton href={project.demo} label="LIVE DEMO" arrowBadge half />
               <BracketButton href={project.github} icon={<GithubMark />} half ariaLabel="View source on GitHub" />
             </div>
           </motion.div>
 
-        <div style={{ paddingTop: 50, flexShrink: 0 }}>
+        <div style={{ paddingTop: "0px", marginTop: "0px", flexShrink: 0 }}>
           <div className="brain-rule" style={{ height: 1, background: RULE_SOFT }} />
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
             <NavLink label="‹ PREV" onClick={onPrev} />
@@ -4344,11 +4456,13 @@ export default function ProjectsSection() {
         .readout-body { scrollbar-width: none; -ms-overflow-style: none; }
         .readout-body::-webkit-scrollbar { display: none; }
 
-        /* Progress-bar segment colours. Declared as custom properties because the
-           rAF loop writes one string per segment 60x/sec — it stays theme-blind
-           and the cascade resolves the actual colour. */
-        :root { --brain-seg-on: #ffffff; --brain-seg-off: rgba(255,255,255,0.16); --brain-ink: #ffffff; }
-        .light { --brain-seg-on: #000000; --brain-seg-off: rgba(0,0,0,0.15); --brain-ink: #000000; }
+        @keyframes lineGrow {
+          from { transform: scaleX(0); opacity: 0; }
+          to { transform: scaleX(1); opacity: 1; }
+        }
+
+        :root { --brain-ink: #ffffff; }
+        .light { --brain-ink: #000000; }
 
         /* ── Light mode ──────────────────────────────────────────────────────
            Every colour in these panels is an inline style, so overrides need
@@ -4382,15 +4496,14 @@ export default function ProjectsSection() {
         .light .brain-bracket-arm { background: #000000 !important; }
 
         .light .brain-title    { color: #000000 !important; }
+        .light .brain-readmore-btn { color: #000000 !important; }
+        .light .brain-title-accent { background: #000000 !important; }
         .light .brain-text     { color: #000000 !important; }
         .light .brain-panel > div > .brain-text { font-weight: 600 !important; }
         .light .brain-body     { color: #111111 !important; }
         .light .brain-dim      { color: rgba(0,0,0,0.5) !important; }
         .light .brain-rule     { background: rgba(0,0,0,0.15) !important; }
-        .light .brain-pct      { color: #000000 !important; }
         .light .brain-navlink  { color: #000000 !important; }
-
-        .light .brain-progress-track { border-color: rgba(0,0,0,0.25) !important; }
 
         /* Buttons keep their hover invert: is-hover is set by the component, so
            the resting and hovered states stay distinct under !important. */

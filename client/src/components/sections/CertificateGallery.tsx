@@ -24,114 +24,87 @@ function useInView(threshold = 0.1) {
 // ── Certificate data ──────────────────────────────────────────────────────────
 const CERTS = [
   {
-    image: "",
-    title: "IOT Challenge Winner",
-    org: "GUSTO College",
-    date: "Jan 2024",
-    // Dark brown/gold gradient like screenshot card 1
+    image: "/certificates/UWE_First_Class.jpg",
+    title: "BSc(Hons) Data Science & AI — First Class Honours",
+    org: "UWE, Bristol",
+    date: "Jun 2026",
+    link: "https://drive.google.com/file/d/1LO6nVwcHJjP2jTCpdU1q3Ca8sTusnFQE/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
     tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(245,158,11,0.25)",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(148,163,184,0.25)",
     borderHover: "rgba(226,232,240,0.5)",
   },
   {
-    image: "",
-    title: "Innovation Hackathon — FixIt App",
-    org: "GUSTO College",
-    date: "Mar 2025",
-    // Dark green gradient like screenshot card 2
-    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
-    tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(52,211,153,0.25)",
-    borderHover: "rgba(226,232,240,0.5)",
-  },
-  {
-    image: "",
+    image: "/certificates/Data_Anlaysis___Machine_Learning.jpeg",
     title: "Data Analysis & Machine Learning",
     org: "Ace of Data",
-    date: "Dec 2025",
-    // Dark teal gradient like screenshot card 3
+    date: "Mar 2026",
+    link: "https://drive.google.com/file/d/1zcjNAbrZgmqS1U3VorT9p0T5z06AbbKt/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
     tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
+    dateColor: "rgba(255,255,255,0.75)",
     glowColor: "rgba(34,211,238,0.25)",
     borderHover: "rgba(226,232,240,0.5)",
   },
   {
-    image: "",
-    title: "Regen Asia Summit",
-    org: "NUS Singapore",
-    date: "Jul 2025",
-    // Dark purple gradient like screenshot card 4
+    image: "/certificates/Introduction_to_Programming_Using_Python.jpeg",
+    title: "Introduction to Programming Using Python",
+    org: "Technortal",
+    date: "May 2025",
+    link: "https://drive.google.com/file/d/1A_xik2ylkbtUj6sEwbvjzQ0aSMTNV8Iy/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
     tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(129,140,248,0.25)",
+    borderHover: "rgba(226,232,240,0.5)",
+  },
+  {
+    image: "/certificates/Introduction_to_Programming_Using_Java.jpeg",
+    title: "Introduction to Programming Using Java",
+    org: "Technortal",
+    date: "2025",
+    link: "https://drive.google.com/file/d/1v2UV60HL7O5r8G12jTIeddVzn_3Eqjz_/view?usp=sharing",
+    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
+    tabColor: "#22d3ee",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(148,163,184,0.25)",
+    borderHover: "rgba(226,232,240,0.5)",
+  },
+  {
+    image: "/certificates/Regen_Asia_Summit_2025.jpeg",
+    title: "Regen Asia Summit 2025",
+    org: "NUS, Singapore",
+    date: "Jul 2025",
+    link: "https://drive.google.com/file/d/1hLlRdwt_oNvih6r8jKHMmEWGTZa3RiyT/view?usp=sharing",
+    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
+    tabColor: "#22d3ee",
+    dateColor: "rgba(255,255,255,0.75)",
     glowColor: "rgba(167,139,250,0.25)",
     borderHover: "rgba(226,232,240,0.5)",
   },
   {
-    image: "",
-    title: "Introduction to Python",
-    org: "Technortal",
-    date: "May 2025",
-    // Dark blue/indigo gradient like screenshot card 5
+    image: "/certificates/IOT_Challenge_Winner.jpeg",
+    title: "IOT Challenge Winner",
+    org: "GUSTO University",
+    date: "Jan 2024",
+    link: "https://drive.google.com/file/d/19O31m9z_sGuEFgVxLfJeDZUIuROBT228/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
     tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(129,140,248,0.25)",
-    borderHover: "rgba(226,232,240,0.5)",
-  },
-  // ── Placeholders ──
-  // Same shape and styling as the five above, so they inherit the card, the
-  // photo placeholder and the scroll layout unchanged. Held at a neutral slate
-  // gradient rather than being given invented brand colors: the five real cards
-  // each take their gradient and glow from the issuing body, and a placeholder
-  // has no body to take one from. Fill in title/org/date/image as each is
-  // confirmed, and give it a gradient then.
-  {
-    image: "",
-    title: "CERTIF_01",
-    org: "TBC",
-    date: "2025",
-    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
-    tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(148,163,184,0.25)",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(245,158,11,0.25)",
     borderHover: "rgba(226,232,240,0.5)",
   },
   {
-    image: "",
-    title: "CERTIF_02",
-    org: "TBC",
+    image: "/certificates/IT_Challenge.jpeg",
+    title: "IT Challenge",
+    org: "GUSTO University",
     date: "2025",
+    link: "https://drive.google.com/file/d/1CnGv2U9MjH2m7WCogPE4b5HXIPgMa6-0/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
     tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(148,163,184,0.25)",
-    borderHover: "rgba(226,232,240,0.5)",
-  },
-  {
-    image: "",
-    title: "CERTIF_03",
-    org: "TBC",
-    date: "2025",
-    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
-    tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(148,163,184,0.25)",
-    borderHover: "rgba(226,232,240,0.5)",
-  },
-  {
-    image: "",
-    title: "CERTIF_04",
-    org: "TBC",
-    date: "2025",
-    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
-    tabColor: "#22d3ee",
-          dateColor: "rgba(255,255,255,0.75)",
-    glowColor: "rgba(148,163,184,0.25)",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(52,211,153,0.25)",
     borderHover: "rgba(226,232,240,0.5)",
   },
 ];
@@ -194,7 +167,10 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
   const [hovered, setHovered] = useState(false);
 
   return (
-    <div
+    <a
+      href={cert.link}
+      target="_blank"
+      rel="noopener noreferrer"
       tabIndex={0}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -226,6 +202,9 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
         cursor: "pointer",
         userSelect: "none",
         outline: "none",
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
       }}
     >
       <CertCornerBrackets />
@@ -316,7 +295,7 @@ function CertCard({ cert, index, inView }: { cert: typeof CERTS[0]; index: numbe
           {cert.date}
         </div>
       </div>
-    </div>
+    </a>
   );
 }
 

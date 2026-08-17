@@ -192,7 +192,7 @@ const Navbar = memo(function Navbar() {
                     padding: "1rem 0",
                     borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)"}`,
                     background: "none",
-                    cursor: "none",
+                    cursor: "pointer",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>

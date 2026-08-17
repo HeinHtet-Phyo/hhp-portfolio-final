@@ -7,56 +7,45 @@ import { useState, useEffect, useRef } from "react";
 // ── Data ──────────────────────────────────────────────────────────────────────
 const EXPERIENCES = [
   {
-    company: "KBZ Pay",
-    role: "Software Engineer Intern",
-    period: "Sep 2024 – Feb 2025",
-    isActive: false,
-    impact: "Built QR payment system serving 5M+ users and optimised API response time by 80%.",
-    stack: ["Java", "Spring Boot", "REST API", "MySQL", "Git", "Agile"],
-    description: [
-      "Built QR payment system serving 5M+ users across Myanmar.",
-      "Optimised API response time by 80% through query refactoring and caching strategies.",
-      "Integrated MPT Ooredoo payment gateway end-to-end.",
-      "Delivered features in Agile sprints with cross-functional teams.",
-    ],
-  },
-  {
     company: "City Mart Holding (CMHL)",
+    logo: "/work/cmhl.png",
     role: "Data Analyst Intern",
     period: "Apr 2025 – Jun 2025",
     isActive: false,
     impact: "Built Power BI dashboards cutting reporting time by 40% across 200+ branches.",
     stack: ["Power BI", "SAP HANA", "SQL", "Excel", "Python", "pandas"],
     description: [
-      "Built Power BI dashboards, cutting reporting time by 40%.",
-      "Extracted and transformed data from SAP HANA across 200+ branches.",
-      "Wrote SQL queries for business intelligence and trend analysis.",
+      "Extracted and cleaned daily sales data from SAP HANA across 200+ branches.",
+      "Built Power BI dashboards visualising sales performance and branch comparisons.",
+      "Wrote SQL queries to analyse weekly and monthly sales trends for senior management.",
     ],
   },
   {
-    company: "McDonald's Bristol",
-    role: "Customer Service Representative",
-    period: "Oct 2025 – May 2026",
+    company: "KBZ Pay",
+    logo: "/work/kbz.png",
+    role: "Software Engineer Intern",
+    period: "Sep 2024 – Feb 2025",
     isActive: false,
-    impact: "High-volume customer service in a fast-paced environment with strong team collaboration.",
-    stack: ["Communication", "Teamwork", "Customer Service", "Time Management"],
+    impact: "Built QR payment system serving 5M+ users and optimised API response time by 80%.",
+    stack: ["Java", "Spring Boot", "REST API", "MySQL", "Git", "Agile"],
     description: [
-      "High-volume customer service in a fast-paced environment.",
-      "Collaborated with team to maintain quality and speed standards.",
-      "Developed strong communication and time-management skills.",
+      "Built QR code payment flow serving 5M+ users across Myanmar.",
+      "Reduced transaction API response time from 5 seconds to 1 second through optimisation.",
+      "Integrated MPT and Ooredoo telecom APIs for mobile top-up feature end-to-end.",
     ],
   },
   {
     company: "GUSTO College Myanmar",
+    logo: "/work/gusto.jpeg",
     role: "IT Support",
     period: "Apr 2024 – Jun 2024",
     isActive: false,
     impact: "Supported 500+ students and staff with 100% issue resolution rate.",
     stack: ["IT Support", "Networking", "Hardware", "Troubleshooting"],
     description: [
-      "Supported 500+ students and staff with technical issues.",
-      "Achieved 100% issue resolution rate across all tickets.",
-      "Handled network and hardware troubleshooting independently.",
+      "Resolved hardware and software issues for 500+ students and staff with 100% resolution rate.",
+      "Provided in-person and remote technical support to non-technical users.",
+      "Maintained computer hardware and supported smooth day-to-day IT operations.",
     ],
   },
 ];
@@ -131,9 +120,9 @@ function StatCard({ label, value, delay, inView }: { label: string; value: strin
 }
 
 // ── Experience Card ───────────────────────────────────────────────────────────
-function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: number }) {
+function ExperienceCard({ exp, index, isOpen, onToggle }: { exp: typeof EXPERIENCES[0]; index: number; isOpen: boolean; onToggle: () => void }) {
   const { ref, inView } = useInView(0.1);
-  const [expanded, setExpanded] = useState(false);
+  const expanded = isOpen;
 
   return (
     <article
@@ -145,23 +134,36 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
         transition: `opacity 0.65s ease ${index * 0.1}s, transform 0.65s cubic-bezier(0.23,1,0.32,1) ${index * 0.1}s`,
       }}
     >
-      {/* Timeline dot */}
+      {/* Timeline line — full height of THIS card only. Visual continuity
+          across cards comes from simple stacking (motionfolio's actual
+          pattern), not a shared measurement system. */}
       <div style={{
         position: "absolute",
-        left: "-29px",
+        left: "15px",
+        top: 0,
+        height: "100%",
+        width: "1px",
+        background: "rgba(255,255,255,0.08)",
+      }} className="exp-line" />
+
+      {/* Timeline circle */}
+      <div style={{
+        position: "absolute",
+        left: "10px",
         top: "2rem",
         width: "11px",
         height: "11px",
         borderRadius: "50%",
-        border: expanded ? "2px solid rgba(255,255,255,0.9)" : "2px solid rgba(255,255,255,0.25)",
-        background: expanded ? "rgba(255,255,255,0.9)" : "rgba(8,8,18,0.98)",
+        border: expanded ? "1px solid #ffffff" : "1px solid rgba(255,255,255,0.25)",
+        background: expanded ? "#ffffff" : "#020008",
         transition: "border-color 0.25s, background 0.25s",
-        zIndex: 2,
-      }} className="exp-dot" />
+      }} className={`exp-dot${expanded ? " exp-dot-active" : ""}`} />
 
+      {/* Content, indented to clear the line + circle on the left */}
+      <div style={{ paddingLeft: "2rem" }}>
       {/* Card button */}
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={onToggle}
         style={{
           width: "100%",
           textAlign: "left",
@@ -244,10 +246,16 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
               color: "rgba(255,255,255,0.4)",
               display: "inline-flex",
               alignItems: "center",
-              gap: "0.35rem",
+              gap: "0.5rem",
               marginBottom: "1rem",
             }}>
-              <BuildingIcon />
+              {exp.logo && (
+                <img
+                  src={exp.logo}
+                  alt={`${exp.company} logo`}
+                  style={{ width: "1rem", height: "1rem", objectFit: "contain", borderRadius: "0", overflow: "hidden", flexShrink: 0 }}
+                />
+              )}
               {exp.company}
             </p>
 
@@ -329,7 +337,8 @@ function ExperienceCard({ exp, index }: { exp: typeof EXPERIENCES[0]; index: num
           </div>
         </div>
       </div>
-    </article>
+      </div>
+      </article>
   );
 }
 
@@ -342,6 +351,10 @@ export default function ExperienceSection() {
     return m ? Number(m[0]) : 9999;
   }));
   const orgCount = new Set(EXPERIENCES.map(e => e.company)).size;
+  // Lifted out of each card so it can be reset externally if ever needed.
+  // Accordion semantics: only one card expanded at a time (matches
+  // motionfolio's expandedIndex pattern).
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <section
@@ -421,29 +434,27 @@ export default function ExperienceSection() {
           </div>
         </div>
 
-        {/* ── RIGHT: Timeline cards ── */}
-        <div style={{ position: "relative", paddingLeft: "1.75rem" }}>
-          {/* Vertical timeline line */}
-          <div style={{
-            position: "absolute",
-            left: "0",
-            top: "2.5rem",
-            bottom: "2.5rem",
-            width: "1px",
-            background: "rgba(255,255,255,0.08)",
-          }} className="exp-line" />
-
-          {/* Cards */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        {/* ── RIGHT: Timeline cards ── matches motionfolio's actual structure:
+            no separate timeline column. Each card owns its own line+circle
+            (see ExperienceCard) and cards simply stack — that's what creates
+            the continuous-looking timeline. */}
+        <div style={{ position: "relative" }}>
+          <div style={{ position: "relative", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {EXPERIENCES.map((exp, i) => (
-              <ExperienceCard key={i} exp={exp} index={i} />
+              <ExperienceCard
+                key={i}
+                exp={exp}
+                index={i}
+                isOpen={openIndex === i}
+                onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+              />
             ))}
           </div>
 
           {/* End of timeline */}
           <div style={{
-            marginTop: "2rem",
-            paddingLeft: "0",
+            marginTop: "0.5rem",
+            paddingLeft: "36px",
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
             letterSpacing: "0.18em",
@@ -500,7 +511,8 @@ export default function ExperienceSection() {
         .light .exp-stat    { border-color: rgba(0,0,0,0.15) !important; }
 
         .light .exp-role    { color: #000000 !important; font-weight: 600 !important; }
-        .light .exp-dot     { background: #000000 !important; border-color: #000000 !important; }
+        .light .exp-dot            { background: #ffffff !important; border-color: rgba(0,0,0,0.4) !important; }
+        .light .exp-dot-active     { background: #000000 !important; border-color: #000000 !important; }
         .light .exp-line    { background: rgba(0,0,0,0.2) !important; }
 
         .light .exp-card-btn {
