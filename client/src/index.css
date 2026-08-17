@@ -581,13 +581,28 @@
   }
 }
 
-/* Mobile: smaller HEIN logo (the only other thing visible besides the hamburger). */
+/* Mobile: HEIN logo, theme toggle, and hamburger — the three elements visible
+   below lg. Bumped ~4px in height/width and ~2px in font-size from their
+   prior mobile sizes. */
 @media (max-width: 767px) {
   .navbar-logo-text {
-    font-size: 13px !important;
+    font-size: 15px !important;
   }
   .navbar-logo {
-    padding: 8px 14px !important;
+    padding: 12px 14px !important;
+    height: 44px !important;
+    margin-left: -12px;
+  }
+  .navbar-right {
+    margin-right: -12px;
+  }
+  .theme-toggle {
+    width: 44px !important;
+    height: 44px !important;
+  }
+  .hamburger-btn {
+    width: 44px !important;
+    height: 44px !important;
   }
 }
 

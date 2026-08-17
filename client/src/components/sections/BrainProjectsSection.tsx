@@ -47,7 +47,7 @@ type Project = {
   descSections?: { heading: string; bullets: string[] }[];
   tech: string[];
   github: string;
-  demo: string;
+  demo: string | null;
   preview: string | null;
   previewBracketColor?: string;
   active: boolean;
@@ -164,7 +164,7 @@ const PROJECTS: Project[] = [
     ],
     tech: ["REACT", "NEXT.JS", "TYPESCRIPT", "NHS_API", "POSTCODES_IO", "TAILWIND_CSS", "PYTHON", "OPENAI_API"],
     github: "https://github.com/HeinHtet-Phyo/preventpath-healthcare-app",
-    demo: "#",
+    demo: null,
     preview: "/previews/preventpath-preview.png",
     active: true,
   },
@@ -192,7 +192,7 @@ const PROJECTS: Project[] = [
     ],
     tech: ["PYTHON", "GUROBI", "SARIMA", "SCIKIT-LEARN", "PANDAS", "NUMPY", "MATPLOTLIB", "JUPYTER"],
     github: "https://github.com/HeinHtet-Phyo/data-chain",
-    demo: "#",
+    demo: null,
     preview: "/previews/datachain-preview.png",
     previewBracketColor: "#222222",
     // Live like the other four. `active` is the single switch behind every interaction: it
@@ -4041,10 +4041,6 @@ function PreviewFrame({ src, link, arm, maxHeight, bracketColor = "#ffffff" }: {
       {src && link
         ? <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "block", width: "100%", height: "100%" }}>{image}</a>
         : image}
-      <CornerBracket pos="tl" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
-      <CornerBracket pos="tr" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
-      <CornerBracket pos="bl" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
-      <CornerBracket pos="br" arm={arm} inset={4} color={bracketColor} dropShadow="drop-shadow(0 0 3px rgba(0,0,0,0.8))" />
     </div>
   );
 }
@@ -4233,7 +4229,7 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
               <div style={{ marginTop: 10 }}>
                 <PreviewFrame
                   src={project.preview}
-                  link={project.demo !== "#" ? project.demo : project.github !== "#" ? project.github : undefined}
+                  link={project.demo && project.demo !== "#" ? project.demo : project.github !== "#" ? project.github : undefined}
                   arm={sheet ? 8 : 12}
                   maxHeight={sheet ? 204 : 180}
                   bracketColor={project.previewBracketColor ?? "#ffffff"}
@@ -4257,8 +4253,15 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
             </div>
 
             <div style={{ display: "flex", flexDirection: "row", gap: 8, marginTop: 22, marginBottom: "0px" }}>
-              <BracketButton href={project.demo} label="LIVE DEMO" arrowBadge half />
-              <BracketButton href={project.github} icon={<GithubMark />} half ariaLabel="View source on GitHub" />
+              {project.demo && <BracketButton href={project.demo} label="LIVE DEMO" arrowBadge half />}
+              <BracketButton
+                href={project.github}
+                icon={project.demo
+                  ? <GithubMark />
+                  : <span style={{ display: "flex", alignItems: "center", gap: 8 }}><GithubMark /> GITHUB</span>}
+                half
+                ariaLabel="View source on GitHub"
+              />
             </div>
           </motion.div>
 
