@@ -184,13 +184,21 @@
   mix-blend-mode: overlay;
 }
 
-/* ── Navbar ── */
+/* ── Navbar ──
+   Tailwind's Preflight resets <button> to cursor:default, so every clickable
+   nav element needs it back explicitly. */
+.navbar button,
+.navbar a,
+.navbar [role="button"] {
+  cursor: pointer;
+}
+
 .navbar {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  padding: 20px 54px 29px;
+  padding: 21px 54px 30px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -203,7 +211,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 12px 20px;
+  padding: 12px 22px;
   border-radius: 9999px;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -268,8 +276,8 @@
      which always loses to plain author CSS regardless of source order, so a
      `display: flex` here would silently defeat `hidden` at every width. */
   align-items: center;
-  gap: 2px;
-  padding: 7px 10px;
+  gap: 14px;
+  padding: 5px 10px;
   border-radius: 9999px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -287,7 +295,7 @@
 
 .nav-item {
   position: relative;
-  padding: 0.5rem 12px;
+  padding: 0.625rem 14px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 700;
@@ -342,8 +350,8 @@
 }
 
 .theme-toggle {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 46px;
   border-radius: 9999px;
   display: flex;
   align-items: center;
@@ -351,7 +359,7 @@
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.1);
   color: rgba(255,255,255,0.7);
-  
+  cursor: pointer;
   transition: background 0.25s, border-color 0.25s, color 0.25s;
 }
 
@@ -375,7 +383,7 @@
   display: flex;
   align-items: center;
   gap: 0.625rem;
-  padding: 12px 16px;
+  padding: 12px 18px;
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 700;
@@ -384,7 +392,7 @@
   background: white;
   color: black;
   border: none;
-  
+  cursor: pointer;
   transition: background 0.25s, box-shadow 0.25s;
   text-decoration: none;
 }

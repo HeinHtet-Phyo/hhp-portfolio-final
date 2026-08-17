@@ -23,14 +23,14 @@ const SKILLS: Record<string, { name: string; icon: string }[]> = {
   ],
   "ML & AI": [
     { name: "Machine Learning", icon: `${DEVICON}/pytorch/pytorch-original.svg` },
-    { name: "Deep Learning", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
+    { name: "Deep Learning", icon: `${DEVICON}/pytorch/pytorch-original.svg` },
     { name: "Neural Networks", icon: `${DEVICON}/keras/keras-original.svg` },
     { name: "NLP", icon: `${DEVICON}/python/python-original.svg` },
     { name: "Predictive Modelling", icon: `${DEVICON}/scikitlearn/scikitlearn-original.svg` },
     { name: "Feature Engineering", icon: `${DEVICON}/numpy/numpy-original.svg` },
     { name: "Data Cleaning", icon: `${DEVICON}/pandas/pandas-original.svg` },
     { name: "Statistical Analysis", icon: `${DEVICON}/r/r-original.svg` },
-    { name: "Recommendation Systems", icon: `${DEVICON}/tensorflow/tensorflow-original.svg` },
+    { name: "Recommendation Systems", icon: `${DEVICON}/python/python-original.svg` },
     { name: "End-to-End ML Pipelines", icon: `${DEVICON}/apacheairflow/apacheairflow-original.svg` },
   ],
   "TOOLS & LIBRARIES": [
