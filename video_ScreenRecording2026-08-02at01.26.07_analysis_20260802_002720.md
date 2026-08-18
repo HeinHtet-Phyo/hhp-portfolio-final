@@ -1,4 +1,4 @@
-Based on the video frames provided, here is a detailed analysis of the certificate section of the portfolio website.
+ruBased on the video frames provided, here is a detailed analysis of the certificate section of the portfolio website.
 
 ### **1. Appearance and Layout**
 *   **Theme:** The section uses a dark mode aesthetic with a black or very dark gray background.

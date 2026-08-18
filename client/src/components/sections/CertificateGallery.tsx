@@ -36,6 +36,18 @@ const CERTS = [
     borderHover: "rgba(226,232,240,0.5)",
   },
   {
+    image: "/certificates/hnd-transcript.jpg",
+    title: "HND in Computing — Distinction",
+    org: "GUSTO College",
+    date: "Oct 2024",
+    link: "https://drive.google.com/file/d/1eULcy32g5-RackmlxJjio13CJ-9f1HiT/view?usp=sharing",
+    gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
+    tabColor: "#22d3ee",
+    dateColor: "rgba(255,255,255,0.75)",
+    glowColor: "rgba(148,163,184,0.25)",
+    borderHover: "rgba(226,232,240,0.5)",
+  },
+  {
     image: "/certificates/Data_Anlaysis___Machine_Learning.jpeg",
     title: "Data Analysis & Machine Learning",
     org: "Ace of Data",
@@ -86,7 +98,7 @@ const CERTS = [
   {
     image: "/certificates/IOT_Challenge_Winner.jpeg",
     title: "IOT Challenge Winner",
-    org: "GUSTO University",
+    org: "GUSTO College",
     date: "Jan 2024",
     link: "https://drive.google.com/file/d/19O31m9z_sGuEFgVxLfJeDZUIuROBT228/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",
@@ -98,7 +110,7 @@ const CERTS = [
   {
     image: "/certificates/IT_Challenge.jpeg",
     title: "IT Challenge",
-    org: "GUSTO University",
+    org: "GUSTO College",
     date: "2025",
     link: "https://drive.google.com/file/d/1CnGv2U9MjH2m7WCogPE4b5HXIPgMa6-0/view?usp=sharing",
     gradient: "linear-gradient(160deg, #14161c 0%, #0c0e12 60%, #06070a 100%)",

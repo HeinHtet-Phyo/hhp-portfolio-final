@@ -50,6 +50,7 @@ type Project = {
   demo: string | null;
   preview: string | null;
   previewBracketColor?: string;
+  awards?: string;
   active: boolean;
 };
 
@@ -143,7 +144,7 @@ const PROJECTS: Project[] = [
   {
     id: 3,
     name: "PREVENTPATH",
-    desc: "NHS-integrated health risk platform generating personalised prevention plans from patient biometrics, postcode data, and wearable inputs. Connects to NHS login, smartwatches, and uploaded records to score cardiovascular, metabolic, and lifestyle risks in real time.",
+    desc: "🏆 2nd Place Winner — VibeHack London Hackathon at UCL. NHS-integrated health risk platform generating personalised prevention plans from patient biometrics, postcode data, and wearable inputs. Connects to NHS login, smartwatches, and uploaded records to score cardiovascular, metabolic, and lifestyle risks in real time.",
     descSections: [
       {
         heading: "KEY FEATURES",
@@ -166,6 +167,7 @@ const PROJECTS: Project[] = [
     github: "https://github.com/HeinHtet-Phyo/preventpath-healthcare-app",
     demo: null,
     preview: "/previews/preventpath-preview.png",
+    awards: "🏆 2nd Place & 3rd Place Winner — VibeHack London 2026",
     active: true,
   },
   {
@@ -4211,13 +4213,29 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
               scrollbarWidth: "none", msOverflowStyle: "none",
             }}
           >
-            <h3 className="brain-title" style={{
-              margin: "4px 0 0", fontFamily: MONO, fontWeight: 700,
-              fontSize: sheet ? 26 : 44,
-              color: INK, letterSpacing: "-0.02em", wordSpacing: "normal", lineHeight: 1.1, whiteSpace: "nowrap",
-            }}>
-              {project.name}
-            </h3>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+              <h3 className="brain-title" style={{
+                margin: "4px 0 0", fontFamily: MONO, fontWeight: 700,
+                fontSize: sheet ? 26 : 44,
+                color: INK, letterSpacing: "-0.02em", wordSpacing: "normal", lineHeight: 1.1, whiteSpace: "nowrap",
+              }}>
+                {project.name}
+              </h3>
+
+              {project.awards && (
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 3,
+                  padding: "1px 4px", marginBottom: 8,
+                  background: "transparent", border: "1px solid #FFD700",
+                  borderRadius: 4, color: "#FFD700", fontFamily: MONO,
+                  fontSize: 8, textTransform: "uppercase", letterSpacing: "0.12em",
+                  width: "fit-content", flexShrink: 0,
+                }}>
+                  <span aria-hidden="true" style={{ fontSize: 8 }}>🏆</span>
+                  <span>2ND PLACE WINNER</span>
+                </div>
+              )}
+            </div>
             <div className="brain-title-accent" style={{
               width: 80, height: 3, background: "#ffffff", borderRadius: 999,
               marginTop: 10, marginBottom: 10,
