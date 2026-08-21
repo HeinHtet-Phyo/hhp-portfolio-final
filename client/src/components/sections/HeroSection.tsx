@@ -147,7 +147,7 @@ function TerminalWindow({ isDark, revealed, animated }: { isDark: boolean; revea
 
   return (
     <motion.div
-      className="hero-terminal-card"
+      className="hero-terminal-card w-full px-0"
       initial={{ opacity: 0, x: 40, y: 20 }}
       animate={revealed ? { opacity: 1, x: 0, y: 0 } : {}}
       transition={{ duration: 0.9, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
