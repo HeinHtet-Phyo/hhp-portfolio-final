@@ -85,11 +85,8 @@ export default function FooterSection() {
         // 8vw matches ContactSection above (and Hero/Education), so the footer's
         // content edges line up with the rest of the page rather than sitting on
         // their own margin.
-        padding: "38px 8vw",
-        // Floor, not a fixed height: the row is 28px + content + 28px, so this
-        // only takes effect if the content is shorter than 24px. Keeps the bar
-        // from collapsing while still growing when the columns stack on mobile.
-        minHeight: "80px",
+        paddingLeft: "8vw",
+        paddingRight: "8vw",
         display: "grid",
         gridTemplateColumns: "1fr 1fr 1fr",
         alignItems: "center",
@@ -97,7 +94,7 @@ export default function FooterSection() {
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: "13px",
       }}
-      className="footer-section"
+      className="footer-section py-2 md:py-5 lg:py-5"
     >
       {/* ── Left: name — styled as a pill matching the navbar logo (.navbar-logo
           in index.css: translucent glass pill, not a solid-fill badge). */}
@@ -160,17 +157,16 @@ export default function FooterSection() {
             grid-template-columns: 1fr !important;
             justify-items: center !important;
             gap: 1rem !important;
-            padding: 24px 8vw !important;
+            padding-left: 8vw !important;
+            padding-right: 8vw !important;
           }
           .footer-section > * {
             justify-self: center !important;
             text-align: center !important;
           }
-          /* HEIN stays left-aligned with "LET'S CONNECT" above, unlike the
-             other two rows which stay centered in the mobile stack. */
           .footer-name {
-            justify-self: start !important;
-            text-align: left !important;
+            justify-self: center !important;
+            text-align: center !important;
           }
         }
       `}</style>
