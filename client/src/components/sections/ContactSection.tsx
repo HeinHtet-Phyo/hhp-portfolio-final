@@ -302,7 +302,7 @@ export default function ContactSection() {
         </div>
 
         {/* ── RIGHT: NETWORKS ── */}
-        <div className="ct-networks-column overflow-hidden pr-1 md:pr-0">
+        <div className="ct-networks-column overflow-hidden">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
@@ -447,7 +447,7 @@ export default function ContactSection() {
           }
           .contact-sitemap-networks {
             display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
+            grid-template-columns: 1fr 2fr !important;
             gap: 2rem !important;
             margin-top: 3rem !important;
           }
