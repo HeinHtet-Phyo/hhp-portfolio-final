@@ -197,7 +197,7 @@ export default function ContactSection() {
         padding: "56px 8vw 120px 8vw", position: "relative", zIndex: 1, borderBottom: "1px solid rgba(255,255,255,0.08)",
       }}
     >
-    <div className="reveal">
+    <div className="reveal px-4 md:px-0">
       {/* Top label */}
       <div style={{
         display: "flex",
