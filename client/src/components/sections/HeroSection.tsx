@@ -497,8 +497,8 @@ export default function HeroSection() {
           .hero-terminal-card {
             width: 100% !important;
             max-width: 100% !important;
-            margin-left: 1rem !important;
-            margin-right: 1rem !important;
+            margin-left: 0 !important;
+            margin-right: 0 !important;
             margin-top: 2.5rem !important;
             box-sizing: border-box !important;
           }
