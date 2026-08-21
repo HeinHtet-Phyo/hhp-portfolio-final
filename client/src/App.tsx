@@ -1,4 +1,5 @@
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -24,6 +25,7 @@ export default function App() {
           <Toaster />
           <Router />
           <Analytics />
+          <SpeedInsights />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
