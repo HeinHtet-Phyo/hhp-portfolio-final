@@ -302,7 +302,7 @@ export default function ContactSection() {
         </div>
 
         {/* ── RIGHT: NETWORKS ── */}
-        <div className="ct-networks-column overflow-hidden pr-11 md:pr-0">
+        <div className="ct-networks-column overflow-hidden pr-3 md:pr-0">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
