@@ -447,7 +447,7 @@ export default function ContactSection() {
           }
           .contact-sitemap-networks {
             display: grid !important;
-            grid-template-columns: 1fr 1.8fr !important;
+            grid-template-columns: 1fr 1.4fr !important;
             gap: 2rem !important;
             margin-top: 3rem !important;
           }
