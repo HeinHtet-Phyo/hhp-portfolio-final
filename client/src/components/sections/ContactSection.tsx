@@ -334,7 +334,7 @@ export default function ContactSection() {
             <NetworkBtn
               icon={<Instagram size={20} />}
               label="Instagram"
-              href="https://www.instagram.com/heinhtetphyo"
+              href="https://www.instagram.com/hein__htetphyo/"
               delay={0.29}
               inView={inView}
             />
