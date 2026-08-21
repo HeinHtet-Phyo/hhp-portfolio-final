@@ -276,7 +276,7 @@ export default function ContactSection() {
             while staying `display:contents` on desktop — invisible to the box
             tree there, so the two divs below still land directly in
             .contact-grid's 1.4fr/0.7fr/0.85fr columns exactly as before. */}
-        <div className="contact-sitemap-networks px-0 md:px-0">
+        <div className="contact-sitemap-networks">
         {/* ── MIDDLE: SITEMAP ── */}
         <div className="ct-sitemap-column">
           <div style={{
@@ -302,7 +302,7 @@ export default function ContactSection() {
         </div>
 
         {/* ── RIGHT: NETWORKS ── */}
-        <div className="ct-networks-column overflow-hidden pl-0 pr-9 md:pr-0">
+        <div className="ct-networks-column overflow-hidden">
           <div style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: "0.62rem",
