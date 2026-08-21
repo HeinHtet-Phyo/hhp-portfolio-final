@@ -188,7 +188,7 @@ function TerminalWindow({ isDark, revealed, animated }: { isDark: boolean; revea
 
       {/* Code content */}
       <div className="hero-terminal-code" style={{
-        padding: "22px 28px 26px",
+        padding: "30px 28px 34px",
         fontFamily: "'JetBrains Mono', monospace",
         fontSize: "clamp(0.65rem, 1.15vw, 0.77rem)",
         lineHeight: 1.7,
