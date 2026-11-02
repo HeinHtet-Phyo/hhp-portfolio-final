@@ -51,6 +51,12 @@ type Project = {
   preview: string | null;
   previewBracketColor?: string;
   awards?: string;
+  // Gold badge beside the title. `icon` is the leading emoji, `text` the uppercase label.
+  badge?: { icon: string; text: string };
+  // Label for the demo button when the link is not a live app (e.g. a video).
+  demoLabel?: string;
+  // Small dim credit line under the tech stack (team members, original repo).
+  credit?: { text: string; href?: string };
   active: boolean;
 };
 
@@ -168,6 +174,7 @@ const PROJECTS: Project[] = [
     demo: null,
     preview: "/previews/preventpath-preview.png",
     awards: "🏆 2nd Place & 3rd Place Winner — VibeHack London 2026",
+    badge: { icon: "🏆", text: "2ND PLACE WINNER" },
     active: true,
   },
   {
@@ -204,10 +211,107 @@ const PROJECTS: Project[] = [
     // all of those at once. Genuinely locked entries are CLASSIFIED_NODES, a separate list.
     active: true,
   },
+  {
+    id: 5,
+    name: "L_PLATE",
+    desc: "🥇 1st Place Winner, Noetic × Nebius Open-Models Hackathon at Imperial College London (24 Oct 2026). Practise driving on real UK streets from your sofa, with an AI driving instructor in the passenger seat. Scan a QR code and your phone becomes the steering wheel; drive a real DVSA-style test route rebuilt in 3D from OpenStreetMap, then get a mock-test debrief from an AI examiner.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "Phone-as-steering-wheel: QR pairing, tilt to steer, on-screen pedals over a WebSocket relay",
+          "Real UK test routes rebuilt in 3D from OpenStreetMap: junctions, traffic lights, zebra crossings, traffic and weather",
+          "AI instructor \"Sam\" (Qwen3-30B on Nebius Token Factory) gives sat-nav directions and live feedback",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "Won 1st place at the Imperial College London hackathon, built in one day by a team of 5",
+          "Examiner model (Qwen3-235B, strict JSON) writes a PASS/FAIL debrief with driving, serious and dangerous faults",
+          "Advice is grounded in real Highway Code rules retrieved with Qwen3 embeddings (RAG)",
+        ],
+      },
+    ],
+    tech: ["REACT", "TYPESCRIPT", "THREE.JS", "REACT_THREE_FIBER", "VITE", "FASTIFY", "WEBSOCKETS", "NEBIUS_TOKEN_FACTORY", "QWEN3", "OPENSTREETMAP", "OSRM"],
+    github: "https://github.com/HeinHtet-Phyo/l-plate",
+    demo: null,
+    preview: "/previews/lplate-preview.webp",
+    awards: "🥇 1st Place Winner — Noetic × Nebius Open-Models Hackathon, Imperial College London 2026",
+    badge: { icon: "🥇", text: "1ST PLACE WINNER" },
+    credit: { text: "Team project with Christopher White, Min Thant Kyaw, Aryaan Haque, Jai Matharu" },
+    active: true,
+  },
+  {
+    id: 6,
+    name: "VANPACK_3D",
+    desc: "🏆 Top 5 of 40 teams, built solo at Halloween at Imperial: Gemini Edition (Google DeepMind × Imperial College London, 31 Oct 2026). Which van do you need, and what will it really cost? Snap photos of your stuff, Gemini 4 Argon measures every item, and deterministic code proves what fits and prices the whole move, shown loading into a realistic 3D van.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "Gemini 4 Argon vision detects items in photos with bounding boxes, sizes, weights and confidence",
+          "3D bin-packing engine tests 10 UK vans, with a 6-check verifier (bounds, overlaps, ≥70% support, payload, fragile, completeness)",
+          "Cost engine: postcodes.io distance, fuel, hire, congestion charge, stairs and labour, all calculated in code",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "Top 5 of 40 teams as a solo builder at a Google DeepMind hackathon",
+          "\"Gemini proposes · You confirm · Code proves\": the AI never guesses numbers; even Gemini's summary is number-checked in code",
+          "Shows when a cheaper-per-day van costs more overall because it needs extra trips",
+        ],
+      },
+    ],
+    tech: ["REACT", "TYPESCRIPT", "THREE.JS", "VITE", "EXPRESS", "GEMINI_4_ARGON", "NANO_BANANA", "GEMINI_TTS", "GOOGLE_AI_STUDIO", "POSTCODES_IO"],
+    github: "https://github.com/HeinHtet-Phyo/vanpack-3d-gemini",
+    demo: "https://youtu.be/1lzJhFKEswg",
+    demoLabel: "DEMO VIDEO",
+    preview: "/previews/vanpack-preview.webp",
+    awards: "🏆 Top 5 of 40 teams (solo) — Halloween at Imperial: Gemini Edition 2026",
+    badge: { icon: "🏆", text: "TOP 5 / 40 TEAMS · SOLO" },
+    active: true,
+  },
+  {
+    id: 7,
+    name: "PROOFBOX",
+    desc: "Built at the Real-Time Video Agents Hack London (VAST Builders Challenge, 17 Oct 2026). Per-item packing proof for B2B fulfilment: an overhead camera records each packing station, QR codes link the footage to orders, and sellers can ask \"was item X packed?\" and get a video-clip verdict to win e-commerce disputes.",
+    descSections: [
+      {
+        heading: "KEY FEATURES",
+        bullets: [
+          "Live packing station: QR code scanning + YOLO object detection on the camera feed",
+          "NVIDIA Cosmos video understanding to verify each packed item",
+          "Inspector agent panel: query an order and get the exact video clip as evidence",
+        ],
+      },
+      {
+        heading: "OUTCOME & IMPACT",
+        bullets: [
+          "Turns packing footage into searchable, per-item proof for dispute claims",
+          "Built end to end in one day by a team of 4 with a physical QR code machine",
+          "I built the React frontend (packing station UI and inspector panel)",
+        ],
+      },
+    ],
+    tech: ["REACT", "TYPESCRIPT", "VITE", "PYTHON", "YOLO", "NVIDIA_COSMOS", "VAST_DATA", "WEIGHTS_&_BIASES"],
+    github: "https://github.com/HeinHtet-Phyo/proofbox",
+    demo: null,
+    preview: "/previews/proofbox-preview.webp",
+    credit: { text: "Original team repo: github.com/lmarkmann/proofbox", href: "https://github.com/lmarkmann/proofbox" },
+    active: true,
+  },
 ];
 
-// The four navigable projects. Node index shows all five; only these cycle.
-const ACTIVE_PROJECTS = PROJECTS.filter((p) => p.active);
+// PROJECTS stays in id order: id doubles as the index into PROJECTS, PROJECT_NODES and
+// PROJECT_HOTSPOTS. Display order (original five, then the new three) lives here instead, and drives the
+// build log, the mobile chip row and PREV/NEXT.
+const DISPLAY_ORDER = [0, 1, 2, 3, 4, 7, 5, 6];
+const DISPLAY_PROJECTS = DISPLAY_ORDER.map((id) => PROJECTS[id]);
+
+// The navigable projects, in display order.
+const ACTIVE_PROJECTS = DISPLAY_PROJECTS.filter((p) => p.active);
 
 // ─── Classified nodes (inert index rows) ──────────────────────────────────────
 const CLASSIFIED_NODES = ["IN_PROGRESS", "IN_PROGRESS"];
@@ -217,6 +321,8 @@ const TEAL       = "#ffffff";
 const TEAL_DIM   = "#aaaaaa";
 const TEAL_GLOW  = "#e0e0e0";
 const BG         = "transparent";
+// Award gold: the same #FFD700 as the winner badge on the detail panel.
+const GOLD       = "#FFD700";
 
 // ─── Brain Model (teal, horizontal side-profile) ──────────────────────────────
 // Project node config — percentages from the mesh's ACTUAL bounding-box centre toward its
@@ -229,6 +335,9 @@ const PROJECT_NODES: { name: string; region: string; pct: [number, number, numbe
   { name: "CityPulse",         region: "back, lower",                pct: [ 0.00, -0.20, -1.80] },
   { name: "PreventPath",       region: "left, lower",                pct: [-1.40, -0.30,  0.05] },
   { name: "PROJECT_05",        region: "lower right inner surface",  pct: [ 1.40, -0.30,  0.15] },
+  { name: "L_PLATE",           region: "upper left, rear",           pct: [-1.00,  0.85, -1.00] },
+  { name: "VANPACK_3D",        region: "upper right, rear",          pct: [ 1.00,  0.85, -1.00] },
+  { name: "PROOFBOX",          region: "front, lower, inset",        pct: [-0.20, -0.25,  1.25] },
 ];
 // Populated at runtime by computeProjectPositions() once the brain GLB has actually loaded —
 // starts as the raw percentage guess (harmless placeholder for the one frame before the real
@@ -390,19 +499,17 @@ function computeProjectPositions(meshes: THREE.Mesh[]): [number, number, number]
   return positions.map((p) => [p.x, p.y, p.z] as [number, number, number]);
 }
 
-// ─── Gold circuit connecting the 5 project nodes ─────────────────────────────
+// ─── Gold circuit connecting the project nodes ───────────────────────────────
 // Complete graph — every node connects straight through the interior to every other node
-// (10 unique pairs from 5 nodes), the intentional cross-brain diagonals forming a spanning
+// (n*(n-1)/2 unique pairs), the intentional cross-brain diagonals forming a spanning
 // circuit. Thicker than the ambient network's 0.0025 threads, warm gold, so it reads as its
 // own distinct layer against the white ambient web.
 function GoldCircuit() {
   const geo = useMemo(() => {
-    const pairs: [number, number][] = [
-      [0, 1], [0, 2], [0, 3], [0, 4],
-      [1, 2], [1, 3], [1, 4],
-      [2, 3], [2, 4],
-      [3, 4],
-    ];
+    const pairs: [number, number][] = [];
+    for (let a = 0; a < PROJECT_HOTSPOTS.length; a++) {
+      for (let b = a + 1; b < PROJECT_HOTSPOTS.length; b++) pairs.push([a, b]);
+    }
     const tubes = pairs.map(([a, b]) => {
       const A = new THREE.Vector3(...PROJECT_HOTSPOTS[a]);
       const B = new THREE.Vector3(...PROJECT_HOTSPOTS[b]);
@@ -977,6 +1084,7 @@ const BOTTOM_REGION_ELEV_DEG: Record<number, number> = {
   2: -14,   // CityPulse   — back  (pct z = -1.80)
   3:  -6,   // PreventPath — left  (pct x = -1.40)
   4:  -6,   // PROJECT_05  — right (pct x = +1.40)
+  7:  -6,   // ProofBox    — front, lower (pct y = -0.25)
 };
 // Pedestal accent glow and bloom both fade to this fraction while a bottom project is framed,
 // and restore on BACK or on switching to a non-bottom project.
@@ -2563,9 +2671,9 @@ function BrainModel({ selected, onHotspotSelect, onHotspotHover, light }: {
               correctly. Added on top of the existing brain material + fresnel rim, neither of
               which is modified here. */}
           <NeuralDots meshes={brainMeshes} light={light} />
-          {/* Gold circuit linking all 5 project nodes through the interior. */}
+          {/* Gold circuit linking all project nodes through the interior. */}
           <GoldCircuit />
-          {/* The 5 project markers — gold glowing focal points scattered across the brain's
+          {/* The project markers — gold glowing focal points scattered across the brain's
               interior regions (see PROJECT_NODES config). */}
           {PROJECT_HOTSPOTS.map((pos, i) => (
             <HotspotDot
@@ -3834,10 +3942,11 @@ function FieldLabel({ text }: { text: string }) {
 }
 
 // ─── Node index rows ──────────────────────────────────────────────────────────
-function NodeRow({ name, active, onSelect }: { name: string; active: boolean; onSelect?: () => void }) {
+function NodeRow({ name, active, gold, onSelect }: { name: string; active: boolean; gold?: boolean; onSelect?: () => void }) {
   const [hover, setHover] = useState(false);
   const inert = !onSelect;
   const lit = hover && !inert;
+  if (gold) return <GoldNodeRow name={name} active={active} lit={lit} inert={inert} onSelect={onSelect} setHover={setHover} />;
   return (
     <div
       onClick={onSelect}
@@ -3857,6 +3966,39 @@ function NodeRow({ name, active, onSelect }: { name: string; active: boolean; on
         transition: "color 0.15s ease",
       }}>
         {name}
+      </span>
+    </div>
+  );
+}
+
+// Award winners (projects with a `badge`): same row, in the badge's gold. Idle is a slightly
+// muted gold so the active/hover state still reads as a step up, with a faint glow on top.
+function GoldNodeRow({ name, active, lit, inert, onSelect, setHover }: {
+  name: string; active: boolean; lit: boolean; inert: boolean; onSelect?: () => void; setHover: (h: boolean) => void;
+}) {
+  const on = active || lit;
+  return (
+    <div
+      onClick={onSelect}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{ height: 30, display: "flex", alignItems: "center", gap: 14, cursor: inert ? "default" : "pointer" }}
+    >
+      <span className="brain-checkbox brain-gold-box" style={{
+        width: 11, height: 11, flexShrink: 0, boxSizing: "border-box",
+        background: active ? GOLD : "transparent",
+        border: active ? "none" : `1px solid ${lit ? GOLD : "rgba(255,215,0,0.55)"}`,
+        boxShadow: on ? "0 0 6px rgba(255,215,0,0.35)" : "none",
+        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+      }} />
+      <span className="brain-text brain-gold" style={{
+        fontFamily: MONO, fontSize: 11, letterSpacing: "0.1em",
+        color: on ? GOLD : "rgba(255,215,0,0.78)",
+        textShadow: on ? "0 0 8px rgba(255,215,0,0.35)" : "none",
+        transition: "color 0.15s ease, text-shadow 0.15s ease",
+      }}>
+        {name}
+        <span aria-hidden="true" style={{ marginLeft: 8, fontSize: 9 }}>★</span>
       </span>
     </div>
   );
@@ -3896,11 +4038,12 @@ function NodeIndexPanel({ selectedId, onSelect, arm, style }: {
 
       <RuledLabel text={`ACTIVE NEURONS [${ACTIVE_PROJECTS.length}/${PROJECTS.length}]`} style={{ marginTop: 20 }} />
       <div style={{ marginTop: 4 }}>
-        {PROJECTS.map((p) => (
+        {DISPLAY_PROJECTS.map((p) => (
           <NodeRow
             key={p.id}
             name={p.name}
             active={p.id === selectedId}
+            gold={!!p.badge}
             onSelect={p.active ? () => onSelect(p.id) : undefined}
           />
         ))}
@@ -3921,7 +4064,7 @@ function NodeChipRow({ selectedId, onSelect }: { selectedId: number | null; onSe
       display: "flex", gap: 8, overflowX: "auto", padding: "0 16px 2px",
       WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
     }}>
-      {PROJECTS.filter((p) => p.active).map((p) => {
+      {ACTIVE_PROJECTS.map((p) => {
         const on = p.id === selectedId;
         return (
           <button
@@ -4027,8 +4170,13 @@ function titleSize(name: string, max: number, avail: number) {
 }
 
 function PreviewFrame({ src, link, arm, maxHeight, bracketColor = "#ffffff" }: { src: string | null; link?: string; arm: number; maxHeight: number; bracketColor?: string }) {
+  // A screenshot path that does not exist yet (or fails to decode) falls back to the same
+  // NO_SIGNAL placeholder as a null src, rather than a broken-image icon.
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (failed) src = null;
   const image = src
-    ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
+    ? <img src={src} alt="" onError={() => setFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", display: "block" }} />
     : <span className="brain-nosignal" style={{ fontFamily: MONO, fontSize: 10, letterSpacing: "0.2em", color: INK_LOCKED }}>NO_SIGNAL</span>;
   return (
     // Height-driven rather than width-driven, so capping the height shrinks the block while
@@ -4213,26 +4361,31 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
               scrollbarWidth: "none", msOverflowStyle: "none",
             }}
           >
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+            {/* flex-wrap: on narrow screens the badge drops under the title instead of being
+                pushed off the panel's right edge and clipped. */}
+            {/* containerType lets the title size against this row's width (cqi): a long name
+                shrinks to fit a narrow panel instead of running off its right edge. 0.62em per
+                character, as in titleSize(). Wide panels still get the full 44px. */}
+            <div style={{ display: "flex", alignItems: "flex-end", flexWrap: "wrap", columnGap: 16, rowGap: 6, containerType: "inline-size" }}>
               <h3 className="brain-title" style={{
                 margin: "4px 0 0", fontFamily: MONO, fontWeight: 700,
-                fontSize: sheet ? 26 : 44,
+                fontSize: `min(${sheet ? 26 : 44}px, calc(100cqi / ${(project.name.length * 0.62).toFixed(2)}))`,
                 color: INK, letterSpacing: "-0.02em", wordSpacing: "normal", lineHeight: 1.1, whiteSpace: "nowrap",
               }}>
                 {project.name}
               </h3>
 
-              {project.awards && (
-                <div style={{
+              {project.badge && (
+                <div title={project.awards} style={{
                   display: "inline-flex", alignItems: "center", gap: 3,
                   padding: "1px 4px", marginBottom: 8,
                   background: "transparent", border: "1px solid #FFD700",
                   borderRadius: 4, color: "#FFD700", fontFamily: MONO,
                   fontSize: 8, textTransform: "uppercase", letterSpacing: "0.12em",
-                  width: "fit-content", flexShrink: 0,
+                  width: "fit-content", maxWidth: "100%", minWidth: 0, whiteSpace: "normal",
                 }}>
-                  <span aria-hidden="true" style={{ fontSize: 8 }}>🏆</span>
-                  <span>2ND PLACE WINNER</span>
+                  <span aria-hidden="true" style={{ fontSize: 8 }}>{project.badge.icon}</span>
+                  <span>{project.badge.text}</span>
                 </div>
               )}
             </div>
@@ -4268,10 +4421,20 @@ function ReadoutPanel({ project, position, total, onPrev, onNext, onBack, arm, s
               }}>
                 {project.tech.join(", ")}
               </p>
+              {project.credit && (
+                <p className="brain-dim" style={{
+                  margin: "6px 0 0", fontFamily: MONO, fontSize: 9.5, letterSpacing: "0.04em",
+                  color: INK_DIM, lineHeight: 1.6,
+                }}>
+                  {project.credit.href
+                    ? <a href={project.credit.href} target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}>{project.credit.text}</a>
+                    : project.credit.text}
+                </p>
+              )}
             </div>
 
             <div style={{ display: "flex", flexDirection: "row", gap: 8, marginTop: 22, marginBottom: "0px" }}>
-              {project.demo && <BracketButton href={project.demo} label="LIVE DEMO" arrowBadge half />}
+              {project.demo && <BracketButton href={project.demo} label={project.demoLabel ?? "LIVE DEMO"} arrowBadge half />}
               <BracketButton
                 href={project.github}
                 icon={project.demo
@@ -4547,6 +4710,9 @@ export default function ProjectsSection() {
         /* Colour only — never border-width. Tailwind preflight leaves every side
            "solid" at width 0, so a width here would fill the box in. */
         .light .brain-checkbox { border-color: rgba(0,0,0,0.5) !important; }
+        /* Award-winner rows: a darker gold, since #FFD700 is unreadable on white. */
+        .light .brain-text.brain-gold { color: #a67c00 !important; text-shadow: none !important; }
+        .light .brain-checkbox.brain-gold-box { border-color: #a67c00 !important; box-shadow: none !important; }
 
         /* Hover label. Corners set only two borders each (inline), so the rule
            touches border-color alone — a width here would fill them into squares. */
